@@ -199,14 +199,14 @@ clib_mem_vm_ext_alloc (clib_mem_vm_alloc_t * a)
 	goto error;
 
     }
-
+#if 0
   if (fd != -1)
     if ((ftruncate (fd, (u64) n_pages * (1 << log2_page_size))) == -1)
       {
 	err = clib_error_return_unix (0, "ftruncate");
 	goto error;
       }
-
+#endif
   if (old_mpol != -1)
     {
       int rv;
