@@ -1306,6 +1306,39 @@ static void vl_api_show_version_reply_t_handler_json
   vam->result_ready = 1;
 }
 
+static void vl_api_do_vpp_cmd_reply_t_handler
+  (vl_api_do_vpp_cmd_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  i32 retval = ntohl (mp->retval);
+
+  if (retval >= 0) {
+	  errmsg ("         output: %s", mp->output);
+  } else {
+	  errmsg ("         execute failed: %d", mp->retval);
+  }
+	
+  vam->retval = retval;
+  vam->result_ready = 1;
+}
+
+static void vl_api_do_vpp_cmd_reply_t_handler_json
+  (vl_api_do_vpp_cmd_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  vat_json_node_t node;
+
+  vat_json_init_object (&node);
+  vat_json_object_add_int (&node, "retval", ntohl (mp->retval));
+  vat_json_object_add_string_copy (&node, "output", mp->output);
+
+  vat_json_print (vam->ofp, &node);
+  vat_json_free (&node);
+
+  vam->retval = ntohl (mp->retval);
+  vam->result_ready = 1;
+}
+
 static void
 vl_api_ip4_arp_event_t_handler (vl_api_ip4_arp_event_t * mp)
 {
@@ -5721,6 +5754,8 @@ _(SESSION_RULE_ADD_DEL_REPLY, session_rule_add_del_reply)		\
 _(SESSION_RULES_DETAILS, session_rules_details)				\
 _(IP_CONTAINER_PROXY_ADD_DEL_REPLY, ip_container_proxy_add_del_reply)	\
 _(OUTPUT_ACL_SET_INTERFACE_REPLY, output_acl_set_interface_reply)       \
+_(DO_VPP_CMD_REPLY, do_vpp_cmd_reply)	\
+
 
 #define foreach_standalone_reply_msg					\
 _(SW_INTERFACE_EVENT, sw_interface_event)                               \

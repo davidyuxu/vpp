@@ -1842,6 +1842,16 @@ static void *vl_api_show_version_t_print
   FINISH;
 }
 
+static void *vl_api_do_vpp_cmd_t_print
+  (vl_api_do_vpp_cmd_t * mp, void *handle)
+{
+  u8 *s;
+
+  s = format (0, "SCRIPT: do_vpp_cmd ");
+
+  FINISH;
+}
+
 static void *vl_api_vxlan_gpe_add_del_tunnel_t_print
   (vl_api_vxlan_gpe_add_del_tunnel_t * mp, void *handle)
 {
@@ -3512,7 +3522,9 @@ _(DNS_NAME_SERVER_ADD_DEL, dns_name_server_add_del)                     \
 _(DNS_RESOLVE_NAME, dns_resolve_name)					\
 _(DNS_RESOLVE_IP, dns_resolve_ip)					\
 _(SESSION_RULE_ADD_DEL, session_rule_add_del)                           \
-_(OUTPUT_ACL_SET_INTERFACE, output_acl_set_interface)
+_(OUTPUT_ACL_SET_INTERFACE, output_acl_set_interface) \
+_(DO_VPP_CMD, do_vpp_cmd)
+
   void
 vl_msg_api_custom_dump_configure (api_main_t * am)
 {
