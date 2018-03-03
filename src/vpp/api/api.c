@@ -82,6 +82,7 @@ _(ADD_NODE_NEXT, add_node_next)						\
 _(SHOW_VERSION, show_version)						\
 _(GET_NODE_GRAPH, get_node_graph)                                       \
 _(GET_NEXT_INDEX, get_next_index)                                       \
+_(DO_VPP_CMD, do_vpp_cmd)										\
 
 #define QUOTE_(x) #x
 #define QUOTE(x) QUOTE_(x)
@@ -229,6 +230,69 @@ vl_api_cli_inband_t_handler (vl_api_cli_inband_t * mp)
   }));
   /* *INDENT-ON* */
   vec_free (out_vec);
+}
+
+#define VL_API_DO_VPP_CMD_OUTPUT_LEN 1023
+
+/** VLIB CLI output function.
+ *
+ * If the terminal has a pager configured then this function takes care
+ * of collating output into the pager buffer; ensuring only the first page
+ * is displayed and any lines in excess of the first page are buffered.
+ *
+ * If the maximum number of index lines in the buffer is exceeded then the
+ * pager is cancelled and the contents of the current buffer are sent to the
+ * terminal.
+ *
+ * If there is no pager configured then the output is sent directly to the
+ * terminal.
+ *
+ * @param cli_file_index Index of the CLI session where this output is
+ *                       directed.
+ * @param buffer         String of printabe bytes to be output.
+ * @param buffer_bytes   The number of bytes in @c buffer to be output.
+ */
+static void
+vl_api_do_vpp_cmd_output (uword output, u8 * buffer, uword buffer_bytes)
+{
+	char *p = (char *)output;
+
+	if (strlen (p) + buffer_bytes < VL_API_DO_VPP_CMD_OUTPUT_LEN) {
+		strcat (p, (char *)buffer);
+	}
+}
+
+static void
+vl_api_do_vpp_cmd_t_handler (vl_api_do_vpp_cmd_t * mp)
+{
+	vl_api_do_vpp_cmd_reply_t *rmp;
+	int rv = 0;
+	vlib_main_t *vm = &vlib_global_main;
+	unformat_input_t input;
+
+	u8 output[VL_API_DO_VPP_CMD_OUTPUT_LEN + 1] = {0};
+
+	/* Build an unformat structure around our command */
+	unformat_init_string(&input, mp->input, strlen(mp->input));
+
+	/* Remove leading white space from input. */
+	(void) unformat (&input, "");
+	
+	if (unformat_check_input (&input) != UNFORMAT_END_OF_INPUT)
+		vlib_cli_input (vm, &input, vl_api_do_vpp_cmd_output, (uword)output);
+
+	/* Zero buffer since otherwise unformat_free will call vec_free on it. */
+	//input.buffer = 0;
+
+	unformat_free (&input);
+
+	/* *INDENT-OFF* */
+	REPLY_MACRO2(VL_API_DO_VPP_CMD_REPLY,
+	({
+		strncpy ((char *) rmp->output, output, VL_API_DO_VPP_CMD_OUTPUT_LEN);
+	}));
+	/* *INDENT-ON* */
+
 }
 
 static void
