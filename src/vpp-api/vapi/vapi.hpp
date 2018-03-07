@@ -238,6 +238,79 @@ public:
     return vapi_get_fd (vapi_ctx, fd);
   }
 
+	/**
+	* @brief wait for responses from vpp and assign them to appropriate objects
+	*
+	* @return VAPI_OK on success, other error code on error
+	*/
+	Common_req * recv (const Common_req *limit = nullptr)
+	{
+		std::lock_guard<std::mutex> lock (dispatch_mutex);
+		vapi_error_e rv = VAPI_OK;
+
+		while (true) {
+			void *shm_data;
+			size_t shm_data_size;
+			rv = vapi_recv (vapi_ctx, &shm_data, &shm_data_size, SVM_Q_TIMEDWAIT, 5);
+			if (VAPI_OK != rv) {
+				return nullptr;
+			}
+			
+#if VAPI_CPP_DEBUG_LEAKS
+			on_shm_data_alloc (shm_data);
+#endif
+
+			std::lock_guard<std::recursive_mutex> requests_lock (requests_mutex);
+			std::lock_guard<std::recursive_mutex> events_lock (events_mutex);
+			
+			vapi_msg_id_t id = vapi_lookup_vapi_msg_id_t (vapi_ctx, be16toh (*static_cast<u16 *> (shm_data)));
+			bool has_context = vapi_msg_is_with_context (id);
+			bool break_dispatch = false;
+			Common_req *matching_req = nullptr;
+
+			if (has_context) {
+				u32 context = *reinterpret_cast<u32 *> ((static_cast<u8 *> (shm_data) + vapi_get_context_offset (id)));
+				const auto x = requests.front ();
+				if (x != nullptr && context == x->context) {
+					matching_req = x;
+					
+					VAPI_DBG("Chk: %p, ctx_id: %u, queue_size: %ld", x, x->context, requests.size());
+					
+					std::tie (rv, break_dispatch) = x->assign_response (id, shm_data);
+					
+					if (break_dispatch) {
+						requests.pop_front ();
+						VAPI_DBG("POP: %p, queue_size: %ld", x, requests.size());
+						return matching_req;
+					} else {
+						VAPI_DBG ("not break, continue to recv");
+					}
+				} else {
+					VAPI_DBG ("Unexpect msg@%p, msg_id:%d(%s), expected: %p, recv: %p", shm_data, id, vapi_get_msg_name(id), limit, matching_req);
+					vapi_msg_free(vapi_ctx, shm_data);
+				}
+			} else {
+				if (events[id]) {
+					std::tie (rv, break_dispatch) = events[id]->assign_response (id, shm_data);
+					matching_req = events[id];
+					if (break_dispatch) {
+						return matching_req;
+					}
+				} else {
+					msg_free (shm_data);
+				}
+			}
+
+			if (nullptr == limit || VAPI_OK != rv) {
+				return nullptr;
+			}
+		}
+		
+		return nullptr;
+	}
+
+
+
   /**
    * @brief wait for responses from vpp and assign them to appropriate objects
    *

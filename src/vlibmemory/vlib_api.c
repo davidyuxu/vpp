@@ -379,6 +379,8 @@ vl_api_clnt_process (vlib_main_t * vm, vlib_node_runtime_t * node,
 		  index = SLEEP_10_US;
 		  sleep_time = 10e-6;
 		}
+	      index = SLEEP_200_US;
+	      sleep_time = 200e-6;
 	      vector_rate_histogram[index] += 1;
 	      break;
 	    }

@@ -486,8 +486,10 @@ int vnet_gtpu_add_del_tunnel
 	  t->fib_entry_index = fib_table_entry_special_add
 	    (t->encap_fib_index, &tun_dst_pfx, FIB_SOURCE_RR,
 	     FIB_ENTRY_FLAG_NONE);
+	  #if 0
 	  t->sibling_index = fib_entry_child_add
 	    (t->fib_entry_index, gtm->fib_node_type, t - gtm->tunnels);
+	  #endif
 	  gtpu_tunnel_restack_dpo (t);
 	}
       else
@@ -592,7 +594,9 @@ int vnet_gtpu_add_del_tunnel
       if (!ip46_address_is_multicast (&t->dst))
 	{
 	  vtep_addr_unref (&t->src);
+	  #if 0
 	  fib_entry_child_remove (t->fib_entry_index, t->sibling_index);
+	  #endif
 	  fib_table_entry_delete_index (t->fib_entry_index, FIB_SOURCE_RR);
 	}
       else if (vtep_addr_unref (&t->dst) == 0)
@@ -811,8 +815,8 @@ gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
     {
     case 0:
       if (is_add)
-	vlib_cli_output (vm, "%U\n", format_vnet_sw_if_index_name,
-			 vnet_get_main (), tunnel_sw_if_index);
+	vlib_cli_output (vm, "%U\n decap-next: %d", format_vnet_sw_if_index_name,
+			 vnet_get_main (), tunnel_sw_if_index, a->decap_next_index);
       break;
 
     case VNET_API_ERROR_TUNNEL_EXIST:

@@ -228,6 +228,7 @@ PLUGIN_ENABLED(nat)
 PLUGIN_ENABLED(stn)
 PLUGIN_ENABLED(l2e)
 PLUGIN_ENABLED(gbp)
+PLUGIN_ENABLED(gtplo)
 
 ###############################################################################
 # Dependency checks
