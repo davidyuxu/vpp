@@ -763,7 +763,12 @@ dpdk_bind_devices_to_uio (dpdk_config_main_t * conf)
       ;
     /* all Intel network devices */
     else if (d->vendor_id == 0x8086 && d->device_class == PCI_CLASS_NETWORK_ETHERNET)
-      ;
+      {
+        clib_warning ("Skip Intel Network PCI device 0x%04x:0x%04x found "
+		  "at PCI address %s\n", (u16) d->vendor_id, (u16) d->device_id,
+		  pci_addr);
+        continue;
+      }
     /* all Intel QAT devices VFs */
     else if (d->vendor_id == 0x8086 && d->device_class == PCI_CLASS_PROCESSOR_CO &&
         (d->device_id == 0x0443 || d->device_id == 0x37c9 || d->device_id == 0x19e3))
