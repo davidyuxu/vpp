@@ -238,13 +238,13 @@ $(CURDIR)/$(DPDK_TARBALL):
 	@rm -f $(B)/.download.ok
 
 $(CURDIR)/$(NASM_TARBALL):
-	@if [ -e $(DPDK_DOWNLOAD_DIR)/$(NASM_TARBALL) ] ; \
+	if [ -e $(DPDK_DOWNLOAD_DIR)/$(NASM_TARBALL) ] ; \
 		then cp $(DPDK_DOWNLOAD_DIR)/$(NASM_TARBALL) $(CURDIR) ; \
 		else curl -o $(CURDIR)/$(NASM_TARBALL) -LO $(NASM_TAR_URL) ; \
 	fi
 
 $(CURDIR)/$(AESNIMB_LIB_TARBALL):
-	@if [ -e $(DPDK_DOWNLOAD_DIR)/$(AESNIMB_LIB_TARBALL) ] ; \
+	if [ -e $(DPDK_DOWNLOAD_DIR)/$(AESNIMB_LIB_TARBALL) ] ; \
 		then cp $(DPDK_DOWNLOAD_DIR)/$(AESNIMB_LIB_TARBALL) $(CURDIR) ; \
 		else curl -o $@ -LO $(AESNIMB_LIB_TARBALL_URL) ; \
 	fi
@@ -268,12 +268,12 @@ download: $(B)/.download.ok
 
 $(B)/.extract.ok: $(B)/.download.ok
 	@echo --- extracting $(DPDK_TARBALL) ---
-	@tar --directory $(B) --extract --file $(CURDIR)/$(DPDK_TARBALL)
+	tar --directory $(B) --extract --file $(CURDIR)/$(DPDK_TARBALL)
 ifeq ($(AESNI),y)
 	@echo --- extracting $(NASM_TARBALL) ---
-	@tar --directory $(B) --extract --file $(CURDIR)/$(NASM_TARBALL)
+	tar --directory $(B) --extract --file $(CURDIR)/$(NASM_TARBALL)
 	@echo --- extracting $(AESNIMB_LIB_TARBALL) ---
-	@tar --directory $(B) --extract --file $(CURDIR)/$(AESNIMB_LIB_TARBALL)
+	tar --directory $(B) --extract --file $(CURDIR)/$(AESNIMB_LIB_TARBALL)
 endif
 	@touch $@
 

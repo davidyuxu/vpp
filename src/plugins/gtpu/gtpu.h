@@ -177,7 +177,8 @@ typedef struct
 _(DROP, "error-drop")                  \
 _(L2_INPUT, "l2-input")                \
 _(IP4_INPUT,  "ip4-input")             \
-_(IP6_INPUT, "ip6-input" )
+_(IP6_INPUT, "ip6-input" )             \
+_(GTPLO, "gtplo" )
 
 typedef enum
 {

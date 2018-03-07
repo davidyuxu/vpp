@@ -131,6 +131,10 @@ if ENABLE_TLSOPENSSL_PLUGIN
 include tlsopenssl.am
 endif
 
+if ENABLE_GTPLO_PLUGIN
+include gtplo.am
+endif
+
 include ../suffix-rules.mk
 
 # Remove *.la files
