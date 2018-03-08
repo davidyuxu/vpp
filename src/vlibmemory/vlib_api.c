@@ -38,7 +38,7 @@
 /*? %%clicmd:group_label Binary API CLI %% ?*/
 /*? %%syscfg:group_label Binary API configuration %% ?*/
 
-#define TRACE_VLIB_MEMORY_QUEUE 0
+#define TRACE_VLIB_MEMORY_QUEUE 1
 
 #include <vlibmemory/vl_memory_msg_enum.h>	/* enumerate all vlib messages */
 
@@ -269,6 +269,32 @@ vl_api_save_msg_table (void)
   vec_free (serialized_message_table);
 }
 
+u64 api_sleep_us = 200;
+static clib_error_t *
+api_sleep (vlib_main_t * vm,
+             unformat_input_t * input, vlib_cli_command_t * cmd)
+{
+  u32 tmp;
+
+  if (unformat (input, "%d", &tmp))
+    {
+      api_sleep_us = tmp;
+    }
+  else
+    return clib_error_return (0, "Api sleep time is set to default");
+
+  vlib_cli_output (vm, "Api sleep time is set to %u us", api_sleep_us);
+  return 0;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (set_api_sleep, static) = {
+  .path = "api-sleep",
+  .short_help = "api-sleep <us>",
+  .function = api_sleep,
+};
+/* *INDENT-ON* */
+
 static uword
 vl_api_clnt_process (vlib_main_t * vm, vlib_node_runtime_t * node,
 		     vlib_frame_t * f)
@@ -358,6 +384,10 @@ vl_api_clnt_process (vlib_main_t * vm, vlib_node_runtime_t * node,
 	      break;
 	    }
 
+	  if (api_sleep_us != ~0) {
+	    sleep_time = (f64)(api_sleep_us) * 1e-6;
+	    break;
+	  }
 	  /* Allow no more than 10us without a pause */
 	  if (vlib_time_now (vm) > start_time + 10e-6)
 	    {
@@ -379,8 +409,7 @@ vl_api_clnt_process (vlib_main_t * vm, vlib_node_runtime_t * node,
 		  index = SLEEP_10_US;
 		  sleep_time = 10e-6;
 		}
-	      index = SLEEP_200_US;
-	      sleep_time = 200e-6;
+	      
 	      vector_rate_histogram[index] += 1;
 	      break;
 	    }

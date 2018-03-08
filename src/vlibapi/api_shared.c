@@ -437,7 +437,7 @@ msg_handler_internal (api_main_t * am,
 }
 
 /* set to 1 if you want before/after message handler event logging */
-#define ELOG_API_MESSAGE_HANDLERS 0
+#define ELOG_API_MESSAGE_HANDLERS 1
 
 #if ELOG_API_MESSAGE_HANDLERS > 0
 static u32
@@ -487,7 +487,7 @@ vl_msg_api_handler_with_vm_node (api_main_t * am,
     } *ed;
     ed = ELOG_DATA (&vm->elog_main, e);
     if (id < vec_len (am->msg_names))
-      ed->c = elog_id_for_msg_name (vm, am->msg_names[id]);
+      ed->c = elog_id_for_msg_name (vm, (char *)(am->msg_names[id]));
     else
       ed->c = elog_id_for_msg_name (vm, "BOGUS");
   }
@@ -536,7 +536,7 @@ vl_msg_api_handler_with_vm_node (api_main_t * am,
     } *ed;
     ed = ELOG_DATA (&vm->elog_main, e);
     if (id < vec_len (am->msg_names))
-      ed->c = elog_id_for_msg_name (vm, am->msg_names[id]);
+      ed->c = elog_id_for_msg_name (vm, (char *)(am->msg_names[id]));
     else
       ed->c = elog_id_for_msg_name (vm, "BOGUS");
   }
