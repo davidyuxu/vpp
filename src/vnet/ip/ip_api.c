@@ -984,7 +984,7 @@ add_del_route_check (fib_protocol_t table_proto,
   return (0);
 }
 
-static int
+int
 ip4_add_del_route_t_handler (vl_api_ip_add_del_route_t * mp)
 {
   u32 fib_index, next_hop_fib_index;
@@ -1053,7 +1053,7 @@ ip4_add_del_route_t_handler (vl_api_ip_add_del_route_t * mp)
 				   label_stack));
 }
 
-static int
+int
 ip6_add_del_route_t_handler (vl_api_ip_add_del_route_t * mp)
 {
   fib_mpls_label_t *label_stack = NULL;
