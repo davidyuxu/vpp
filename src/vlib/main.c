@@ -1507,7 +1507,6 @@ vlib_main_or_worker_loop (vlib_main_t * vm, int is_main)
 				      VLIB_NODE_STATE_POLLING,
 				      /* frame */ 0,
 				      cpu_time_now);
-
       if (PREDICT_TRUE (is_main && vm->queue_signal_pending == 0))
 	vm->queue_signal_callback (vm);
 

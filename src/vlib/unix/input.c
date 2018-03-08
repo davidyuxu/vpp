@@ -129,6 +129,32 @@ linux_epoll_file_update (clib_file_t * f, clib_file_update_type_t update_type)
     }
 }
 
+int epoll_idle_wait_ms = ~0;
+static clib_error_t *
+set_epoll_idle_wait (vlib_main_t * vm,
+             unformat_input_t * input, vlib_cli_command_t * cmd)
+{
+  u32 tmp;
+
+  if (unformat (input, "%d", &tmp))
+    {
+      epoll_idle_wait_ms = tmp;
+    }
+  else
+    return clib_error_return (0, "epoll idle wait time is set to default");
+
+  vlib_cli_output (vm, "epoll idle wait time is set to %u ms", epoll_idle_wait_ms);
+  return 0;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (set_epoll_idle_wait_cmd, static) = {
+  .path = "epoll-idle-wait",
+  .short_help = "epoll-idle-wait <ms>",
+  .function = set_epoll_idle_wait,
+};
+/* *INDENT-ON* */
+
 static_always_inline uword
 linux_epoll_input_inline (vlib_main_t * vm, vlib_node_runtime_t * node,
 			  vlib_frame_t * frame, u32 thread_index)
@@ -157,8 +183,13 @@ linux_epoll_input_inline (vlib_main_t * vm, vlib_node_runtime_t * node,
 	/* Nothing on the fast wheel, sleep 10ms */
 	if (ticks_until_expiration == TW_SLOTS_PER_RING)
 	  {
-	    timeout = 10e-3;
-	    timeout_ms = max_timeout_ms;
+	    if ((epoll_idle_wait_ms != ~0) && (epoll_idle_wait_ms < max_timeout_ms)) {
+	      timeout = (f64)(epoll_idle_wait_ms) * 1e-3;
+	      timeout_ms = epoll_idle_wait_ms;
+	    } else {
+	      timeout = 10e-3;
+    	      timeout_ms = max_timeout_ms;
+	    }
 	  }
 	else
 	  {

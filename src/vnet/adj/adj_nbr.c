@@ -63,10 +63,16 @@ adj_nbr_insert (fib_protocol_t nh_proto,
 	       0,
 	       sizeof(BVT(clib_bihash)));
 
-	BV(clib_bihash_init) (adj_nbr_tables[nh_proto][sw_if_index],
-			      "Adjacency Neighbour table",
-			      ADJ_NBR_DEFAULT_HASH_NUM_BUCKETS,
-			      ADJ_NBR_DEFAULT_HASH_MEMORY_SIZE);
+	if (vnet_sw_interface_is_p2p(vnet_get_main(), sw_if_index))
+		BV(clib_bihash_init) (adj_nbr_tables[nh_proto][sw_if_index],
+				      "Adjacency Neighbour table",
+				      1,
+				      10<<10);
+	else
+		BV(clib_bihash_init) (adj_nbr_tables[nh_proto][sw_if_index],
+				      "Adjacency Neighbour table",
+				      ADJ_NBR_DEFAULT_HASH_NUM_BUCKETS,
+				      ADJ_NBR_DEFAULT_HASH_MEMORY_SIZE);
     }
 
     ADJ_NBR_SET_KEY(kv, link_type, nh_addr);
@@ -116,6 +122,26 @@ adj_nbr_find (fib_protocol_t nh_proto,
 	return (kv.value);
     }
 }
+
+static clib_error_t *
+dump_adj_hash (vlib_main_t * vm,
+             unformat_input_t * input, vlib_cli_command_t * cmd)
+{
+  u32 sw_if_index;
+
+  if (!unformat (input, "%d", &sw_if_index))
+    return clib_error_return (0, "Please specify the sw interface index");
+
+  vlib_cli_output (vm, "Adj Hash Table for sw_if_index %d:\n%U\n",
+		   sw_if_index, BV (format_bihash), adj_nbr_tables[0][sw_if_index], 1 /* verbose */ );
+  return 0;
+}
+
+VLIB_CLI_COMMAND (dump_adj_hash_command, static) = {
+    .path = "dump adj-hash",
+    .short_help = "dump adj-hash <sw_if_index>",
+    .function = dump_adj_hash,
+};
 
 static inline u32
 adj_get_nd_node (fib_protocol_t proto)
@@ -234,7 +260,6 @@ adj_nbr_add_or_lock (fib_protocol_t nh_proto,
 			  adj_get_nd_node(nh_proto),
 			  vnet_tx_node_index_for_sw_interface(vnm, sw_if_index),
 			  &adj->rewrite_header);
-
 	/*
 	 * we need a rewrite where the destination IP address is converted
 	 * to the appropriate link-layer address. This is interface specific.
