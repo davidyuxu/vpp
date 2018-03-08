@@ -2873,6 +2873,11 @@ ip_api_hookup (vlib_main_t * vm)
 #undef _
 
   /*
+   * Thread-safe API messages
+   */
+  am->is_mp_safe[VL_API_IP_ADD_DEL_ROUTE] = 1;
+
+  /*
    * Set up the (msg_name, crc, message-id) table
    */
   setup_message_id_table (am);
