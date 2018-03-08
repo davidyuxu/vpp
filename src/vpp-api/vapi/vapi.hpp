@@ -356,8 +356,11 @@ public:
               }
             else
               {
+		vapi_msg_free(vapi_ctx, shm_data);
+		#if 0
                 std::tie (rv, break_dispatch) =
                     x->assign_response (id, nullptr);
+		#endif
               }
             if (break_dispatch)
               {
