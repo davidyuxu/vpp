@@ -658,7 +658,6 @@ VLIB_NODE_FN (dpdk_input_node) (vlib_main_t * vm, vlib_node_runtime_t * node,
       n_rx_packets += dpdk_device_input (vm, dm, xd, node, thread_index,
 					 dq->queue_id);
     }
-  /* *INDENT-ON* */
 
   poll_rate_limit (dm);
 
