@@ -242,6 +242,13 @@ static inline uword BV (clib_bihash_get_offset) (BVT (clib_bihash) * h,
   return vp - hp;
 }
 
+/* Expose an API to allow designers to assign their own mheap, by Jordy */
+static inline void BV (clib_bihash_set_mheap) (BVT (clib_bihash) * h, void *new_heap)
+{
+  ASSERT(new_heap);
+  h->mheap = new_heap;
+}
+
 void BV (clib_bihash_init)
   (BVT (clib_bihash) * h, char *name, u32 nbuckets, uword memory_size);
 

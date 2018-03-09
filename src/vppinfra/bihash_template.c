@@ -29,7 +29,8 @@ void BV (clib_bihash_init)
   h->cache_hits = 0;
   h->cache_misses = 0;
 
-  h->mheap = mheap_alloc (0 /* use VM */ , memory_size);
+  if (h->mheap == NULL) /* Allow customerized mheap, by Jordy*/
+    h->mheap = mheap_alloc (0 /* use VM */ , memory_size);
 
   oldheap = clib_mem_set_heap (h->mheap);
   vec_validate_aligned (h->buckets, nbuckets - 1, CLIB_CACHE_LINE_BYTES);
@@ -634,7 +635,7 @@ u8 *BV (format_bihash) (u8 * s, va_list * args)
   s = format (s, "    %lld cache hits, %lld cache misses\n",
 	      h->cache_hits, h->cache_misses);
   if (h->mheap)
-    s = format (s, "    mheap: %U", format_mheap, h->mheap, 0 /* verbose */ );
+    s = format (s, "    mheap: %U", format_mheap, h->mheap, verbose);
   return s;
 }
 
