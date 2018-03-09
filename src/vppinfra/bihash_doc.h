@@ -89,6 +89,10 @@ static inline void *clib_bihash_get_value (clib_bihash * h, uword offset);
 /** Get clib mheap offset given a pointer */
 static inline uword clib_bihash_get_offset (clib_bihash * h, void *v);
 
+/** Set a pre-defined mheap for a bi-hash table */
+static inline void BV (clib_bihash_set_mheap) (BVT (clib_bihash) * h, void *new_heap);
+
+
 /** initialize a bounded index extensible hash table
 
     @param h - the bi-hash table to initialize

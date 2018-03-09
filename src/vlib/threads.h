@@ -26,13 +26,13 @@
  *
  */
 
-// #define BARRIER_TRACING 1
+ #define BARRIER_TRACING 1
 
 /*
  * Two options for barrier tracing output: syslog & elog.
  */
 
-// #define BARRIER_TRACING_ELOG 1
+ #define BARRIER_TRACING_ELOG 1
 
 extern vlib_main_t **vlib_mains;
 

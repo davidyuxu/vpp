@@ -47,9 +47,8 @@ void BV (clib_bihash_init)
   h->cache_hits = 0;
   h->cache_misses = 0;
 
-  h->alloc_arena = (uword) clib_mem_vm_alloc (memory_size);
-  h->alloc_arena_next = h->alloc_arena;
-  h->alloc_arena_size = memory_size;
+  if (h->mheap == NULL) /* Allow customerized mheap, by Jordy*/
+    h->mheap = mheap_alloc (0 /* use VM */ , memory_size);
 
   bucket_size = nbuckets * sizeof (h->buckets[0]);
   h->buckets = BV (alloc_aligned) (h, bucket_size);
@@ -644,13 +643,8 @@ u8 *BV (format_bihash) (u8 * s, va_list * args)
   s = format (s, "    %lld linear search buckets\n", linear_buckets);
   s = format (s, "    %lld cache hits, %lld cache misses\n",
 	      h->cache_hits, h->cache_misses);
-  used_bytes = h->alloc_arena_next - h->alloc_arena;
-  s = format (s,
-	      "    arena: base %llx, next %llx\n"
-	      "           used %lld b (%lld Mbytes) of %lld b (%lld Mbytes)\n",
-	      h->alloc_arena, h->alloc_arena_next,
-	      used_bytes, used_bytes >> 20,
-	      h->alloc_arena_size, h->alloc_arena_size >> 20);
+  if (h->mheap)
+    s = format (s, "    mheap: %U", format_mheap, h->mheap, verbose);
   return s;
 }
 
