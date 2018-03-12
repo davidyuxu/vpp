@@ -1077,6 +1077,124 @@ VLIB_CLI_COMMAND (set_interface_ip6_gtpu_bypass_command, static) = {
 };
 /* *INDENT-ON* */
 
+
+int
+gtpu_tunnels_init()
+{
+  gtpu_main_t *gtm = &gtpu_main;
+  ip46_address_t src, dst;
+  u32 encap_fib_index = 0;
+  u32 mcast_sw_if_index = ~0;
+  u32 decap_next_index = GTPU_INPUT_NEXT_IP4_INPUT;
+  u32 teid = gtm->start_teid;
+  int rv;
+  vnet_gtpu_add_del_tunnel_args_t _a, *a = &_a;
+  u32 tunnel_sw_if_index;
+  u32 i;
+
+  /* Cant "universally zero init" (={0}) due to GCC bug 53119 */
+  memset (&src, 0, sizeof src);
+  memset (&dst, 0, sizeof dst);
+  src = gtm->src;
+  dst = gtm->dst;
+
+  memset (a, 0, sizeof (*a));
+
+  a->is_add = 1;
+  a->is_ip6 = 0;
+#define _(x) a->x = x;
+    foreach_copy_field;
+#undef _
+
+  /* add */
+  for (i = 0; i < gtm->prealloc_tunnels; i++,a->teid++) {
+    rv = vnet_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
+    switch (rv)
+      {
+      case 0:
+	break;
+    
+      case VNET_API_ERROR_TUNNEL_EXIST:
+	clib_warning("tunnel already exists...");
+	break;
+	
+      case VNET_API_ERROR_NO_SUCH_ENTRY:
+	clib_warning ("tunnel does not exist...");
+	break;
+    
+      default:
+	clib_warning("vnet_gtpu_add_del_tunnel returned %d", rv);
+	break;
+      }
+  }
+
+  /* del */
+  a->is_add = 0;
+  a->teid = gtm->start_teid;
+  for (i = 0; i < gtm->prealloc_tunnels; i++,a->teid++) {
+    rv = vnet_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
+    switch (rv)
+      {
+      case 0:
+        break;
+    
+      case VNET_API_ERROR_TUNNEL_EXIST:
+        clib_warning("tunnel already exists...");
+        break;
+        
+      case VNET_API_ERROR_NO_SUCH_ENTRY:
+        clib_warning ("tunnel does not exist...");
+        break;
+    
+      default:
+        clib_warning("vnet_gtpu_add_del_tunnel returned %d", rv);
+        break;
+      }
+  }
+
+  return 0;
+}
+
+static clib_error_t *
+gtpu_config (vlib_main_t * vm, unformat_input_t * input)
+{
+  gtpu_main_t *gtm = &gtpu_main;
+  clib_error_t *error = 0;
+
+  gtm->prealloc_tunnels = 0;
+  gtm->start_teid = 1;
+  gtm->src.ip4.as_u32 = clib_host_to_net_u32(0x01010101);
+  gtm->dst.ip4.as_u32 = clib_host_to_net_u32(0x02020202);
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "src %U",
+    		     unformat_ip4_address, &gtm->src.ip4))
+        {
+        }
+      else if (unformat (input, "dst %U",
+    		     unformat_ip4_address, &gtm->dst.ip4))
+        {
+        }
+      else if (unformat (input, "teid %d", &gtm->start_teid))
+        ;
+      else if (unformat (input, "capacity %d", &gtm->prealloc_tunnels))
+        ;
+      else
+        {
+          return clib_error_return (0, "unknown input `%U'",
+    				format_unformat_error, input);
+        }
+    }
+
+  if (gtm->prealloc_tunnels > 0)
+    gtpu_tunnels_init ();
+  
+  return error;
+}
+
+VLIB_CONFIG_FUNCTION (gtpu_config, "gtpu");
+
 clib_error_t *
 gtpu_init (vlib_main_t * vm)
 {
