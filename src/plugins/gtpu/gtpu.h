@@ -227,6 +227,12 @@ typedef struct
   /* convenience */
   vlib_main_t *vlib_main;
   vnet_main_t *vnet_main;
+
+  /* for pre-allocate, by Jordy */
+  ip46_address_t src;
+  ip46_address_t dst;
+  u32 prealloc_tunnels;
+  u32 start_teid;
 } gtpu_main_t;
 
 extern gtpu_main_t gtpu_main;
