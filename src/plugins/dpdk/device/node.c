@@ -607,6 +607,7 @@ CLIB_MULTIARCH_FN (dpdk_input) (vlib_main_t * vm, vlib_node_runtime_t * node,
       else
         n_rx_packets += dpdk_device_input (dm, xd, node, thread_index, dq->queue_id, /* maybe_multiseg */ 0);
     }
+  /* *INDENT-ON* */
 
   poll_rate_limit (dm);
 

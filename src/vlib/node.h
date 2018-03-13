@@ -190,7 +190,7 @@ vlib_node_next_registered (vlib_node_registration_t * c)
 typedef struct
 {
   /* Total calls, clock ticks and vector elements processed for this node. */
-  u64 calls, vectors, clocks, suspends, invaild_clocks, invaild_calls;
+  u64 calls, vectors, clocks, suspends;
   u64 max_clock;
   u64 max_clock_n;
 } vlib_node_stats_t;
@@ -425,10 +425,6 @@ typedef struct vlib_node_runtime_t
 
   u32 max_clock_n;			/**< Number of vectors in the recorded
 					  max_clock. */
-
-  u32 invalid_clock_last_overflow;			/** < Number of clock cycle without any victer handled */
-  u32 invalid_calls_since_last_overflow;			/** < Number of invalid calls cycle without any victer handled */
-					  
 
   u32 calls_since_last_overflow;	/**< Number of calls. */
 

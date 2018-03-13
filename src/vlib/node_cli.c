@@ -94,51 +94,33 @@ format_vlib_node_stats (u8 * s, va_list * va)
   vlib_main_t *vm = va_arg (*va, vlib_main_t *);
   vlib_node_t *n = va_arg (*va, vlib_node_t *);
   int max = va_arg (*va, int);
-  f64 v,w;
+  f64 v;
   char *state;
   u8 *ns;
   u8 *misc_info = 0;
-  u64 c, p, l, d, t;
+  u64 c, p, l, d;
   f64 x;
   f64 maxc, maxcn;
   u32 maxn;
   u32 indent;
-  u32 is_main;
-
-  is_main = vm->thread_index==0? 1:0;
 
   if (!n)
     {
-      if (is_main) {
-	      if (max)
-		return format (s,
-			       "%=30s%=17s%=16s%=16s%=16s%=16s",
-			       "Name", "Max Node Clocks", "Vectors at Max",
-			       "Max Clocks", "Avg Clocks", "Avg Vectors/Call");
-	      else
-		return format (s,
-			       "%=30s%=12s%=16s%=16s%=16s%=16s%=16s",
-			       "Name", "State", "Calls", "Vectors", "Suspends",
-			       "Clocks", "Vectors/Call");
-      }else{
-		if (max)
-		return format (s,
-			       "%=30s%=17s%=16s%=16s%=16s%=16s%=8s",
-			       "Name", "Max Node Clocks", "Vectors at Max",
-			       "Max Clocks", "Avg Clocks", "Avg Vectors/Call", "Idle");
-	      else
-		return format (s,
-			       "%=30s%=12s%=16s%=16s%=16s%=16s%=16s%=8s",
-			       "Name", "State", "Calls", "Vectors", "Suspends",
-			       "Clocks", "Vectors/Call", "Idle");
-      }
+      if (max)
+	return format (s,
+		       "%=30s%=17s%=16s%=16s%=16s%=16s",
+		       "Name", "Max Node Clocks", "Vectors at Max",
+		       "Max Clocks", "Avg Clocks", "Avg Vectors/Call");
+      else
+	return format (s,
+		       "%=30s%=12s%=16s%=16s%=16s%=16s%=16s",
+		       "Name", "State", "Calls", "Vectors", "Suspends",
+		       "Clocks", "Vectors/Call");
     }
 
   indent = format_get_indent (s);
 
-  l = n->stats_total.clocks - n->stats_last_clear.clocks;  
-  w = ((f64)(n->stats_total.invaild_clocks - n->stats_last_clear.invaild_clocks) * 100/(f64)l );
-  t = n->stats_total.invaild_calls - n->stats_last_clear.invaild_calls; 
+  l = n->stats_total.clocks - n->stats_last_clear.clocks;
   c = n->stats_total.calls - n->stats_last_clear.calls;
   p = n->stats_total.vectors - n->stats_last_clear.vectors;
   d = n->stats_total.suspends - n->stats_last_clear.suspends;
@@ -148,7 +130,6 @@ format_vlib_node_stats (u8 * s, va_list * va)
     maxcn = (f64) n->stats_total.max_clock / (f64) maxn;
   else
     maxcn = 0.0;
-
 
   /* Clocks per packet, per call or per suspend. */
   x = 0;
@@ -207,21 +188,12 @@ format_vlib_node_stats (u8 * s, va_list * va)
 
   ns = n->name;
 
-  if (is_main){
-	  if (max)
-	    s = format (s, "%-30v%=17.2e%=16d%=16.2e%=16.2e%=16.2e",
-			ns, maxc, maxn, maxcn, x, v);
-	  else
-	    s = format (s, "%-30v%=12s%16Ld%16Ld%16Ld%16.2e%16.2f", ns, state,
-			c, p, d, x, v);
-  } else {
-  	if (max)
-	    s = format (s, "%-30v%=17.2e%=16d%=16.2e%=16.2e%=16.2e%=8.2f%%%16d",
-			ns, maxc, maxn, maxcn, x, v, w, t);
-	  else
-	    s = format (s, "%-30v%=12s%16Ld%16Ld%16Ld%16.2e%16.2f%8.2f%%%16d", ns, state,
-			c, p, d, x, v, w, t);
-  }
+  if (max)
+    s = format (s, "%-30v%=17.2e%=16d%=16.2e%=16.2e%=16.2e",
+		ns, maxc, maxn, maxcn, x, v);
+  else
+    s = format (s, "%-30v%=12s%16Ld%16Ld%16Ld%16.2e%16.2f", ns, state,
+		c, p, d, x, v);
 
   if (ns != n->name)
     vec_free (ns);
@@ -263,7 +235,7 @@ show_node_runtime (vlib_main_t * vm,
       f64 dt;
       u64 n_input, n_output, n_drop, n_punt;
       u64 n_internal_vectors, n_internal_calls;
-      u64 n_clocks,n_invalid_clocks, l, v, c, d, x;
+      u64 n_clocks, l, v, c, d;
       int brief = 1;
       int max = 0;
       vlib_main_t **stat_vms = 0, *stat_vm;
@@ -318,16 +290,14 @@ show_node_runtime (vlib_main_t * vm,
 
 	  vec_sort_with_function (nodes, node_cmp);
 
-	  n_input = n_output = n_drop = n_punt = n_clocks = n_invalid_clocks = 0;
+	  n_input = n_output = n_drop = n_punt = n_clocks = 0;
 	  n_internal_vectors = n_internal_calls = 0;
 	  for (i = 0; i < vec_len (nodes); i++)
 	    {
 	      n = nodes[i];
 
 	      l = n->stats_total.clocks - n->stats_last_clear.clocks;
-		x = n->stats_total.invaild_clocks - n->stats_last_clear.invaild_clocks;
 	      n_clocks += l;
-		n_invalid_clocks += x;
 
 	      v = n->stats_total.vectors - n->stats_last_clear.vectors;
 	      c = n->stats_total.calls - n->stats_last_clear.calls;
@@ -370,36 +340,19 @@ show_node_runtime (vlib_main_t * vm,
 	    }
 
 	  dt = time_now - nm->time_last_runtime_stats_clear;
-	  if (stat_vm->thread_index == 0) {
-		  vlib_cli_output
-		    (vm,
-		     "Time %.1f, average vectors/node %.2f, last %d main loops %.2f per node %.2f"
-		     "\n  vector rates in %.4e, out %.4e, drop %.4e, punt %.4e",
-		     dt,
-		     (n_internal_calls > 0
-		      ? (f64) n_internal_vectors / (f64) n_internal_calls
-		      : 0),
-		     1 << VLIB_LOG2_MAIN_LOOPS_PER_STATS_UPDATE,
-		     vectors_per_main_loop[j],
-		     last_vector_length_per_node[j],
-		     (f64) n_input / dt,
-		     (f64) n_output / dt, (f64) n_drop / dt, (f64) n_punt / dt);
-	  }else {
-		  vlib_cli_output
-		    (vm,
-		     "Time %.1f, average vectors/node %.2f, last %d main loops %.2f per node %.2f"
-		     "\n  vector rates in %.4e, out %.4e, drop %.4e, punt %.4e, Idle %.2f%%",
-		     dt,
-		     (n_internal_calls > 0
-			? (f64) n_internal_vectors / (f64) n_internal_calls
-			: 0),
-		     1 << VLIB_LOG2_MAIN_LOOPS_PER_STATS_UPDATE,
-		     vectors_per_main_loop[j],
-		     last_vector_length_per_node[j],
-		     (f64) n_input / dt,
-		     (f64) n_output / dt, (f64) n_drop / dt, (f64) n_punt / dt,
-		     ((f64)n_invalid_clocks * 100 / (f64)n_clocks));
-	  }
+	  vlib_cli_output
+	    (vm,
+	     "Time %.1f, average vectors/node %.2f, last %d main loops %.2f per node %.2f"
+	     "\n  vector rates in %.4e, out %.4e, drop %.4e, punt %.4e",
+	     dt,
+	     (n_internal_calls > 0
+	      ? (f64) n_internal_vectors / (f64) n_internal_calls
+	      : 0),
+	     1 << VLIB_LOG2_MAIN_LOOPS_PER_STATS_UPDATE,
+	     vectors_per_main_loop[j],
+	     last_vector_length_per_node[j],
+	     (f64) n_input / dt,
+	     (f64) n_output / dt, (f64) n_drop / dt, (f64) n_punt / dt);
 
 	  vlib_cli_output (vm, "%U", format_vlib_node_stats, stat_vm, 0, max);
 	  for (i = 0; i < vec_len (nodes); i++)
