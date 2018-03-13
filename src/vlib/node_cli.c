@@ -136,8 +136,8 @@ format_vlib_node_stats (u8 * s, va_list * va)
 
   indent = format_get_indent (s);
 
-  l = n->stats_total.clocks - n->stats_last_clear.clocks;
-  w = (f32) ((n->stats_total.invaild_clocks - n->stats_last_clear.invaild_clocks)/l * 100);
+  l = n->stats_total.clocks - n->stats_last_clear.clocks;  
+  w = ((f64)(n->stats_total.invaild_clocks - n->stats_last_clear.invaild_clocks) * 100/(f64)l );
   c = n->stats_total.calls - n->stats_last_clear.calls;
   p = n->stats_total.vectors - n->stats_last_clear.vectors;
   d = n->stats_total.suspends - n->stats_last_clear.suspends;
@@ -147,6 +147,7 @@ format_vlib_node_stats (u8 * s, va_list * va)
     maxcn = (f64) n->stats_total.max_clock / (f64) maxn;
   else
     maxcn = 0.0;
+
 
   /* Clocks per packet, per call or per suspend. */
   x = 0;
@@ -213,21 +214,12 @@ format_vlib_node_stats (u8 * s, va_list * va)
 	    s = format (s, "%-30v%=12s%16Ld%16Ld%16Ld%16.2e%16.2f", ns, state,
 			c, p, d, x, v);
   } else {
-	  if (strcmp(state, "polling")) {
-		  if (max)
-		    s = format (s, "%-30v%=17.2e%=16d%=16.2e%=16.2e%=16.2e%=8s",
-				ns, maxc, maxn, maxcn, x, v, "N/A");
-		  else
-		    s = format (s, "%-30v%=12s%16Ld%16Ld%16Ld%16.2e%16.2f%8s", ns, state,
-				c, p, d, x, v, "N/A");
-	  }else{
-	  	if (max)
-		    s = format (s, "%-30v%=17.2e%=16d%=16.2e%=16.2e%=16.2e%=8.2f%%",
-				ns, maxc, maxn, maxcn, x, v, w);
-		  else
-		    s = format (s, "%-30v%=12s%16Ld%16Ld%16Ld%16.2e%16.2f%8.2f%%", ns, state,
-				c, p, d, x, v, w);
-	  }
+  	if (max)
+	    s = format (s, "%-30v%=17.2e%=16d%=16.2e%=16.2e%=16.2e%=8.2f%%",
+			ns, maxc, maxn, maxcn, x, v, w);
+	  else
+	    s = format (s, "%-30v%=12s%16Ld%16Ld%16Ld%16.2e%16.2f%8.2f%%", ns, state,
+			c, p, d, x, v, w);
   }
 
   if (ns != n->name)
@@ -405,7 +397,7 @@ show_node_runtime (vlib_main_t * vm,
 		     last_vector_length_per_node[j],
 		     (f64) n_input / dt,
 		     (f64) n_output / dt, (f64) n_drop / dt, (f64) n_punt / dt,
-		     (f32) (n_invalid_clocks/ n_clocks * 100));
+		     ((f64)n_invalid_clocks * 100 / (f64)n_clocks));
 	  }
 
 	  vlib_cli_output (vm, "%U", format_vlib_node_stats, stat_vm, 0, max);

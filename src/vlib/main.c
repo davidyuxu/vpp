@@ -546,7 +546,7 @@ vlib_node_runtime_sync_stats (vlib_main_t * vm,
   n->stats_total.calls += n_calls + r->calls_since_last_overflow;
   n->stats_total.vectors += n_vectors + r->vectors_since_last_overflow;
   n->stats_total.clocks += n_clocks + r->clocks_since_last_overflow;
-  if ((n->state == VLIB_NODE_STATE_POLLING) && (n_vectors == 0)) {
+  if ((vm->thread_index != 0) && (n_vectors == 0)) {
   	n->stats_total.invaild_clocks += n_clocks + r->invalid_clock_last_overflow;
   }else{
   	n->stats_total.invaild_clocks += r->invalid_clock_last_overflow;
@@ -625,7 +625,7 @@ vlib_node_runtime_update_stats (vlib_main_t * vm,
   ca1 = ca0 + n_calls;
   v1 = v0 + n_vectors;
   cl1 = cl0 + n_clocks;
-  if ((node->state == VLIB_NODE_STATE_POLLING) && (n_vectors == 0)) {
+  if ((vm->thread_index != 0) && (n_vectors == 0)) {
   	w1 = w0 + n_clocks;
   }
   
