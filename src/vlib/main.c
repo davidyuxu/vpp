@@ -546,21 +546,12 @@ vlib_node_runtime_sync_stats (vlib_main_t * vm,
   n->stats_total.calls += n_calls + r->calls_since_last_overflow;
   n->stats_total.vectors += n_vectors + r->vectors_since_last_overflow;
   n->stats_total.clocks += n_clocks + r->clocks_since_last_overflow;
-  if ((vm->thread_index != 0) && (n_vectors == 0)) {
-  	n->stats_total.invaild_clocks += n_clocks + r->invalid_clock_last_overflow;
-	n->stats_total.invaild_calls += n_calls + r->invalid_calls_since_last_overflow;
-  }else{
-  	n->stats_total.invaild_clocks += r->invalid_clock_last_overflow;
-	n->stats_total.invaild_calls += r->invalid_calls_since_last_overflow;
-  }
   n->stats_total.max_clock = r->max_clock;
   n->stats_total.max_clock_n = r->max_clock_n;
 
   r->calls_since_last_overflow = 0;
   r->vectors_since_last_overflow = 0;
   r->clocks_since_last_overflow = 0;
-  r->invalid_clock_last_overflow = 0;
-  r->invalid_calls_since_last_overflow = 0;
 }
 
 always_inline void __attribute__ ((unused))
@@ -618,42 +609,30 @@ vlib_node_runtime_update_stats (vlib_main_t * vm,
 				uword n_calls,
 				uword n_vectors, uword n_clocks)
 {
-  u32 ca0, ca1, v0, v1, cl0, cl1, r, w0, w1, l0, l1 ;
+  u32 ca0, ca1, v0, v1, cl0, cl1, r;
 
   cl0 = cl1 = node->clocks_since_last_overflow;
   ca0 = ca1 = node->calls_since_last_overflow;
-  l0 = l1 = node->invalid_calls_since_last_overflow;
   v0 = v1 = node->vectors_since_last_overflow;
-  w0 = w1 = node->invalid_clock_last_overflow;
 
   ca1 = ca0 + n_calls;
   v1 = v0 + n_vectors;
   cl1 = cl0 + n_clocks;
-  if ((vm->thread_index != 0) && (n_vectors == 0)) {
-  	w1 = w0 + n_clocks;
-	l1 = l0 + n_calls;
-  }
-  
 
   node->calls_since_last_overflow = ca1;
   node->clocks_since_last_overflow = cl1;
   node->vectors_since_last_overflow = v1;
-  node->invalid_clock_last_overflow = w1;
-  node->invalid_calls_since_last_overflow = l1;
-  
   node->max_clock_n = node->max_clock > n_clocks ?
     node->max_clock_n : n_vectors;
   node->max_clock = node->max_clock > n_clocks ? node->max_clock : n_clocks;
 
   r = vlib_node_runtime_update_main_loop_vector_stats (vm, node, n_vectors);
 
-  if (PREDICT_FALSE (ca1 < ca0 || v1 < v0 || cl1 < cl0 || w1 < w0 || l1 < l0))
+  if (PREDICT_FALSE (ca1 < ca0 || v1 < v0 || cl1 < cl0))
     {
       node->calls_since_last_overflow = ca0;
       node->clocks_since_last_overflow = cl0;
       node->vectors_since_last_overflow = v0;
-	node->invalid_clock_last_overflow = w0;
-	node->invalid_calls_since_last_overflow = l0;
       vlib_node_runtime_sync_stats (vm, node, n_calls, n_vectors, n_clocks);
     }
 
