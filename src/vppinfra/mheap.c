@@ -665,6 +665,8 @@ mheap_get_aligned (void *v,
 
   /* Round requested size. */
   n_user_data_bytes = clib_max (n_user_data_bytes, MHEAP_MIN_USER_DATA_BYTES);
+  /* Fix small size with cache-line align issue, by Jordy */
+  n_user_data_bytes = clib_max (n_user_data_bytes, align);
   n_user_data_bytes =
     round_pow2 (n_user_data_bytes,
 		STRUCT_SIZE_OF (mheap_elt_t, user_data[0]));
