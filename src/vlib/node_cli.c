@@ -98,7 +98,7 @@ format_vlib_node_stats (u8 * s, va_list * va)
   char *state;
   u8 *ns;
   u8 *misc_info = 0;
-  u64 c, p, l, d;
+  u64 c, p, l, d, t;
   f64 x;
   f64 maxc, maxcn;
   u32 maxn;
@@ -138,6 +138,7 @@ format_vlib_node_stats (u8 * s, va_list * va)
 
   l = n->stats_total.clocks - n->stats_last_clear.clocks;  
   w = ((f64)(n->stats_total.invaild_clocks - n->stats_last_clear.invaild_clocks) * 100/(f64)l );
+  t = n->stats_total.invaild_calls - n->stats_last_clear.invaild_calls; 
   c = n->stats_total.calls - n->stats_last_clear.calls;
   p = n->stats_total.vectors - n->stats_last_clear.vectors;
   d = n->stats_total.suspends - n->stats_last_clear.suspends;
@@ -215,11 +216,11 @@ format_vlib_node_stats (u8 * s, va_list * va)
 			c, p, d, x, v);
   } else {
   	if (max)
-	    s = format (s, "%-30v%=17.2e%=16d%=16.2e%=16.2e%=16.2e%=8.2f%%",
-			ns, maxc, maxn, maxcn, x, v, w);
+	    s = format (s, "%-30v%=17.2e%=16d%=16.2e%=16.2e%=16.2e%=8.2f%%%16d",
+			ns, maxc, maxn, maxcn, x, v, w, t);
 	  else
-	    s = format (s, "%-30v%=12s%16Ld%16Ld%16Ld%16.2e%16.2f%8.2f%%", ns, state,
-			c, p, d, x, v, w);
+	    s = format (s, "%-30v%=12s%16Ld%16Ld%16Ld%16.2e%16.2f%8.2f%%%16d", ns, state,
+			c, p, d, x, v, w, t);
   }
 
   if (ns != n->name)
