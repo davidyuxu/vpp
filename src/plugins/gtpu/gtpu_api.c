@@ -221,6 +221,7 @@ static void vl_api_gtpu_add_del_tunnel_v2_t_handler
 
 	
 	vl_api_ip_add_del_route_t r;
+    memset (&r, 0, sizeof(r));
     r.client_index = mp->client_index;
     r.context = mp->context;
 	r.is_add = mp->is_add;
