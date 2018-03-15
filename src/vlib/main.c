@@ -1495,6 +1495,7 @@ vlib_main_or_worker_loop (vlib_main_t * vm, int is_main)
 	}
 
       /* Process pre-input nodes. */
+      if (is_main) /* PRE-INPUT can only run in main thread, by Jordy */
       vec_foreach (n, nm->nodes_by_type[VLIB_NODE_TYPE_PRE_INPUT])
 	cpu_time_now = dispatch_node (vm, n,
 				      VLIB_NODE_TYPE_PRE_INPUT,
