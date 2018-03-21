@@ -709,8 +709,10 @@ show_memory_usage (vlib_main_t * vm,
 
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
-      if (unformat (input, "verbose"))
-	verbose = 1;
+      if (unformat (input, "verbose %d", &verbose))
+      	;
+      else if (unformat (input, "verbose"))
+      	verbose = 1;
       else
 	{
 	  error = clib_error_return (0, "unknown input `%U'",

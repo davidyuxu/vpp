@@ -112,6 +112,8 @@ do_one_file (vat_main_t * vam)
 	  fgets ((char *) vam->inbuf, vec_len (vam->inbuf), vam->ifp) == 0)
 	break;
 
+//process_cmd:
+
       vam->input_line_number++;
 
       vec_free (this_cmd);
@@ -183,6 +185,46 @@ do_one_file (vat_main_t * vam)
       rv = (*fp) (vam);
       if (rv < 0)
 	errmsg ("%s error: %U\n", cmdp, format_api_error, vam, rv);
+#if 0
+      else {
+	u32 is_gtp_cmd = (NULL == strstr((char *)vam->inbuf, "gtpu_add_del_tunnel")) ? 0 : 1;
+	u32 is_del = (NULL == strstr((char *)vam->inbuf, " del")) ? 0 : 1;
+	if (is_gtp_cmd && !is_del) {
+	  char * end = strchr((char *)vam->inbuf, '\n');
+	  u8 *outbuf;
+
+	  if (end)
+	    *end = '\0';
+
+	  outbuf = format(0, "%s del\n", (char *)vam->inbuf);
+	  
+	  if (0 == fgets ((char *) vam->inbuf, vec_len (vam->inbuf), vam->ifp)) {
+	    break;
+	  }
+	  
+	  if (strstr((char *)vam->inbuf, "ip_add_del_route")) {
+	    char * sw_if_str = strstr((char *)vam->inbuf, "sw_if_index");
+	    if (sw_if_str) {
+	      u8 *append_str= format(0, "sw_if_index %d", vam->sw_if_index);
+	      
+	      *sw_if_str = '\0';
+	      
+	      strcat((char *)vam->inbuf, (char *)append_str);
+	      fprintf (vam->ofp, "%s del\n", (char *)vam->inbuf);
+	      strcat((char *)vam->inbuf, "\n");
+
+	      vec_free (append_str);
+	      fputs((char *)outbuf, vam->ofp);
+	    }
+	  }
+
+	  vec_free (outbuf);
+
+	  goto process_cmd;
+	}
+      }
+#endif
+
       unformat_free (vam->input);
 
       if (vam->regenerate_interface_table)

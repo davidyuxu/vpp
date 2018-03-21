@@ -520,6 +520,9 @@ dpo_stack_from_node (u32 child_node_index,
         }
     }
     dpo_stack_i(edge, dpo, parent);
+
+    /* should free this local vector to avoid memory leak, by Jordy */
+    vec_free(parent_indices);
 }
 
 static clib_error_t *

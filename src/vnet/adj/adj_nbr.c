@@ -44,7 +44,7 @@ static BVT(clib_bihash) **adj_nbr_tables[FIB_PROTOCOL_MAX];
 /* Allow all p2p interfaces to use a separate mheap, by Jordy */
 static void *adj_nbr_mheap_p2p = NULL;
 #define ADJ_NBR_P2P_HASH_NUM_BUCKETS (1)
-#define ADJ_NBR_P2P_HASH_MEMORY_SIZE (32<<20)
+#define ADJ_NBR_P2P_HASH_MEMORY_SIZE (64<<20)
 
 static void
 adj_nbr_insert (fib_protocol_t nh_proto,
@@ -148,7 +148,9 @@ dump_adj_hash (vlib_main_t * vm,
   }
 
   if (~0 == sw_if_index) {
-    return clib_error_return (0, "Please specify the interface!");
+    vlib_cli_output (vm, "P2p Adj mheap:\n %U\n",
+	      format_mheap, adj_nbr_mheap_p2p, verbose);
+    return 0;
   }
 
   FOR_EACH_FIB_PROTOCOL (proto)

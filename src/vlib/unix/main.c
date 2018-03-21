@@ -623,6 +623,8 @@ vlib_unix_main (int argc, char *argv[])
     }
   unformat_free (&input);
 
+  clib_elf_main_init(vm->name);
+
   vlib_thread_stack_init (0);
 
   __os_thread_index = 0;

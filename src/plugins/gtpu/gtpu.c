@@ -877,10 +877,27 @@ show_gtpu_tunnel_command_fn (vlib_main_t * vm,
 {
   gtpu_main_t *gtm = &gtpu_main;
   gtpu_tunnel_t *t;
+  int verbose = 0;
+  clib_error_t *error;
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "verbose"))
+	verbose++;
+      else
+	{
+	  error = clib_error_return (0, "unknown input `%U'",
+				     format_unformat_error, input);
+	  return error;
+	}
+    }
 
   if (pool_elts (gtm->tunnels) == 0)
     vlib_cli_output (vm, "No gtpu tunnels configured...");
+  else
+    vlib_cli_output (vm, "%d gtpu tunnels configured!", pool_elts (gtm->tunnels));
 
+  if (verbose > 0)
   pool_foreach (t, gtm->tunnels, (
 				   {
 				   vlib_cli_output (vm, "%U",
@@ -1154,6 +1171,9 @@ gtpu_tunnels_init()
 
   return 0;
 }
+
+/** Default heap size for the IPv4 mtries */
+#define GTPU_REWRITE_HEAP_SIZE (32<<20)
 
 static clib_error_t *
 gtpu_config (vlib_main_t * vm, unformat_input_t * input)
