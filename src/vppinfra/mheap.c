@@ -539,6 +539,7 @@ mheap_get_search_free_list (void *v,
 	}
     }
 
+  bin = user_data_size_to_bin_index (n_user_bytes + align);
   for (i = bin / BITS (uword); i < ARRAY_LEN (h->non_empty_free_elt_heads);
        i++)
     {
@@ -639,6 +640,9 @@ mheap_get_extend_vector (void *v,
   return v;
 }
 
+/* Optimized minimal allocate size to avoid memory fragments, by Jordy */
+#define OPTIMIZED_MHEAP_MIN_USER_DATA_BYTES  32
+
 void *
 mheap_get_aligned (void *v,
 		   uword n_user_data_bytes,
@@ -665,8 +669,10 @@ mheap_get_aligned (void *v,
 
   /* Round requested size. */
   n_user_data_bytes = clib_max (n_user_data_bytes, MHEAP_MIN_USER_DATA_BYTES);
-  /* Fix small size with cache-line align issue, by Jordy */
-  n_user_data_bytes = clib_max (n_user_data_bytes, align);
+
+  /* Adjust minimal user data size to eliminate performance issue, by Jordy */
+  n_user_data_bytes = clib_max (n_user_data_bytes, OPTIMIZED_MHEAP_MIN_USER_DATA_BYTES);
+  
   n_user_data_bytes =
     round_pow2 (n_user_data_bytes,
 		STRUCT_SIZE_OF (mheap_elt_t, user_data[0]));
@@ -1193,7 +1199,7 @@ format_mheap (u8 * s, va_list * va)
     s = format (s, ", %U capacity", format_mheap_byte_count, usage.bytes_max);
 
   /* Show histogram of sizes. */
-  if (verbose > 1)
+  if ((verbose == 5) || (verbose >= 100))
     {
       uword hist[MHEAP_N_BINS];
       mheap_elt_t *e;
@@ -1269,7 +1275,7 @@ format_mheap (u8 * s, va_list * va)
 	  {
 	    if (i > 0)
 	      s = format (s, "%U", format_white_space, indent);
-#ifdef CLIB_UNIX
+#if 1//#ifdef CLIB_UNIX
 	    s =
 	      format (s, " %U\n", format_clib_elf_symbol_with_address,
 		      t->callers[i]);
@@ -1294,31 +1300,84 @@ format_mheap (u8 * s, va_list * va)
 
   /* FIXME.  This output could be wrong in the unlikely case that format
      uses the same mheap as we are currently inspecting. */
-  if (verbose > 1)
+  if ((verbose == 4) || (verbose >= 100))
     {
       mheap_elt_t *e;
       uword i, o;
 
       s = format (s, "\n");
 
-      e = mheap_elt_at_uoffset (v, 0);
+      e = v; //mheap_elt_at_uoffset (v, 0);
       i = 0;
       while (1)
 	{
-	  if ((i % 8) == 0)
+	  if ((i % 4) == 0)
 	    s = format (s, "%8d: ", i);
 
 	  o = mheap_elt_uoffset (v, e);
 
 	  if (e->is_free)
-	    s = format (s, "(%8d) ", o);
+	    s = format (s, "(%08x-%-4d) ", o, e->n_user_data);
 	  else
-	    s = format (s, " %8d  ", o);
+	    s = format (s, " %08x-%-4d  ", o, e->n_user_data);
 
-	  if ((i % 8) == 7 || (i + 1) >= h->n_elts)
+	  if ((i % 4) == 3 || (i + 1) >= h->n_elts)
 	    s = format (s, "\n");
+
+	  if (e->n_user_data != MHEAP_N_USER_DATA_INVALID) {
+            e = mheap_next_elt (e);
+	    i++;
+	  } else
+	    break;
 	}
     }
+
+  if ((verbose == 2) || (verbose == 3) || (verbose >= 100)) {
+  	uword bin, count, cl_align_count_off0, cl_align_count_off4;
+#if CLIB_VEC64 > 0
+	u64 offset;
+#else
+	u32 offset;
+#endif
+	mheap_elt_t *e;
+
+	s = format(s, "\nFree list:\n");
+	for (bin = 0; bin < MHEAP_N_BINS; bin++) {
+	  offset = h->first_free_elt_uoffset_by_bin[bin];
+	  if (offset != MHEAP_GROUNDED)
+	    s = format(s, "bin %d:\n", bin);
+
+	  count = 0;
+	  cl_align_count_off0 = cl_align_count_off4 = 0;
+	  while (offset != MHEAP_GROUNDED) {
+	    e = mheap_elt_at_uoffset (v, offset);
+	    
+	    if (((verbose == 3) && (count < 4)) || (verbose >= 100))
+	      s = format(s, "%4d(%08x %02d) ", mheap_elt_data_bytes (e), offset, offset % CLIB_CACHE_LINE_BYTES);
+
+	    if ((offset % CLIB_CACHE_LINE_BYTES) == 0)
+	    	cl_align_count_off0++;
+
+	    if (((offset + 4) % CLIB_CACHE_LINE_BYTES) == 0)
+	    	cl_align_count_off4++;
+	    
+	    count++;
+
+	    if (verbose >= 100)
+  	      if ((count % 4 == 0) || (offset == MHEAP_GROUNDED))
+  	    	s = format(s, "\n");
+
+	    if (verbose == 3)
+	      if ((count == 4) || (offset == MHEAP_GROUNDED))
+	        s = format(s, "\n");
+
+	    offset = e->free_elt.next_uoffset;
+	  }
+	  
+	  if (count)
+	    s = format(s, "total %d, total ca_0 %d, total ca_4 %d\n", count, cl_align_count_off0, cl_align_count_off4);
+	}
+  }
 
   mheap_maybe_unlock (v);
 
