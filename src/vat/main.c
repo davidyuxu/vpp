@@ -77,6 +77,13 @@ format_api_error (u8 * s, va_list * args)
   return s;
 }
 
+typedef struct {
+  char event[8];
+  u64  time;
+}myevent;
+
+myevent * events;
+
 void
 do_one_file (vat_main_t * vam)
 {
@@ -87,6 +94,7 @@ do_one_file (vat_main_t * vam)
   u8 *cmdp, *argsp;
   uword *p;
   u8 *this_cmd = 0;
+  myevent startev = {"start", 0}, endev = {"end", 0};
 
   vam->input = &_input;
 
@@ -182,7 +190,14 @@ do_one_file (vat_main_t * vam)
 	  fp = exec;
 	}
 
+      startev.time = clib_cpu_time_now();
+      vec_add1(events, startev);
+      
       rv = (*fp) (vam);
+
+      endev.time = clib_cpu_time_now();
+      vec_add1(events, endev);
+
       if (rv < 0)
 	errmsg ("%s error: %U\n", cmdp, format_api_error, vam, rv);
 #if 0
@@ -445,6 +460,8 @@ main (int argc, char **argv)
     api_sw_interface_dump (vam);
 
   vec_validate (vam->inbuf, 4096);
+  vec_validate (events, 200000);
+  _vec_len (events) = 0;
 
   vam->current_file = (u8 *) "plugin-init";
   vat_plugin_init (vam);
@@ -463,8 +480,18 @@ main (int argc, char **argv)
       fclose (vam->ifp);
     }
 
+  /* dump all events here */
+  myevent *e;
+  vec_foreach (e, events)
+  {
+    f64 dt = (e->time - vam->clib_time.init_cpu_time) * vam->clib_time.seconds_per_clock;
+    fprintf(vam->ofp, "%8s %18.9f\n", e->event, dt);
+  }
+
   if (output_file)
     fclose (vam->ofp);
+
+  clib_warning ("\nmheap usage: %U\n", format_mheap, heap, 1);
 
   if (interactive)
     {
