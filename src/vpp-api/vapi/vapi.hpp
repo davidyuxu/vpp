@@ -36,6 +36,8 @@
 #include <unordered_set>
 #endif
 
+extern "C" vapi_msg_id_t vapi_msg_id_memclnt_keepalive;
+
 /**
  * @file
  * @brief C++ VPP API
@@ -301,7 +303,7 @@ public:
 						VAPI_DBG ("not break, continue to recv");
 					}
 				} else {
-					if (id == vapi_get_msg_id_t<vapi_msg_memclnt_keepalive>()) {
+					if (id == vapi_msg_id_memclnt_keepalive) {
 						keepalive_rcv++;
 					} else {
 						discard++;
