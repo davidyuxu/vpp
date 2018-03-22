@@ -164,6 +164,7 @@ define sw_interface_dump
   u32 context;
   u8 name_filter_valid;
   u8 name_filter[49];
+  u32 max_interface;
 };
 
 /** \brief Set or delete one or all ip addresses on a specified interface
@@ -554,6 +555,50 @@ autoreply define collect_detailed_interface_stats
   u32 context;
   u32 sw_if_index;
   u8  enable_disable;
+};
+
+
+/** \brief Get interface stats
+    @param context - sender context, to match reply w/ request
+    @param count - interface count
+    @param sw_if_index - index of the interface
+*/
+define get_sw_interface_stats
+{
+  u32 client_index;
+  u32 context;
+  u32 count;
+  u32 sw_if_index[count];
+};
+
+
+typeonly manual_print manual_endian define sw_interface_counters
+{
+  	u32 sw_if_index;
+
+	u64 rx_pkts;
+	u64 rx_bytes;
+	u64 tx_pkts;
+	u64 tx_bytes;
+	u64 drop;
+	u64 punt;
+	u64 ip4;
+	u64 ip6;
+	u64 rx_no_buf;
+	u64 rx_miss;
+	u64 rx_error;
+	u64 tx_error;
+};
+
+/** \brief Get interface stats response
+    @param context - sender context, to match reply w/ request
+*/
+define get_sw_interface_stats_reply
+{
+  u32 context;
+  i32 retval;
+  u32 count;
+  vl_api_sw_interface_counters_t data[count];
 };
 
 /*

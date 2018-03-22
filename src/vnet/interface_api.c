@@ -48,6 +48,8 @@
 #include <vlibapi/api_helper_macros.h>
 vpe_api_main_t vpe_api_main;
 
+#define SW_INTERFACE_COUNTER_BATCH_SIZE	126
+
 #define foreach_vpe_api_msg                                     \
 _(SW_INTERFACE_SET_FLAGS, sw_interface_set_flags)               \
 _(SW_INTERFACE_SET_MTU, sw_interface_set_mtu)                   \
@@ -69,7 +71,9 @@ _(CREATE_LOOPBACK, create_loopback)				\
 _(CREATE_LOOPBACK_INSTANCE, create_loopback_instance)		\
 _(DELETE_LOOPBACK, delete_loopback)                             \
 _(INTERFACE_NAME_RENUMBER, interface_name_renumber)             \
-_(COLLECT_DETAILED_INTERFACE_STATS, collect_detailed_interface_stats)
+_(COLLECT_DETAILED_INTERFACE_STATS, collect_detailed_interface_stats) \
+_(GET_SW_INTERFACE_STATS, get_sw_interface_stats)                         
+
 
 static void
 vl_api_sw_interface_set_flags_t_handler (vl_api_sw_interface_set_flags_t * mp)
@@ -140,6 +144,8 @@ vl_api_sw_interface_set_mtu_t_handler (vl_api_sw_interface_set_mtu_t * mp)
   BAD_SW_IF_INDEX_LABEL;
   REPLY_MACRO (VL_API_SW_INTERFACE_SET_MTU_REPLY);
 }
+
+
 
 static void
 send_sw_interface_details (vpe_api_main_t * am,
@@ -283,6 +289,112 @@ vl_api_sw_interface_dump_t_handler (vl_api_sw_interface_dump_t * mp)
 
   vec_free (name);
   vec_free (filter);
+}
+
+static void
+vl_api_get_sw_interface_stats_t_handler (vl_api_get_sw_interface_stats_t * mp)
+{
+  vpe_api_main_t *am = &vpe_api_main;
+  vnet_interface_main_t *im = &am->vnet_main->interface_main;
+  vl_api_get_sw_interface_stats_reply_t *rmp;
+  vl_api_sw_interface_counters_t counter[SW_INTERFACE_COUNTER_BATCH_SIZE] = {0};
+  vlib_combined_counter_main_t *ccm;
+  vlib_simple_counter_main_t *scm;
+  u32 i, count;
+  u32 mp_size;
+  int rv = 0;
+  vlib_counter_t v;
+  u64 c;
+
+  count = ntohl(mp->count); 
+  count = count < SW_INTERFACE_COUNTER_BATCH_SIZE ? count : SW_INTERFACE_COUNTER_BATCH_SIZE;
+  mp_size = sizeof (vl_api_sw_interface_counters_t) * count;
+  
+  for (i = 0; i < count; i++) {
+      counter[i].sw_if_index = mp->sw_if_index[i];
+      if (!vnet_sw_if_index_is_api_valid(ntohl(counter[i].sw_if_index))) {        
+          rv = VNET_API_ERROR_INVALID_SW_IF_INDEX;                
+          goto done;                                   
+      }
+  }
+
+
+  vnet_interface_counter_lock (im);
+  
+  for (i = 0; i < count; i++) {
+    ccm = &im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_RX];
+    if (vec_len(ccm) > counter[i].sw_if_index) {
+      vlib_get_combined_counter (ccm, counter[i].sw_if_index, &v);
+      clib_mem_unaligned (&counter[i].rx_pkts, u64) = clib_host_to_net_u64 (v.packets);
+      clib_mem_unaligned (&counter[i].rx_bytes, u64) = clib_host_to_net_u64 (v.bytes);
+    }
+
+    ccm = &im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_TX];
+    if (vec_len(ccm) > counter[i].sw_if_index) {
+      vlib_get_combined_counter (ccm, counter[i].sw_if_index, &v);
+      clib_mem_unaligned (&counter[i].tx_pkts, u64) = clib_host_to_net_u64 (v.packets);
+      clib_mem_unaligned (&counter[i].tx_bytes, u64) = clib_host_to_net_u64 (v.bytes);
+    }
+
+
+    scm = &im->sw_if_counters[VNET_INTERFACE_COUNTER_DROP];
+    if (vec_len(scm) > counter[i].sw_if_index) {
+      c = vlib_get_simple_counter (scm, counter[i].sw_if_index);
+      clib_mem_unaligned (&counter[i].drop, u64) = clib_host_to_net_u64 (c);
+    }
+
+
+    scm = &im->sw_if_counters[VNET_INTERFACE_COUNTER_PUNT];
+    if (vec_len(scm) > counter[i].sw_if_index) {
+      c = vlib_get_simple_counter (scm, counter[i].sw_if_index);
+      clib_mem_unaligned (&counter[i].punt, u64) = clib_host_to_net_u64 (c);
+    }
+
+    scm = &im->sw_if_counters[VNET_INTERFACE_COUNTER_IP4];
+    if (vec_len(scm) > counter[i].sw_if_index) {
+      c = vlib_get_simple_counter (scm, counter[i].sw_if_index);
+      clib_mem_unaligned (&counter[i].ip4, u64) = clib_host_to_net_u64 (c);
+    }
+
+    scm = &im->sw_if_counters[VNET_INTERFACE_COUNTER_IP6];
+    if (vec_len(scm) > counter[i].sw_if_index) {
+      c = vlib_get_simple_counter (scm, counter[i].sw_if_index);
+      clib_mem_unaligned (&counter[i].ip6, u64) = clib_host_to_net_u64 (c);
+    }
+
+    scm = &im->sw_if_counters[VNET_INTERFACE_COUNTER_RX_NO_BUF];
+    if (vec_len(scm) > counter[i].sw_if_index) {
+      c = vlib_get_simple_counter (scm, counter[i].sw_if_index);
+      clib_mem_unaligned (&counter[i].rx_no_buf, u64) = clib_host_to_net_u64 (c);
+    }
+
+    scm = &im->sw_if_counters[VNET_INTERFACE_COUNTER_RX_MISS];
+    if (vec_len(scm) > counter[i].sw_if_index) {
+      c = vlib_get_simple_counter (scm, counter[i].sw_if_index);
+      clib_mem_unaligned (&counter[i].rx_miss, u64) = clib_host_to_net_u64 (c);
+    }
+
+    scm = &im->sw_if_counters[VNET_INTERFACE_COUNTER_RX_ERROR];
+    if (vec_len(scm) > counter[i].sw_if_index) {
+      c = vlib_get_simple_counter (scm, counter[i].sw_if_index);
+      clib_mem_unaligned (&counter[i].rx_error, u64) = clib_host_to_net_u64 (c);
+    }
+
+    scm = &im->sw_if_counters[VNET_INTERFACE_COUNTER_TX_ERROR];
+    if (vec_len(scm) > counter[i].sw_if_index) {
+      c = vlib_get_simple_counter (scm, counter[i].sw_if_index);
+      clib_mem_unaligned (&counter[i].tx_error, u64) = clib_host_to_net_u64 (c);
+    }
+
+  }
+
+  vnet_interface_counter_unlock (im);
+
+done:
+  REPLY_MACRO4 (VL_API_GET_SW_INTERFACE_STATS_REPLY, mp_size, { 
+    rmp->count = htonl(count);
+    memcpy(rmp->data, counter, count * sizeof(vl_api_sw_interface_counters_t));
+    });
 }
 
 static void
