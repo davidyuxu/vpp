@@ -115,6 +115,10 @@ if ENABLE_GTPLO_PLUGIN
 include gtplo.am
 endif
 
+if ENABLE_PPF_GTPU_PLUGIN
+include ppf_gtpu.am
+endif
+
 include ../suffix-rules.mk
 
 # Remove *.la files
