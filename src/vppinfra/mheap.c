@@ -671,7 +671,7 @@ mheap_get_aligned (void *v,
   n_user_data_bytes = clib_max (n_user_data_bytes, MHEAP_MIN_USER_DATA_BYTES);
 
   /* Adjust minimal user data size to eliminate performance issue, by Jordy */
-  n_user_data_bytes = clib_max (n_user_data_bytes, OPTIMIZED_MHEAP_MIN_USER_DATA_BYTES);
+  //n_user_data_bytes = clib_max (n_user_data_bytes, OPTIMIZED_MHEAP_MIN_USER_DATA_BYTES);
   
   n_user_data_bytes =
     round_pow2 (n_user_data_bytes,
