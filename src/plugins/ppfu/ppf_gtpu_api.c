@@ -25,13 +25,13 @@
 #include <vppinfra/byte_order.h>
 #include <vlibmemory/api.h>
 
-#include <ppf_gtpu/ppf_gtpu.h>
+#include <ppfu/ppf_gtpu.h>
 
 
 #define vl_msg_id(n,h) n,
 typedef enum
 {
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
   /* We'll want to know how many messages IDs we need... */
   VL_MSG_FIRST_AVAILABLE,
 } vl_msg_id_t;
@@ -39,28 +39,28 @@ typedef enum
 
 /* define message structures */
 #define vl_typedefs
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
 #include <vnet/ip/ip.api.h>
 #undef vl_typedefs
 
 /* define generated endian-swappers */
 #define vl_endianfun
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
 #undef vl_endianfun
 
 /* instantiate all the print functions we know about */
 #define vl_print(handle, ...) vlib_cli_output (handle, __VA_ARGS__)
 #define vl_printfun
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
 #undef vl_printfun
 
 /* Get the API version number */
 #define vl_api_version(n,v) static u32 api_version=(v);
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
 #undef vl_api_version
 
 #define vl_msg_name_crc_list
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
 #undef vl_msg_name_crc_list
 
 #define REPLY_MSG_ID_BASE gtm->msg_id_base
@@ -119,9 +119,12 @@ static void vl_api_ppf_gtpu_add_del_tunnel_t_handler
     .mcast_sw_if_index = ntohl (mp->mcast_sw_if_index),
     .encap_fib_index = p[0],
     .decap_next_index = ntohl (mp->decap_next_index),
-    .teid = ntohl (mp->teid),
+    .in_teid = ntohl (mp->in_teid),
+    .out_teid = ntohl (mp->out_teid),
     .dst = to_ip46 (mp->is_ipv6, mp->dst_address),
     .src = to_ip46 (mp->is_ipv6, mp->src_address),
+    .call_id = 0,
+    .tunnel_type = 0,
   };
 
   /* Check src & dst are different */
@@ -194,9 +197,12 @@ static void vl_api_ppf_gtpu_add_del_tunnel_v2_t_handler
     .mcast_sw_if_index = ntohl (mp->mcast_sw_if_index),
     .encap_fib_index = p[0],
     .decap_next_index = ntohl (mp->decap_next_index),
-    .teid = ntohl (mp->teid),
+    .in_teid = ntohl (mp->in_teid),
+    .out_teid = ntohl (mp->out_teid),   
     .dst = to_ip46 (mp->is_ipv6, mp->dst_address),
     .src = to_ip46 (mp->is_ipv6, mp->src_address),
+    .call_id = 0,
+    .tunnel_type = 0,
   };
 
   /* Check src & dst are different */
@@ -288,7 +294,8 @@ static void send_ppf_gtpu_tunnel_details
       rmp->encap_vrf_id = htonl (im4->fibs[t->encap_fib_index].ft_table_id);
     }
   rmp->mcast_sw_if_index = htonl (t->mcast_sw_if_index);
-  rmp->teid = htonl (t->teid);
+  rmp->in_teid = htonl (t->in_teid);
+  rmp->out_teid = htonl (t->out_teid);
   rmp->decap_next_index = htonl (t->decap_next_index);
   rmp->sw_if_index = htonl (t->sw_if_index);
   rmp->is_ipv6 = is_ipv6;

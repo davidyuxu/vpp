@@ -38,7 +38,8 @@ define ppf_gtpu_add_del_tunnel
   u32 mcast_sw_if_index;
   u32 encap_vrf_id;
   u32 decap_next_index;
-  u32 teid;
+  u32 in_teid;
+  u32 out_teid;
 };
 
 /** \brief reply for set or delete an GTPU tunnel
@@ -86,7 +87,8 @@ define ppf_gtpu_tunnel_details
   u32 mcast_sw_if_index;
   u32 encap_vrf_id;
   u32 decap_next_index;
-  u32 teid;
+  u32 in_teid;
+  u32 out_teid;
 };
 
 /** \brief Interface set ppf_gtpu-bypass request
@@ -163,7 +165,8 @@ define ppf_gtpu_add_del_tunnel_v2
   u32 mcast_sw_if_index;
   u32 encap_vrf_id;
   u32 decap_next_index;
-  u32 teid;
+  u32 in_teid;
+  u32 out_teid;
   u32 next_hop_sw_if_index;
   u32 table_id;
   u32 classify_table_index;

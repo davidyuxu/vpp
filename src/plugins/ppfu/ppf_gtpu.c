@@ -29,7 +29,8 @@
 #include <vnet/dpo/dpo.h>
 #include <vnet/plugin/plugin.h>
 #include <vpp/app/version.h>
-#include <ppf_gtpu/ppf_gtpu.h>
+#include <ppfu/ppf_gtpu.h>
+#include <ppfu/ppfu.h>
 
 
 ppf_gtpu_main_t ppf_gtpu_main;
@@ -63,6 +64,14 @@ format_decap_next (u8 * s, va_list * args)
       return format (s, "ip4");
     case PPF_GTPU_INPUT_NEXT_IP6_INPUT:
       return format (s, "ip6");
+    case PPF_GTPU_INPUT_NEXT_GTPLO:
+      return format (s, "gtplo");
+    case PPF_GTPU_INPUT_NEXT_PPF_GTP4_ENCAP:
+      return format (s, "ppf_gtpu4-encap");
+    case PPF_GTPU_INPUT_NEXT_PPF_PDCP_INPUT:
+      return format (s, "ppf_pdcp_input");
+    case PPF_GTPU_INPUT_NEXT_PPF_SB_PATH_LB:
+      return format (s, "ppf_sb_path_lb");
     default:
       return format (s, "index %d", next_index);
     }
@@ -75,11 +84,11 @@ format_ppf_gtpu_tunnel (u8 * s, va_list * args)
   ppf_gtpu_tunnel_t *t = va_arg (*args, ppf_gtpu_tunnel_t *);
   ppf_gtpu_main_t *ngm = &ppf_gtpu_main;
 
-  s = format (s, "[%d] src %U dst %U teid %d fib-idx %d sw-if-idx %d ",
+  s = format (s, "[%d] src %U dst %U in_teid %d out_teid %d fib-idx %d sw-if-idx %d ",
 	      t - ngm->tunnels,
 	      format_ip46_address, &t->src, IP46_TYPE_ANY,
 	      format_ip46_address, &t->dst, IP46_TYPE_ANY,
-	      t->teid,  t->encap_fib_index, t->sw_if_index);
+	      t->in_teid, t->out_teid, t->encap_fib_index, t->sw_if_index);
 
   s = format (s, "encap-dpo-idx %d ", t->next_dpo.dpoi_index);
   s = format (s, "decap-next-%U ", format_decap_next, t->decap_next_index);
@@ -205,14 +214,16 @@ const static fib_node_vft_t ppf_gtpu_vft = {
 
 
 #define foreach_copy_field                      \
-_(teid)                                          \
+_(in_teid)                                   \
+_(out_teid)						\
 _(mcast_sw_if_index)                            \
 _(encap_fib_index)                              \
 _(decap_next_index)                             \
 _(src)                                          \
 _(dst)							\
 _(call_id)							\
-_(direction)
+_(tunnel_type)						\
+
 
 static void
 ip_udp_ppf_gtpu_rewrite (ppf_gtpu_tunnel_t * t, bool is_ip6)
@@ -268,7 +279,7 @@ ip_udp_ppf_gtpu_rewrite (ppf_gtpu_tunnel_t * t, bool is_ip6)
   /* PPF_GTPU header */
   ppf_gtpu->ver_flags = PPF_GTPU_V1_VER | PPF_GTPU_PT_GTP;
   ppf_gtpu->type = PPF_GTPU_TYPE_PPF_GTPU;
-  ppf_gtpu->teid = clib_host_to_net_u32 (t->teid);
+  ppf_gtpu->teid = clib_host_to_net_u32 (t->out_teid);
 
   t->rewrite = r.rw;
   /* Now only support 8-byte ppf_gtpu header. TBD */
@@ -374,13 +385,13 @@ int vnet_ppf_gtpu_add_del_tunnel
   if (!is_ip6)
     {
       key4.src = a->dst.ip4.as_u32;	/* decap src in key is encap dst in config */
-      key4.teid = clib_host_to_net_u32 (a->teid);
+      key4.teid = clib_host_to_net_u32 (a->in_teid);
       p = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64);
     }
   else
     {
       key6.src = a->dst.ip6;
-      key6.teid = clib_host_to_net_u32 (a->teid);
+      key6.teid = clib_host_to_net_u32 (a->in_teid);
       p = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6);
     }
 
@@ -417,9 +428,25 @@ int vnet_ppf_gtpu_add_del_tunnel
 
 	//add by lollita for ppf gtpu tunnel swap
 	call_key4.call_id = t->call_id;
-	call_key4.direction = t->direction;
+	call_key4.tunnel_type = t->tunnel_type;
 	hash_set (gtm->ppf_gtpu4_tunnel_by_callid_dir, call_key4.as_u64, t - gtm->tunnels);
-	
+
+	if (t->tunnel_type == PPF_GTPU_SB ) {
+		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_PDCP_INPUT;
+	} else if (t->tunnel_type == PPF_GTPU_NB ||t->tunnel_type == PPF_GTPU_SRB || t->tunnel_type == PPF_GTPU_LBO) {
+		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_SB_PATH_LB;
+	}
+
+	if (is_ip6) 
+	 t->encap_next_index = PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP;
+	else
+	 t->encap_next_index = PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+
+
+	if (t->decap_next_index == ~0) {
+		return VNET_API_ERROR_NEXT_HOP_NOT_FOUND_MP;
+	}
+		
       vnet_hw_interface_t *hi;
       if (vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) > 0)
 	{
@@ -660,14 +687,20 @@ unformat_decap_next (unformat_input_t * input, va_list * args)
 }
 
 static uword
-unformat_ppf_gtpu_direction (unformat_input_t * input, va_list * args)
+unformat_ppf_gtpu_tunnel_type (unformat_input_t * input, va_list * args)
 {
   u32 *result = va_arg (*args, u32 *);
   
-  if (unformat (input, "ppfuplink"))
-    *result = PPF_GTPU_UPLINK;
-  else if (unformat (input, "ppfdownlink"))
-    *result = PPF_GTPU_DOWNLINK;
+  if (unformat (input, "sb"))
+    *result = PPF_GTPU_SB;
+  else if (unformat (input, "nb"))
+    *result = PPF_GTPU_NB;
+  else if (unformat (input, "srb"))
+    *result = PPF_GTPU_SRB;
+  else if (unformat (input, "lbo"))
+    *result = PPF_GTPU_LBO;
+  else
+  	return 0;
 
   return 1;
 }
@@ -688,10 +721,11 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
   u8 ipv6_set = 0;
   u32 encap_fib_index = 0;
   u32 mcast_sw_if_index = ~0;
-  u32 decap_next_index = PPF_GTPU_INPUT_NEXT_L2_INPUT;
   u32 call_id = ~0;
-  u32 direction = ~0;
-  u32 teid = 0;
+  u32 tunnel_type = ~0;
+  u32 in_teid = 0;
+  u32 out_teid = 0;
+  u32 decap_next_index = ~0;
   u32 tmp;
   int rv;
   vnet_ppf_gtpu_add_del_tunnel_args_t _a, *a = &_a;
@@ -764,12 +798,14 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 	}
 	else if (unformat (line_input, "call-id %d", &call_id))
 	;
-	else if (unformat (line_input, "direction %U", unformat_ppf_gtpu_direction, &direction))
+	else if (unformat (line_input, "tunnel-type %U", unformat_ppf_gtpu_tunnel_type, &tunnel_type))
 	;
       else if (unformat (line_input, "decap-next %U", unformat_decap_next,
 			 &decap_next_index, ipv4_set))
 	;
-      else if (unformat (line_input, "teid %d", &teid))
+      else if (unformat (line_input, "inteid %d", &in_teid))
+	;
+	else if (unformat (line_input, "outteid %d", &out_teid))
 	;
       else
 	{
@@ -821,26 +857,6 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
       goto done;
     }
 
-  if (call_id != ~0)
-  {
-
-#if 0
-  	if (direction != PPF_GTPU_UPLINK || direction != PPF_GTPU_DOWNLINK) 
-  	{
-		error = clib_error_return (0, "direction should be ppfuplink or ppfdownlink");
-		goto done;
-  	}
- #endif
-	decap_next_index = PPF_GTPU_INPUT_NEXT_ENCAP;
-
-   }
-
-  if (decap_next_index == ~0)
-    {
-      error = clib_error_return (0, "next node not found");
-      goto done;
-    }
-
   memset (a, 0, sizeof (*a));
 
   a->is_add = is_add;
@@ -850,9 +866,8 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
   foreach_copy_field;
 #undef _
 
-  vlib_cli_output (vm, "decap-next: %d, call_id: %d, direction: %d", 
-		   a->decap_next_index, a->call_id, a->direction);
-
+  vlib_cli_output (vm, "call_id: %d, tunnel_type: %d, in_teid %d, out_teid %d\n", 
+		   a->call_id, a->tunnel_type, a->in_teid, a->out_teid);
 
   rv = vnet_ppf_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
 
@@ -860,9 +875,9 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
     {
     case 0:
       if (is_add)
-	vlib_cli_output (vm, "%U decap-next: %d, call_id: %d, direction: %d", format_vnet_sw_if_index_name,
+	vlib_cli_output (vm, "%U decap-next: %d, call_id: %d, tunnel_type: %d", format_vnet_sw_if_index_name,
 			 vnet_get_main (), tunnel_sw_if_index,
-			 a->decap_next_index, a->call_id, a->direction);
+			 a->decap_next_index, a->call_id, a->tunnel_type);
       break;
 
     case VNET_API_ERROR_TUNNEL_EXIST:
@@ -871,6 +886,10 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 
     case VNET_API_ERROR_NO_SUCH_ENTRY:
       error = clib_error_return (0, "tunnel does not exist...");
+      goto done;
+
+    case VNET_API_ERROR_NEXT_HOP_NOT_FOUND_MP:
+      error = clib_error_return (0, "can not find decap next index for the tunnel");
       goto done;
 
     default:
@@ -910,8 +929,8 @@ VLIB_CLI_COMMAND (create_ppf_gtpu_tunnel_command, static) = {
   .path = "create ppf_gtpu tunnel",
   .short_help =
   "create ppf_gtpu tunnel src <local-vtep-addr>"
-  " {dst <remote-vtep-addr>|group <mcast-vtep-addr> <intf-name>} teid <nn>"
-  " [encap-vrf-id <nn>] [decap-next [l2|ip4|ip6|node <name>]] [call-id <nn>] [del]",
+  " {dst <remote-vtep-addr>|group <mcast-vtep-addr> <intf-name>} inteid <nn> outteid <nn>"
+  " [encap-vrf-id <nn>] [decap-next [l2|ip4|ip6|node <name>]] [call-id <nn>] [tunnel-type <nn>] [del]",
   .function = ppf_gtpu_add_del_tunnel_command_fn,
 };
 /* *INDENT-ON* */
@@ -1132,13 +1151,14 @@ ppf_gtpu_tunnels_init()
   u32 encap_fib_index = 0;
   u32 mcast_sw_if_index = ~0;
   u32 decap_next_index = PPF_GTPU_INPUT_NEXT_IP4_INPUT;
-  u32 teid = gtm->start_teid;
+  u32 in_teid = gtm->start_teid;
+  u32 out_teid = gtm->start_teid;
   int rv;
   vnet_ppf_gtpu_add_del_tunnel_args_t _a, *a = &_a;
   u32 tunnel_sw_if_index;
   u32 i;
   u32 call_id = 0;
-  u32 direction = 0;
+  u32 tunnel_type = 0;
 
   /* Cant "universally zero init" (={0}) due to GCC bug 53119 */
   memset (&src, 0, sizeof src);
@@ -1155,7 +1175,7 @@ ppf_gtpu_tunnels_init()
 #undef _
 
   /* add */
-  for (i = 0; i < gtm->prealloc_tunnels; i++,a->teid++) {
+  for (i = 0; i < gtm->prealloc_tunnels; i++,a->in_teid++,a->out_teid++) {
     rv = vnet_ppf_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
     switch (rv)
       {
@@ -1178,8 +1198,9 @@ ppf_gtpu_tunnels_init()
 
   /* del */
   a->is_add = 0;
-  a->teid = gtm->start_teid;
-  for (i = 0; i < gtm->prealloc_tunnels; i++,a->teid++) {
+  a->in_teid = gtm->start_teid;
+  a->out_teid = gtm->start_teid;
+  for (i = 0; i < gtm->prealloc_tunnels; i++,a->in_teid++,a->out_teid++ ) {
     rv = vnet_ppf_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
     switch (rv)
       {

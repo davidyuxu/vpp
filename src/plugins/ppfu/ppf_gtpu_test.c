@@ -17,7 +17,7 @@
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
 #include <vppinfra/error.h>
-#include <ppf_gtpu/ppf_gtpu.h>
+#include <ppfu/ppf_gtpu.h>
 
 #define __plugin_msg_base ppf_gtpu_test_main.msg_id_base
 #include <vlibapi/vat_helper_macros.h>
@@ -62,7 +62,7 @@ uword unformat_ip46_prefix (unformat_input_t * input, va_list * args)
 
 #define vl_msg_id(n,h) n,
 typedef enum {
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
     /* We'll want to know how many messages IDs we need... */
     VL_MSG_FIRST_AVAILABLE,
 } vl_msg_id_t;
@@ -70,24 +70,24 @@ typedef enum {
 
 /* define message structures */
 #define vl_typedefs
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
 #undef vl_typedefs
 
 /* declare message handlers for each api */
 
 #define vl_endianfun             /* define message structures */
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
 #undef vl_endianfun
 
 /* instantiate all the print functions we know about */
 #define vl_print(handle, ...)
 #define vl_printfun
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
 #undef vl_printfun
 
 /* Get the API version number. */
 #define vl_api_version(n,v) static u32 api_version=(v);
-#include <ppf_gtpu/ppf_gtpu.api.h>
+#include <ppfu/ppf_gtpu.api.h>
 #undef vl_api_version
 
 typedef struct {

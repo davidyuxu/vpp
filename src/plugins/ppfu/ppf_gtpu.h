@@ -106,7 +106,7 @@ typedef CLIB_PACKED
     };
     struct {
       u32 call_id;
-      u32 direction;
+      u32 tunnel_type;
     };
     u64 as_u64;
     
@@ -126,6 +126,16 @@ typedef CLIB_PACKED
 }) ppf_gtpu6_tunnel_key_t;
 /* *INDENT-ON* */
 
+typedef enum
+{
+	PPF_GTPU_SB = 0, 			//The DRB SB GTP tunnel
+	PPF_GTPU_NB,			//The DRB NB GTP tunnel
+	PPF_GTPU_LBO,			//The GTP tunnel for PPF LBO
+	PPF_GTPU_SRB,			//The GTP SRB SB GTP tunnel
+	PPF_GTPU_NORMAL
+} ppf_gtpu_tunnel_type_t;
+
+
 typedef struct
 {
   /* Rewrite string */
@@ -135,7 +145,8 @@ typedef struct
   dpo_id_t next_dpo;
 
   /* ppf_gtpu teid in HOST byte order */
-  u32 teid;
+  u32 in_teid;
+  u32 out_teid;
 
   /* tunnel src and dst addresses */
   ip46_address_t src;
@@ -146,6 +157,7 @@ typedef struct
 
   /* decap next index */
   u32 decap_next_index;
+  u32 encap_next_index;
 
   /* The FIB index for src/dst addresses */
   u32 encap_fib_index;
@@ -175,16 +187,19 @@ typedef struct
   u32 sibling_index;
 
   u32 call_id;
-  u32 direction;
+  ppf_gtpu_tunnel_type_t tunnel_type;
+
 } ppf_gtpu_tunnel_t;
 
-#define foreach_ppf_gtpu_input_next        \
+ #define foreach_ppf_gtpu_input_next        \
 _(DROP, "error-drop")                  \
 _(L2_INPUT, "l2-input")                \
 _(IP4_INPUT,  "ip4-input")             \
 _(IP6_INPUT, "ip6-input" )             \
 _(GTPLO, "gtplo" )			   \
-_(ENCAP, "ppf_gtpu4-encap" )
+_(PPF_GTP4_ENCAP, "ppf_gtpu4-encap" )		   \
+_(PPF_PDCP_INPUT, "ppf_pdcp_input" )		   \
+_(PPF_SB_PATH_LB, "ppf_sb_path_lb" )
 
 
 typedef enum
@@ -198,10 +213,23 @@ typedef enum
 typedef enum
 {
 #define ppf_gtpu_error(n,s) PPF_GTPU_ERROR_##n,
-#include <ppf_gtpu/ppf_gtpu_error.def>
+#include <ppfu/ppf_gtpu_error.def>
 #undef ppf_gtpu_error
   PPF_GTPU_N_ERROR,
 } ppf_gtpu_input_error_t;
+
+#define foreach_ppf_gtpu_encap_next        \
+_(DROP, "error-drop")                  \
+_(IP4_LOOKUP, "ip4-lookup")             \
+_(IP6_LOOKUP, "ip6-lookup")
+
+typedef enum {
+    PPF_GTPU_ENCAP_NEXT_DROP,
+    PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP,
+    PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP,
+    PPF_GTPU_ENCAP_N_NEXT,
+} ppf_gtpu_encap_next_t;
+
 
 typedef struct
 {
@@ -264,22 +292,16 @@ typedef struct
   u32 mcast_sw_if_index;
   u32 encap_fib_index;
   u32 decap_next_index;
-  u32 teid;
+  u32 in_teid;
+  u32 out_teid;
   u32 call_id;
-  u32 direction;
+  u32 tunnel_type;
 } vnet_ppf_gtpu_add_del_tunnel_args_t;
 
 int vnet_ppf_gtpu_add_del_tunnel
   (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp);
 
 void vnet_int_ppf_gtpu_bypass_mode (u32 sw_if_index, u8 is_ip6, u8 is_enable);
-
-typedef enum
-{
-  PPF_GTPU_UPLINK = 0,
-  PPF_GTPU_DOWNLINK,
-  PPF_GTPU_ERROR_DIR
- } ppf_gtpu_direction_t;
 
 #endif /* included_vnet_ppf_gtpu_h */
 
