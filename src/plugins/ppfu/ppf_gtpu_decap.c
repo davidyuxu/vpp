@@ -17,7 +17,7 @@
 
 #include <vlib/vlib.h>
 #include <vnet/pg/pg.h>
-#include <ppf_gtpu/ppf_gtpu.h>
+#include <ppfu/ppf_gtpu.h>
 
 vlib_node_registration_t ppf_gtpu4_input_node;
 vlib_node_registration_t ppf_gtpu6_input_node;
@@ -229,8 +229,8 @@ ppf_gtpu_input (vlib_main_t * vm,
 
 	    	ppf_key4_0.call_id = t0->call_id;
 
-	      ppf_key4_0.direction = ( t0->direction == PPF_GTPU_DOWNLINK ) ? 
-	      			PPF_GTPU_UPLINK : PPF_GTPU_DOWNLINK;
+	      ppf_key4_0.tunnel_type = ( t0->tunnel_type == PPF_GTPU_SB ) ? 
+	      			PPF_GTPU_NB : PPF_GTPU_SB;
 
 	      ppf_p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_callid_dir, ppf_key4_0.as_u64);
 
@@ -417,8 +417,8 @@ ppf_gtpu_input (vlib_main_t * vm,
 
 	    	ppf_key4_1.call_id = t1->call_id;
 
-	      ppf_key4_1.direction = ( t1->direction == PPF_GTPU_DOWNLINK ) ? 
-	      			PPF_GTPU_UPLINK : PPF_GTPU_DOWNLINK;
+	      ppf_key4_1.tunnel_type = ( t1->tunnel_type == PPF_GTPU_SB ) ? 
+	      			PPF_GTPU_NB : PPF_GTPU_SB;
 
 	      ppf_p1 = hash_get (gtm->ppf_gtpu4_tunnel_by_callid_dir, ppf_key4_1.as_u64);
 
@@ -662,8 +662,8 @@ ppf_gtpu_input (vlib_main_t * vm,
 
 	    	ppf_key4_0.call_id = t0->call_id;
 
-	      ppf_key4_0.direction = ( t0->direction == PPF_GTPU_DOWNLINK ) ? 
-	      			PPF_GTPU_UPLINK : PPF_GTPU_DOWNLINK;
+	      ppf_key4_0.tunnel_type = ( t0->tunnel_type == PPF_GTPU_SB ) ? 
+	      			PPF_GTPU_NB : PPF_GTPU_SB;
 
 	      ppf_p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_callid_dir, ppf_key4_0.as_u64);
 
@@ -849,7 +849,7 @@ ppf_gtpu6_input (vlib_main_t * vm,
 
 static char * ppf_gtpu_error_strings[] = {
 #define ppf_gtpu_error(n,s) s,
-#include <ppf_gtpu/ppf_gtpu_error.def>
+#include <ppfu/ppf_gtpu_error.def>
 #undef ppf_gtpu_error
 #undef _
 };
@@ -899,7 +899,6 @@ VLIB_REGISTER_NODE (ppf_gtpu6_input_node) = {
 };
 
 VLIB_NODE_FUNCTION_MULTIARCH (ppf_gtpu6_input_node, ppf_gtpu6_input)
-
 
 typedef enum {
   IP_PPF_GTPU_BYPASS_NEXT_DROP,
