@@ -1,0 +1,359 @@
+/* Hey Emacs use -*- mode: C -*- */
+/*
+ * Copyright (c) 2016 Cisco and/or its affiliates.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/** \file
+    This file defines the vpp control-plane API messages
+    used to control the PPFU plugin
+*/
+
+
+/** \brief Get the plugin version
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+*/
+
+define ppfu_plugin_get_version
+{
+  u32 client_index;
+  u32 context;
+};
+
+/** \brief Reply to get the plugin version
+    @param context - returned sender context, to match reply w/ request
+    @param major - Incremented every time a known breaking behavior change is introduced
+    @param minor - Incremented with small changes, may be used to avoid buggy versions
+*/
+
+define ppfu_plugin_get_version_reply
+{
+  u32 context;
+  u32 major;
+  u32 minor;
+};
+
+
+
+typeonly define pdcpsecurity_parameters
+{
+/*
+ *  INTEGRITY_KEY_VALID       =0x1, 
+ *  CONFIDENTIALITY_KEY_VALID =0x2, 
+ *  INTEGRITY_ALG_VALID       =0x4,
+ *  CONFIDENTIALITY_ALG_VALID =0x8 
+*/  
+  u16 valid_parameters;
+/*
+ *  UB_EIA_NONE=0, UB_EIA0=1, UB_EIA1=2, UB_EIA2=3, UB_EIA3=4 
+*/
+  u8 integrity_algorithm;
+/*
+ *  UB_EEA0=1, UB_EEA1=2, UB_EEA2=3, UB_EEA3=4 
+*/
+  u8 confidentiality_algorithm;
+  u8 integrity_key[16];
+  u8 confidentiality_key[16];
+};
+
+typeonly define pdcp_entity
+{
+  u32 sn_length;   
+  u32 initial_uplink_count;
+  u32 initial_downlink_count;
+  u32 fc_in_flight_limit;
+/*
+ * unique UE identity
+*/  
+  u32 logging_id; 
+};
+
+
+typeonly define network_endpoint
+{
+  u32 teid;
+  u32 ip_address;
+  u32 port;
+  u32 dscp; // RFC 2474/3168/3260
+};
+
+
+typeonly define nb_path_context
+{
+/*
+ * INTERNAL_DATA_RELAY = 1,
+ * INTERNAL_NXMH_GTP_UDP = 2,
+ * INTERNAL_GTP_UDP = 3,
+ * EXTERNAL_GTP_UDP = 4,
+ * EXTERNAL_GTP_TCP_CLIENT = 5,
+ * EXTERNAL_GTP_TCP_SERVER = 6,
+ * INTERNAL_NXMH_GTP_UDP_REMOTE = 7,
+ * INTERNAL_NXMH_RETX_GTP_UDP = 8,
+ * INTERNAL_NXMH_NO_FLOW_CTRL_GTP_UDP = 9
+*/ 
+  u32 protocol_configuration;
+/*
+ * NB_TYPE_NETEP = 0,
+ * NB_TYPE_GW = 1,
+ * NB_TYPE_DEV = 2,
+*/
+  u32 type;
+/*
+ * union {
+*/
+/*
+    vl_api_network_endpoint_t np;
+*/  
+    vl_api_network_endpoint_t np;
+    u32 gw_ip_address;
+    u8 device_name[32];
+/* 
+  *} path;
+*/
+};
+
+typeonly define sb_path_context
+{  
+  u32 sb_id;   
+  vl_api_network_endpoint_t primary_np;
+  vl_api_network_endpoint_t secondary_np;
+/*
+ * INTERNAL_DATA_RELAY = 1,
+ * INTERNAL_NXMH_GTP_UDP = 2,
+ * INTERNAL_GTP_UDP = 3,
+ * EXTERNAL_GTP_UDP = 4,
+ * EXTERNAL_GTP_TCP_CLIENT = 5,
+ * EXTERNAL_GTP_TCP_SERVER = 6,
+ * INTERNAL_NXMH_GTP_UDP_REMOTE = 7,
+ * INTERNAL_NXMH_RETX_GTP_UDP = 8,
+ * INTERNAL_NXMH_NO_FLOW_CTRL_GTP_UDP = 9
+*/ 
+  u32 protocol_configuration;
+  u32 ep_weight;
+/*
+ * INCOMING_AND_OUTGOING=0, 
+ * INCOMING_ONLY=1
+*/
+  u32 traffic_state;
+};
+
+
+
+
+
+
+/** \brief Bearer install from client to api server request
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+*/
+define ppfu_plugin_bearer_install
+{
+  u32 client_index;
+  u32 context;
+  u32 ue_bearer_id;
+  u32 transaction_id;
+  vl_api_pdcp_entity_t entity;
+  vl_api_pdcpsecurity_parameters_t secparam;
+  vl_api_nb_path_context_t nb;
+  vl_api_sb_path_context_t sb[3];
+/*
+ * PATHDELAY = 1,   // 5G Stand-alone.  
+ * STRICTORDER = 2 // 5G with Light Interworking.
+*/
+  u32 sb_policy;
+};
+
+/** \brief Reply to bearer install
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+    @param retval - return code for the request
+    @param ue_bearer_id - the bearer id, returned by the server
+*/
+define ppfu_plugin_bearer_install_reply
+{
+  u32 context;
+  i32 retval;
+  u32 client_index;
+  u32 ue_bearer_id;
+  u32 transaction_id;
+  u32 msg_result;
+  u32 request_id;
+};
+
+
+
+/** \brief Bearer update from client to api server request
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+*/
+define ppfu_plugin_bearer_update
+{
+  u32 client_index;
+  u32 context;
+  u32 ue_bearer_id;
+  u32 transaction_id;
+  vl_api_pdcpsecurity_parameters_t secparam;
+  vl_api_sb_path_context_t sb[3];
+  u8 removal_sb_id[3];
+  u8 reserve;
+};
+
+/** \brief Reply to bearer update
+    @param context - sender context, to match reply w/ request
+    @param retval - return code for the request
+    @param ue_bearer_id - the bearer id, returned by the server
+*/
+define ppfu_plugin_bearer_update_reply
+{
+  u32 context;
+  i32 retval;
+  u32 ue_bearer_id;
+  u32 transaction_id;
+  u32 msg_result;
+  u32 nb_ipaddress_size;
+  u32 nb_ipaddress[4];
+  u32 sb_ipaddress_size;
+  u32 sb_ipaddress[4];
+  u32 sb_ext_ipaddress_size;
+  u32 sb_ext_ipaddress[4];
+  vl_api_network_endpoint_t nb;
+  u32 sb_size;
+  vl_api_network_endpoint_t sb[3];
+};
+
+
+/** \brief Bearer release from client to api server request
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+*/
+define ppfu_plugin_bearer_release
+{
+  u32 client_index;
+  u32 context;
+/*
+ * ue_bearer_id = 0
+*/
+  u32 ue_bearer_id;
+  u32 transaction_id;
+};
+
+/** \brief Reply to bearer release
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+    @param retval - return code for the request
+    @param ue_bearer_id - the bearer id, returned by the server
+*/
+define ppfu_plugin_bearer_release_reply
+{
+  u32 context;
+  i32 retval;
+  u32 ue_bearer_id;
+  u32 transaction_id;
+  u32 msg_result;
+};
+
+
+/** \brief System reset from client to api server request and server response
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+*/
+define ppfu_plugin_system_reset
+{
+  u32 client_index;
+  u32 context;
+/*
+ * ue_bearer_id = 0
+*/
+  u32 ue_bearer_id;
+  u32 transaction_id;
+};
+
+/** \brief Reply to system reset
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+    @param retval - return code for the request
+    @param ue_bearer_id - the bearer id, returned by the server
+*/
+define ppfu_plugin_system_reset_reply
+{
+  u32 context;
+  i32 retval;
+  u32 ue_bearer_id;
+  u32 transaction_id;
+  u32 msg_result;
+};
+
+
+/** \brief Outgoing data from client to api server request
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+*/
+define ppfu_plugin_outgoing_data
+{
+  u32 client_index;
+  u32 context;
+  u32 ue_bearer_id;
+  u32 transaction_id;
+  u32 request_id;
+  u8 sb_id[3];
+  u8 sb_num;
+  u32 data_l;
+  u8 date[data_l];
+};
+
+/** \brief Reply to outgoing data
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+    @param retval - return code for the request
+    @param ue_bearer_id - the bearer id, returned by the server
+*/
+define ppfu_plugin_outgoing_data_reply
+{
+  u32 context;
+  i32 retval;
+  u32 ue_bearer_id;
+  u32 transaction_id;
+  u32 msg_result;
+  u32 request_id;
+};
+
+
+/** \brief Incomming data from api server to client
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+*/
+autoreply define ppfu_plugin_incomming_data
+{
+  u32 client_index;
+  u32 context;
+  u32 ue_bearer_id;
+  u32 data_l;
+  u8 date[data_l];
+};
+
+
+/** \brief Error indication from api server to client
+    @param client_index - opaque cookie to identify the sender
+    @param context - sender context, to match reply w/ request
+*/
+autoreply define ppfu_plugin_error_indication
+{
+  u32 client_index;
+  u32 context;
+  u32 ue_bearer_id;
+  u32 sb_id;
+  u32 error_code;
+  u8 error_message[128];
+};
+

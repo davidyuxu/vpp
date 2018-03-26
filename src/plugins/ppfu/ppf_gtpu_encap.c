@@ -17,7 +17,8 @@
 #include <vnet/vnet.h>
 #include <vnet/ip/ip.h>
 #include <vnet/ethernet/ethernet.h>
-#include <ppf_gtpu/ppf_gtpu.h>
+#include <ppfu/ppf_gtpu.h>
+
 
 /* Statistics (not all errors) */
 #define foreach_ppf_gtpu_encap_error    \
@@ -36,17 +37,7 @@ typedef enum {
     PPF_GTPU_ENCAP_N_ERROR,
 } ppf_gtpu_encap_error_t;
 
-#define foreach_ppf_gtpu_encap_next        \
-_(DROP, "error-drop")                  \
-_(IP4_LOOKUP, "ip4-lookup")             \
-_(IP6_LOOKUP, "ip6-lookup")
 
-typedef enum {
-    PPF_GTPU_ENCAP_NEXT_DROP,
-    PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP,
-    PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP,
-    PPF_GTPU_ENCAP_N_NEXT,
-} ppf_gtpu_encap_next_t;
 
 typedef struct {
   u32 tunnel_index;
@@ -493,7 +484,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
               ppf_gtpu_encap_trace_t *tr =
                 vlib_add_trace (vm, node, b0, sizeof (*tr));
               tr->tunnel_index = t0 - gtm->tunnels;
-              tr->teid = t0->teid;
+              tr->teid = t0->out_teid;
            }
 
           if (PREDICT_FALSE(b1->flags & VLIB_BUFFER_IS_TRACED))
@@ -501,7 +492,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
               ppf_gtpu_encap_trace_t *tr =
                 vlib_add_trace (vm, node, b1, sizeof (*tr));
               tr->tunnel_index = t1 - gtm->tunnels;
-              tr->teid = t1->teid;
+              tr->teid = t1->out_teid;
             }
 
 	  vlib_validate_buffer_enqueue_x4 (vm, node, next_index,
@@ -658,7 +649,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
               ppf_gtpu_encap_trace_t *tr =
                 vlib_add_trace (vm, node, b0, sizeof (*tr));
               tr->tunnel_index = t0 - gtm->tunnels;
-              tr->teid = t0->teid;
+              tr->teid = t0->out_teid;
             }
 	  vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
 					   to_next, n_left_to_next,
