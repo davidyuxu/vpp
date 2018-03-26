@@ -624,7 +624,10 @@ vlib_unix_main (int argc, char *argv[])
     }
   unformat_free (&input);
 
+  /* load symbols for memory trace in debug version, by Jordy */
+#if CLIB_DEBUG > 0
   clib_elf_main_init(vm->name);
+#endif
 
   vlib_thread_stack_init (0);
 

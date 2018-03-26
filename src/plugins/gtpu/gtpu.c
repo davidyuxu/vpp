@@ -465,7 +465,10 @@ int vnet_gtpu_add_del_tunnel
       l2im->configs[sw_if_index].bd_index = 0;
 
       vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, sw_if_index);
-      si->flags |= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
+      /* default to hidden, by Jordy */
+      //si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;      
+      si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
+      
       vnet_sw_interface_set_flags (vnm, sw_if_index,
 				   VNET_SW_INTERFACE_FLAG_ADMIN_UP);
 
@@ -1172,9 +1175,6 @@ gtpu_tunnels_init()
   return 0;
 }
 
-/** Default heap size for the IPv4 mtries */
-#define GTPU_REWRITE_HEAP_SIZE (32<<20)
-
 static clib_error_t *
 gtpu_config (vlib_main_t * vm, unformat_input_t * input)
 {
@@ -1207,8 +1207,9 @@ gtpu_config (vlib_main_t * vm, unformat_input_t * input)
         }
     }
 
-  if (gtm->prealloc_tunnels > 0)
+  if (gtm->prealloc_tunnels > 0) {
     gtpu_tunnels_init ();
+  }
   
   return error;
 }

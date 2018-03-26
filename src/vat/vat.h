@@ -214,6 +214,8 @@ typedef struct
 
   /* Convenience */
   vlib_main_t *vlib_main;
+
+  FILE *logfp;
 } vat_main_t;
 
 extern vat_main_t vat_main;

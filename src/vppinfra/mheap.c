@@ -640,9 +640,6 @@ mheap_get_extend_vector (void *v,
   return v;
 }
 
-/* Optimized minimal allocate size to avoid memory fragments, by Jordy */
-#define OPTIMIZED_MHEAP_MIN_USER_DATA_BYTES  32
-
 void *
 mheap_get_aligned (void *v,
 		   uword n_user_data_bytes,
@@ -669,9 +666,6 @@ mheap_get_aligned (void *v,
 
   /* Round requested size. */
   n_user_data_bytes = clib_max (n_user_data_bytes, MHEAP_MIN_USER_DATA_BYTES);
-
-  /* Adjust minimal user data size to eliminate performance issue, by Jordy */
-  //n_user_data_bytes = clib_max (n_user_data_bytes, OPTIMIZED_MHEAP_MIN_USER_DATA_BYTES);
   
   n_user_data_bytes =
     round_pow2 (n_user_data_bytes,
@@ -1275,7 +1269,7 @@ format_mheap (u8 * s, va_list * va)
 	  {
 	    if (i > 0)
 	      s = format (s, "%U", format_white_space, indent);
-#if 1//#ifdef CLIB_UNIX
+#if CLIB_DEBUG > 0//#ifdef CLIB_UNIX
 	    s =
 	      format (s, " %U\n", format_clib_elf_symbol_with_address,
 		      t->callers[i]);
@@ -1333,7 +1327,7 @@ format_mheap (u8 * s, va_list * va)
     }
 
   if ((verbose == 2) || (verbose == 3) || (verbose >= 100)) {
-  	uword bin, count, cl_align_count_off0, cl_align_count_off4;
+  	uword bin, count;
 #if CLIB_VEC64 > 0
 	u64 offset;
 #else
@@ -1348,34 +1342,21 @@ format_mheap (u8 * s, va_list * va)
 	    s = format(s, "bin %d:\n", bin);
 
 	  count = 0;
-	  cl_align_count_off0 = cl_align_count_off4 = 0;
 	  while (offset != MHEAP_GROUNDED) {
 	    e = mheap_elt_at_uoffset (v, offset);
 	    
 	    if (((verbose == 3) && (count < 4)) || (verbose >= 100))
 	      s = format(s, "%4d(%08x %02d) ", mheap_elt_data_bytes (e), offset, offset % CLIB_CACHE_LINE_BYTES);
-
-	    if ((offset % CLIB_CACHE_LINE_BYTES) == 0)
-	    	cl_align_count_off0++;
-
-	    if (((offset + 4) % CLIB_CACHE_LINE_BYTES) == 0)
-	    	cl_align_count_off4++;
 	    
 	    count++;
-
-	    if (verbose >= 100)
-  	      if ((count % 4 == 0) || (offset == MHEAP_GROUNDED))
-  	    	s = format(s, "\n");
-
-	    if (verbose == 3)
-	      if ((count == 4) || (offset == MHEAP_GROUNDED))
-	        s = format(s, "\n");
-
 	    offset = e->free_elt.next_uoffset;
+
+	    if (((verbose >= 100) && (count % 4 == 0)) || (offset == MHEAP_GROUNDED))
+	      s = format(s, "\n");
 	  }
 	  
 	  if (count)
-	    s = format(s, "total %d, total ca_0 %d, total ca_4 %d\n", count, cl_align_count_off0, cl_align_count_off4);
+	    s = format(s, "total %d\n", count);
 	}
   }
 
