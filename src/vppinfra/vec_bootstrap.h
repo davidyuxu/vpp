@@ -51,7 +51,6 @@
    User header information may preceed standard vec header.
    If you change u32 len -> u64 len, single vectors can
    exceed 2**32 elements. Clib heaps are vectors. */
-
 typedef struct
 {
 #if CLIB_VEC64 > 0

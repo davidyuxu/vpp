@@ -459,6 +459,40 @@ adj_back_walk_notify (fib_node_t *node,
     return (FIB_NODE_BACK_WALK_CONTINUE);
 }
 
+static clib_error_t *
+adj_config (vlib_main_t * vm, unformat_input_t * input)
+{
+  clib_error_t *error = 0;
+  u32 max_adj_elts = 0;
+  uword heap_size = 0;
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "capacity %d", &max_adj_elts))
+        ;
+      else if (unformat (input, "heap-size %U", unformat_memory_size, &heap_size))
+        ;
+      else
+        {
+          return clib_error_return (0, "unknown input `%U'",
+    				format_unformat_error, input);
+        }
+    }
+
+  if (max_adj_elts != 0) {
+    pool_init_fixed (adj_pool, max_adj_elts);
+  }
+
+  if (heap_size != 0)
+    adj_nbr_mheap_size = heap_size;
+  
+  return error;
+}
+
+VLIB_EARLY_CONFIG_FUNCTION (adj_config, "adj");
+
+
+
 /*
  * Adjacency's graph node virtual function table
  */

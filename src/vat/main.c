@@ -190,13 +190,17 @@ do_one_file (vat_main_t * vam)
 	  fp = exec;
 	}
 
-      startev.time = clib_cpu_time_now();
-      vec_add1(events, startev);
+      if (vam->logfp) {
+        startev.time = clib_cpu_time_now();
+        vec_add1(events, startev);
+      }
       
       rv = (*fp) (vam);
 
-      endev.time = clib_cpu_time_now();
-      vec_add1(events, endev);
+      if (vam->logfp) {
+        endev.time = clib_cpu_time_now();
+        vec_add1(events, endev);
+      }
 
       if (rv < 0)
 	errmsg ("%s error: %U\n", cmdp, format_api_error, vam, rv);
@@ -358,6 +362,7 @@ main (int argc, char **argv)
   unformat_input_t _argv, *a = &_argv;
   u8 **input_files = 0;
   u8 *output_file = 0;
+  u8 *log_file = 0;
   u8 *chroot_prefix;
   u8 *this_input_file;
   u8 interactive = 1;
@@ -366,14 +371,21 @@ main (int argc, char **argv)
   mheap_t *h;
   int i;
   f64 timeout;
+  
+#if CLIB_DEBUG > 0
+  clib_elf_main_init("/home/vppshare/jordy/vpp/build-root/install-vpp_debug-native/vpp/bin/vpp_api_test");
+#else
+  clib_elf_main_init("/home/vppshare/jordy/vpp/build-root/install-vpp-native/vpp/bin/vpp_api_test");
+#endif
 
-  clib_mem_init (0, 128 << 20);
+  clib_mem_init (0, 1 << 30);
 
   heap = clib_mem_get_per_cpu_heap ();
   h = mheap_header (heap);
 
   /* make the main heap thread-safe */
   h->flags |= MHEAP_FLAG_THREAD_SAFE;
+  h->flags |= MHEAP_FLAG_TRACE;
 
   clib_macro_init (&vam->macro_main);
   clib_macro_add_builtin (&vam->macro_main, "current_file",
@@ -392,6 +404,8 @@ main (int argc, char **argv)
       if (unformat (a, "in %s", &this_input_file))
 	vec_add1 (input_files, this_input_file);
       else if (unformat (a, "out %s", &output_file))
+	;
+      else if (unformat (a, "log %s", &log_file))
 	;
       else if (unformat (a, "script"))
 	interactive = 0;
@@ -436,6 +450,11 @@ main (int argc, char **argv)
       exit (1);
     }
 
+  if (log_file)
+    vam->logfp = fopen ((char *) log_file, "w");
+  else
+    vam->logfp = NULL;
+
   clib_time_init (&vam->clib_time);
 
   vat_api_hookup (vam);
@@ -457,11 +476,14 @@ main (int argc, char **argv)
   vam->json_output = json_output;
 
   if (!json_output)
-    api_sw_interface_dump (vam);
+    ;//api_sw_interface_dump (vam);
 
   vec_validate (vam->inbuf, 4096);
-  vec_validate (events, 200000);
-  _vec_len (events) = 0;
+
+  if (vam->logfp) {
+    vec_validate (events, 200000);
+    _vec_len (events) = 0;
+  }
 
   vam->current_file = (u8 *) "plugin-init";
   vat_plugin_init (vam);
@@ -481,11 +503,14 @@ main (int argc, char **argv)
     }
 
   /* dump all events here */
-  myevent *e;
-  vec_foreach (e, events)
-  {
-    f64 dt = (e->time - vam->clib_time.init_cpu_time) * vam->clib_time.seconds_per_clock;
-    fprintf(vam->ofp, "%8s %18.9f\n", e->event, dt);
+  if (vam->logfp) {
+    myevent *e;
+    vec_foreach (e, events)
+    {
+      f64 dt = (e->time - vam->clib_time.init_cpu_time) * vam->clib_time.seconds_per_clock;
+      fprintf(vam->ofp, "%8s %18.9f\n", e->event, dt);
+    }
+    fclose (vam->logfp);
   }
 
   if (output_file)
