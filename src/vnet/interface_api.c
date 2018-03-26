@@ -314,8 +314,8 @@ vl_api_get_sw_interface_stats_t_handler (vl_api_get_sw_interface_stats_t * mp)
   mp_size = sizeof (vl_api_sw_interface_counters_t) * count;
   
   for (i = 0; i < count; i++) {
-      counter[i].sw_if_index = mp->sw_if_index[i];
-      if (!vnet_sw_if_index_is_api_valid(ntohl(counter[i].sw_if_index))) {        
+      counter[i].sw_if_index = ntohl(mp->sw_if_index[i]);
+      if (!vnet_sw_if_index_is_api_valid(counter[i].sw_if_index)) {        
           rv = VNET_API_ERROR_INVALID_SW_IF_INDEX;                
           goto done;                                   
       }
@@ -389,6 +389,7 @@ vl_api_get_sw_interface_stats_t_handler (vl_api_get_sw_interface_stats_t * mp)
       clib_mem_unaligned (&counter[i].tx_error, u64) = clib_host_to_net_u64 (c);
     }
 
+    counter[i].sw_if_index = htonl(counter[i].sw_if_index);
   }
 
   vnet_interface_counter_unlock (im);

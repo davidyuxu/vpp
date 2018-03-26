@@ -465,7 +465,7 @@ int vnet_gtpu_add_del_tunnel
       l2im->configs[sw_if_index].bd_index = 0;
 
       vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, sw_if_index);
-      si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
+      si->flags |= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
       vnet_sw_interface_set_flags (vnm, sw_if_index,
 				   VNET_SW_INTERFACE_FLAG_ADMIN_UP);
 
