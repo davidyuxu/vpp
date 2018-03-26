@@ -230,6 +230,7 @@ PLUGIN_ENABLED(l2e)
 PLUGIN_ENABLED(gbp)
 PLUGIN_ENABLED(gtplo)
 PLUGIN_ENABLED(ppf_gtpu)
+PLUGIN_ENABLED(ppfu)
 
 ###############################################################################
 # Dependency checks
