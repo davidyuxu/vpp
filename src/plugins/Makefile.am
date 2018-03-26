@@ -56,7 +56,7 @@ endif
 
 
 if ENABLE_GTPU_PLUGIN
-include gtpu.am
+#include gtpu.am
 endif
 
 if ENABLE_IGMP_PLUGIN
@@ -133,6 +133,9 @@ endif
 
 if ENABLE_GTPLO_PLUGIN
 include gtplo.am
+
+if ENABLE_PPFU_PLUGIN
+include ppfu.am
 endif
 
 include ../suffix-rules.mk
