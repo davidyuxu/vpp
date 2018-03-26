@@ -317,18 +317,13 @@ public:
 					event_rcv++;
 					std::tie (rv, break_dispatch) = events[id]->assign_response (id, shm_data);
 					matching_req = events[id];
-					if (break_dispatch) {
-						return matching_req;
-					}
 				} else {
 					discard++;
 					msg_free (shm_data);
 				}
 			}
 
-			if (nullptr == limit || VAPI_OK != rv) {
-				return nullptr;
-			}
+			return nullptr;
 		}
 		
 		return nullptr;
@@ -474,7 +469,7 @@ private:
     vapi_error_e rv = vapi_send (vapi_ctx, req->request.shm_data);
     if (VAPI_OK == rv)
       {
-      	rx_req++;
+      	tx_req++;
         VAPI_DBG ("Push %p", req);
         requests.emplace_back (req);
         req->set_context (req_context);
