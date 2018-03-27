@@ -95,6 +95,6 @@ vlib_unix_SOURCES =				\
   examples/vlib/mc_test.c
 
 vlib_unix_LDADD = libvlib.la \
-	          libvppinfra.la -lpthread -lm -ldl -lrt
+	          libvppinfra.la -lpthread -lm -ldl -lrt -lbacktrace
 
 # vi:syntax=automake

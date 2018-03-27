@@ -684,9 +684,10 @@ LDS = \
   libsvm.la \
   libsvmdb.la \
   libvlibmemory.la \
-  -lpthread -ldl -lrt -lm
+  -lpthread -ldl -lrt -lm -lbacktrace
 
-TESTS += test_cp_serdes test_lisp_types
+#TESTS += test_cp_serdes test_lisp_types
+TESTS += test_cp_serdes
 
 test_cp_serdes_SOURCES =			\
  tests/vnet/lisp-cp/test_cp_serdes.c		\
