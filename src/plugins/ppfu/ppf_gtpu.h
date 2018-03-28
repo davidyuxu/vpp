@@ -188,6 +188,7 @@ typedef struct
 
   u32 call_id;
   ppf_gtpu_tunnel_type_t tunnel_type;
+  u32 sb_id;
 
 } ppf_gtpu_tunnel_t;
 
@@ -230,6 +231,31 @@ typedef enum {
     PPF_GTPU_ENCAP_N_NEXT,
 } ppf_gtpu_encap_next_t;
 
+#define MAX_SESSION_NUM 100000
+
+#define MAX_SB_PER_DRB  3
+
+#define INVALID_TUNNEL_ID ~0
+
+typedef struct
+{
+	ppf_gtpu_tunnel_type_t tunnel_type;
+	u32 tunnel_id;
+}ppf_gtpu_tunnel_id_type_t;
+
+typedef struct
+{	
+	u32 callid;
+}ppf_srb_nb_t;
+
+typedef struct 
+{	
+	ppf_gtpu_tunnel_id_type_t nb_tunnel;
+	ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_DRB];
+	ppf_srb_nb_t srb_nb;
+}ppf_callline_t;
+
+extern ppf_callline_t ppf_calline_table[MAX_SESSION_NUM];
 
 typedef struct
 {
@@ -296,6 +322,7 @@ typedef struct
   u32 out_teid;
   u32 call_id;
   u32 tunnel_type;
+  u32 sb_id;
 } vnet_ppf_gtpu_add_del_tunnel_args_t;
 
 int vnet_ppf_gtpu_add_del_tunnel

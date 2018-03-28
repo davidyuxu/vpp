@@ -56,7 +56,7 @@ endif
 
 
 if ENABLE_GTPU_PLUGIN
-#include gtpu.am
+include gtpu.am
 endif
 
 if ENABLE_IGMP_PLUGIN
