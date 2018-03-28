@@ -109,25 +109,25 @@ typeonly define nb_path_context
  * NB_TYPE_DEV = 2,
 */
   u32 type;
-/*
- * union {
-*/
-/*
-    vl_api_network_endpoint_t np;
-*/  
-    vl_api_network_endpoint_t np;
-    u32 gw_ip_address;
-    u8 device_name[32];
-/* 
-  *} path;
-*/
+  u32 teid;
+  u32 ip_address;
+  u32 port;
+  u32 dscp;
 };
 
 typeonly define sb_path_context
 {  
   u32 sb_id;   
-  vl_api_network_endpoint_t primary_np;
-  vl_api_network_endpoint_t secondary_np;
+
+  u32 pri_teid;
+  u32 pri_ip_address;
+  u32 pri_port;
+  u32 pri_dscp;
+
+  u32 sec_teid;
+  u32 sec_ip_address;
+  u32 sec_port;
+  u32 sec_dscp;
 /*
  * INTERNAL_DATA_RELAY = 1,
  * INTERNAL_NXMH_GTP_UDP = 2,

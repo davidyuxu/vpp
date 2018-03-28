@@ -193,10 +193,10 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  tid2 = vnet_buffer(b2)->sw_if_index[VLIB_TX];
 	  tid3 = vnet_buffer(b3)->sw_if_index[VLIB_TX];
 
-	  t0 = &gtm->tunnels[tid0];
-	  t1 = &gtm->tunnels[tid1];
-	  t2 = &gtm->tunnels[tid2];
-	  t3 = &gtm->tunnels[tid3];
+  	  t0 = &gtm->tunnels[tid0];
+   	  t1 = &gtm->tunnels[tid1];
+        t2 = &gtm->tunnels[tid2];
+        t3 = &gtm->tunnels[tid3];
 
 	  vnet_buffer (b0)->sw_if_index[VLIB_TX] = t0->encap_fib_index;
 	  vnet_buffer (b1)->sw_if_index[VLIB_TX] = t1->encap_fib_index;

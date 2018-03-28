@@ -125,6 +125,7 @@ static void vl_api_ppf_gtpu_add_del_tunnel_t_handler
     .src = to_ip46 (mp->is_ipv6, mp->src_address),
     .call_id = 0,
     .tunnel_type = 0,
+    .sb_id = 0,
   };
 
   /* Check src & dst are different */
@@ -203,6 +204,7 @@ static void vl_api_ppf_gtpu_add_del_tunnel_v2_t_handler
     .src = to_ip46 (mp->is_ipv6, mp->src_address),
     .call_id = 0,
     .tunnel_type = 0,
+    .sb_id = 0,
   };
 
   /* Check src & dst are different */
