@@ -107,10 +107,12 @@ typedef enum {
 } ppf_srb_nb_rx_next_t;
 
 #define foreach_ppf_srb_nb_tx_next        \
- _(DROP, "error-drop")	 
+ _(DROP, "error-drop")	 		\
+_(IP4_LOOKUP, "ip4-lookup")
 
  typedef enum {
     PPF_SRB_NB_TX_NEXT_DROP,
+    PPF_SRB_NB_TX_NEXT_IP4_LOOKUP,
     PPF_SRB_NB_TX_N_NEXT,
 } ppf_srb_nb_tx_next_t;
 
@@ -138,6 +140,12 @@ extern ppf_pdcp_main_t ppf_pdcp_main;
 
 typedef struct
 {
+  u8 *rewrite;
+  
+  /* tunnel src (vpp) and dst (cp) addresses, ipv4 is enough */
+  u32 src;
+  u32 dst;
+
   u32 srb_rx_next_index;
   u32 sb_lb_next_index;  
 
@@ -152,7 +160,6 @@ typedef struct
   /* convenience */
   vlib_main_t *vlib_main;
   vnet_main_t *vnet_main;
-
 } ppf_sb_main_t;
 
 extern ppf_sb_main_t ppf_sb_main;
@@ -178,6 +185,44 @@ typedef struct
   u32 call_id;
   u32 tunnel_type;
 } vnet_ppf_pdcp_add_del_tunnel_args_t;
+
+
+typedef struct _ppf_srb_out_msg_
+{
+  u32 request_id;
+  u8  sb_id[3];
+  u8  sb_num;
+  u32 data_l;
+  u8  data[0];
+} ppf_srb_out_msg_t;
+
+typedef struct _ppf_srb_in_msg_
+{
+  u32 request_id;
+  u32 integrity_status;
+  u32 data_l;
+  u8  data[0];
+} ppf_srb_in_msg_t;
+
+typedef struct _ppf_srb_header_t_
+{
+  u32 call_id;  // instead of ue_bearer_id
+  u32 transaction_id;
+  union {
+    ppf_srb_in_msg_t  in;
+    ppf_srb_out_msg_t out;
+  } msg;
+} ppf_srb_header_t;
+
+/* *INDENT-OFF* */
+typedef CLIB_PACKED(struct
+{
+  ip4_header_t       ip4;            /* 20 bytes */
+  udp_header_t       udp;            /* 8 bytes */
+  ppf_srb_header_t   srb;            /* 24 bytes */
+}) ip4_srb_header_t;
+/* *INDENT-ON* */
+
 
 #endif /* included_vnet_ppfu_h */
 
