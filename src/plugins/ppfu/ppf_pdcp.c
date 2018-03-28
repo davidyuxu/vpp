@@ -55,6 +55,7 @@ ppf_pdcp_init (vlib_main_t * vm)
 	
   ppm->pdcp_input_next_index = PPF_PDCP_INPUT_NEXT_PPF_PDCP_DECRYPT;
   ppm->pdcp_decrypt_next_index = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+  ppm->pdcp_encrypt_next_index = PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU4_ENCAP;
 
   if (ppf_main.max_capacity) {
     pool_init_fixed (ppm->sessions, ppf_main.max_capacity);

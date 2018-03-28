@@ -161,6 +161,8 @@ typedef struct
 
 #define INVALID_TUNNEL_ID ~0
 
+#define DEFAULT_SB_INDEX 0
+
 typedef enum
 {
   PPF_GTPU_SB = 0, 			//The DRB SB GTP tunnel
@@ -169,6 +171,12 @@ typedef enum
   PPF_GTPU_SRB,			//The GTP SRB SB GTP tunnel
   PPF_GTPU_NORMAL
 } ppf_gtpu_tunnel_type_t;
+
+typedef enum
+{
+   PPF_SRB_CALL = 0,
+   PPF_DRB_CALL
+ }ppf_calline_type_t;
 
 typedef struct
 {
@@ -204,6 +212,7 @@ typedef struct
 typedef struct 
 {	
   u32 call_index;
+  ppf_calline_type_t call_type; 
   union {
     ppf_drb_callline_t drb;
     ppf_srb_callline_t srb;
