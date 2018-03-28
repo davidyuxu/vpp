@@ -18,6 +18,7 @@
 #include <vnet/ip/ip.h>
 #include <vnet/ethernet/ethernet.h>
 #include <ppfu/ppfu.h>
+#include <ppfu/ppf_gtpu.h>
 
 
 /* Statistics (not all errors) */
@@ -66,6 +67,8 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
   u32 n_left_from, * from, * to_next;
   ppf_pdcp_decrypt_next_t next_index;
   u32 pkts_processed = 0;
+  ppf_main_t *pm = &ppf_main;
+  ppf_gtpu_main_t *gtm = &ppf_gtpu_main; 
 
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
@@ -91,6 +94,9 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    u32 sw_if_index3 = 0;
 	    u32 bi0, bi1, bi2, bi3;					    //map to pi0, pi1
 	    vlib_buffer_t * b0, * b1, *b2, *b3;	  //map to p0, p1
+	    u32 call_id0, call_id1, call_id2, call_id3;
+  	    ppf_callline_t *callline0, *callline1, *callline2, *callline3;
+  	    ppf_gtpu_tunnel_t *t0, *t1, *t2, *t3;
 	    
 	    /* Prefetch next iteration. */
 	    {
@@ -141,6 +147,15 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    sw_if_index2 = vnet_buffer(b2)->sw_if_index[VLIB_RX];
 	    sw_if_index3 = vnet_buffer(b3)->sw_if_index[VLIB_RX];
 
+	    t0 = pool_elt_at_index (gtm->tunnels, sw_if_index0);
+	    call_id0 = t0->call_id;	    
+	    callline0 = &(pm->ppf_calline_table[call_id0]);
+
+	    if (callline0 ->call_type == PPF_SRB_CALL)
+	    	next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
+	    else if (callline0 ->call_type == PPF_DRB_CALL)
+	    	next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+	    
 	    if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
 	    {
 		  if (b0->flags & VLIB_BUFFER_IS_TRACED) 
@@ -151,6 +166,15 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 			  t->next_index = next0;			  
 		   }
 	     }
+
+	    t1 = pool_elt_at_index (gtm->tunnels, sw_if_index1);
+	    call_id1 = t1->call_id;	    
+	    callline1 = &(pm->ppf_calline_table[call_id1]);
+
+	    if (callline1 ->call_type == PPF_SRB_CALL)
+	    	next1 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
+	    else if (callline1 ->call_type == PPF_DRB_CALL)
+	    	next1 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
 	  
 	  if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
 	  {
@@ -163,6 +187,15 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 		 }
 	   }
 
+	    t2 = pool_elt_at_index (gtm->tunnels, sw_if_index2);
+	    call_id2 = t2->call_id;	    
+	    callline2 = &(pm->ppf_calline_table[call_id2]);
+
+	    if (callline2 ->call_type == PPF_SRB_CALL)
+	    	next2 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
+	    else if (callline2 ->call_type == PPF_DRB_CALL)
+	    	next2 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+
 	   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
 	   {
 		if (b2->flags & VLIB_BUFFER_IS_TRACED) 
@@ -174,6 +207,15 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 			
 		 }
 	   }
+
+	    t3 = pool_elt_at_index (gtm->tunnels, sw_if_index3);
+	    call_id3 = t3->call_id;	    
+	    callline3 = &(pm->ppf_calline_table[call_id3]);
+
+	    if (callline3 ->call_type == PPF_SRB_CALL)
+	    	next3 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
+	    else if (callline3 ->call_type == PPF_DRB_CALL)
+	    	next3 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
 
 	   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
 	   {
@@ -201,6 +243,9 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    u32 sw_if_index0 = 0;
 	    u32 bi0;					//map to pi0, pi1
 	    vlib_buffer_t * b0;     //map to p0, p1
+	    ppf_gtpu_tunnel_t *t0;
+	    u32 call_id0;
+	    ppf_callline_t *callline0;
 
 	    /* speculatively enqueue b0 to the current next frame */
 	    bi0 = from[0];
@@ -215,6 +260,15 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    ASSERT (b0->current_data == 0);
 
 	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
+
+	    t0 = pool_elt_at_index (gtm->tunnels, sw_if_index0);
+	    call_id0 = t0->call_id;	    
+	    callline0 = &(pm->ppf_calline_table[call_id0]);
+
+	    if (callline0 ->call_type == PPF_SRB_CALL)
+	    	next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
+	    else if (callline0 ->call_type == PPF_DRB_CALL)
+	    	next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
 
 	    if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
 	    {
