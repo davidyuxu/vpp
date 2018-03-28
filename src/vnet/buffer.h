@@ -403,6 +403,19 @@ typedef struct
       u64 pg_replay_timestamp;
     };
     u32 unused[10];
+
+    struct
+    {
+      u8 sb_num;
+      u8 sb_id[3];
+      
+      struct
+      {
+        u32 in_sn;
+	u32 out_sn;
+      } pdcp;
+    } ppf_srb_out;
+
   };
 } vnet_buffer_opaque2_t;
 
