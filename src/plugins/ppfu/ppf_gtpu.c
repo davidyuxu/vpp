@@ -29,14 +29,11 @@
 #include <vnet/dpo/dpo.h>
 #include <vnet/plugin/plugin.h>
 #include <vpp/app/version.h>
-#include <ppfu/ppf_gtpu.h>
 #include <ppfu/ppfu.h>
+#include <ppfu/ppf_gtpu.h>
 
 
 ppf_gtpu_main_t ppf_gtpu_main;
-
-ppf_callline_t ppf_calline_table[MAX_SESSION_NUM];
-
 
 /* *INDENT-OFF* */
 VNET_FEATURE_INIT (ip4_ppf_gtpu_bypass, static) = {
@@ -376,6 +373,7 @@ mcast_shared_remove (ip46_address_t * dst)
 int vnet_ppf_gtpu_add_del_tunnel
   (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp)
 {
+  ppf_main_t *pm = &ppf_main;
   ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
   ppf_gtpu_tunnel_t *t = 0;
   vnet_main_t *vnm = gtm->vnet_main;
@@ -402,7 +400,7 @@ int vnet_ppf_gtpu_add_del_tunnel
       p = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6);
     }
     
-  if (a->call_id >= MAX_SESSION_NUM) {
+  if (a->call_id >= pm->max_capacity) {
 	return VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
   }
 
@@ -431,16 +429,16 @@ int vnet_ppf_gtpu_add_del_tunnel
 	tunnel_id = t - gtm->tunnels;
 
 	//add by lollita for ppf gtpu tunnel swap
-	callline = &ppf_calline_table[t->call_id]; 
+	callline = &pm->ppf_calline_table[t->call_id]; 
 
 	if (t->tunnel_type == PPF_GTPU_NB) {
 	
-		callline->nb_tunnel.tunnel_id = tunnel_id;
-		callline->nb_tunnel.tunnel_type = t->tunnel_type;
+		callline->rb.drb.nb_tunnel.tunnel_id = tunnel_id;
+		callline->rb.drb.nb_tunnel.tunnel_type = t->tunnel_type;
 		
 	} else if (t->tunnel_type == PPF_GTPU_SB) {
 
-		it = &(callline->sb_tunnel[t->sb_id]);
+		it = &(callline->rb.drb.sb_tunnel[t->sb_id]);
 
 		if (it->tunnel_id != ~0 && it->tunnel_id != tunnel_id) {
 			pool_put (gtm->tunnels, t);
@@ -640,15 +638,15 @@ int vnet_ppf_gtpu_add_del_tunnel
       tunnel_id = t - gtm->tunnels;
 
 	//add by lollita for ppf gtpu tunnel swap
-	callline = &ppf_calline_table[t->call_id]; 
+	callline = &pm->ppf_calline_table[t->call_id]; 
 
 	if (t->tunnel_type == PPF_GTPU_NB) {
 	
-		callline->nb_tunnel.tunnel_id = ~0;
+		callline->rb.drb.nb_tunnel.tunnel_id = ~0;
 		
 	} else if (t->tunnel_type == PPF_GTPU_SB) {
 
-		it = &(callline->sb_tunnel[t->sb_id]);
+		it = &(callline->rb.drb.sb_tunnel[t->sb_id]);
 
 		if (it->tunnel_id != ~0 && it->tunnel_id != tunnel_id) {
 			return VNET_API_ERROR_TUNNEL_EXIST;

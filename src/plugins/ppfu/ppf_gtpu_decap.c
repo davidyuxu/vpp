@@ -17,6 +17,7 @@
 
 #include <vlib/vlib.h>
 #include <vnet/pg/pg.h>
+#include <ppfu/ppfu.h>
 #include <ppfu/ppf_gtpu.h>
 
 vlib_node_registration_t ppf_gtpu4_input_node;
@@ -74,6 +75,7 @@ ppf_gtpu_input (vlib_main_t * vm,
              u32 is_ip4)
 {
   u32 n_left_from, next_index, * from, * to_next;
+  ppf_main_t * pm = &ppf_main;
   ppf_gtpu_main_t * gtm = &ppf_gtpu_main;
   vnet_main_t * vnm = gtm->vnet_main;
   vnet_interface_main_t * im = &vnm->interface_main;
@@ -228,9 +230,9 @@ ppf_gtpu_input (vlib_main_t * vm,
 
 		if (t0->tunnel_type == PPF_GTPU_SB) {
 
-			callline0 = ppf_calline_table[t0->call_id];
+			callline0 = pm->ppf_calline_table[t0->call_id];
 
-			next_tunne_id0 = callline0.nb_tunnel.tunnel_id;
+			next_tunne_id0 = callline0.rb.drb.nb_tunnel.tunnel_id;
 	      }
 
 	      goto next0; /* valid packet */
@@ -416,9 +418,9 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    	
 		if (t1->tunnel_type == PPF_GTPU_SB) {
 
-			callline1 = ppf_calline_table[t1->call_id];
+			callline1 = pm->ppf_calline_table[t1->call_id];
 
-			next_tunne_id1 = callline1.nb_tunnel.tunnel_id;
+			next_tunne_id1 = callline1.rb.drb.nb_tunnel.tunnel_id;
 	      }
 	    	
 	      goto next1; /* valid packet */
@@ -661,9 +663,9 @@ ppf_gtpu_input (vlib_main_t * vm,
 
 		if (t0->tunnel_type == PPF_GTPU_SB) {
 
-			callline0 = ppf_calline_table[t0->call_id];
+			callline0 = pm->ppf_calline_table[t0->call_id];
 
-			next_tunne_id0 = callline0.nb_tunnel.tunnel_id;
+			next_tunne_id0 = callline0.rb.drb.nb_tunnel.tunnel_id;
 	      }
 	    	
 	      goto next00; /* valid packet */

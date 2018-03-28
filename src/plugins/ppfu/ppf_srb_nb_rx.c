@@ -18,13 +18,14 @@
 #include <vnet/ip/ip.h>
 #include <vnet/ethernet/ethernet.h>
 #include <ppfu/ppfu.h>
+#include <ppfu/ppf_gtpu.h>
 
 /* Statistics (not all errors) */
 #define foreach_ppf_srb_nb_rx_error    \
+_(GOOD, "Good srb outgoing packets")   \
 _(INVALID_DST, "Unknown destination")   \
 _(INVALID_SRC, "Unknown source")	\
-_(NO_SUCH_CALL, "No such call packets")	\
-_(GOOD, "Good srb outgoing packets")
+_(NO_SUCH_CALL, "No such call packets")	
 
 
 static char * ppf_srb_nb_rx_error_strings[] = {
@@ -42,6 +43,7 @@ typedef enum {
 
 
 typedef struct {
+  ppf_srb_header_t srb;
   u32 tunnel_index;
 } ppf_srb_nb_rx_trace_t;
 
@@ -60,23 +62,16 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
 		    u32 is_ip4)
 {
   u32 n_left_from, next_index, * from, * to_next;
+  ppf_main_t *pm = &ppf_main;
   ppf_sb_main_t *psm = &ppf_sb_main;
-  vnet_main_t * vnm = psm->vnet_main;
-  vnet_interface_main_t * im = &vnm->interface_main;
-  u32 pkts_decapsulated = 0;
-  u32 thread_index = vlib_get_thread_index();
-  u32 stats_sw_if_index, stats_n_packets, stats_n_bytes;
-  
-  if (is_ip4)
-    last_key4.as_u64 = ~0;
-  else
-    memset (&last_key6, 0xff, sizeof (last_key6));
-  
+  CLIB_UNUSED(ppf_pdcp_main_t *ppm) = &ppf_pdcp_main;
+  CLIB_UNUSED(vnet_main_t * vnm) = psm->vnet_main;
+  u32 stats_n_packets, stats_n_bytes;
+    
   from = vlib_frame_vector_args (from_frame);
   n_left_from = from_frame->n_vectors;
   
   next_index = node->cached_next_index;
-  stats_sw_if_index = node->runtime_data[0];
   stats_n_packets = stats_n_bytes = 0;
   
   while (n_left_from > 0)
@@ -93,12 +88,11 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           u32 next0;
           ip4_header_t * ip4_0;
           ppf_srb_header_t * srb0;
-          u32 srb_hdr_len0 = 0;
-          uword * p0;
+	  CLIB_UNUSED(ppf_callline_t * c0);
           u32 tunnel_index0;
           ppf_gtpu_tunnel_t * t0;
           u32 error0;
-          u32 sw_if_index0, len0;
+          CLIB_UNUSED(u32 sw_if_index0), len0;
                     
           bi0 = from[0];
           to_next[0] = bi0;
@@ -130,10 +124,17 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
             goto trace0;
           }
 
+          /* Validate UDP tunnel SIP against packet DIP */
+          if (PREDICT_FALSE (ip4_0->src_address.as_u32 != psm->dst)) {
+            error0 = PPF_SRB_NB_RX_ERROR_INVALID_SRC;
+            next0 = PPF_SRB_NB_RX_NEXT_DROP;
+            goto trace0;
+          }
+	  
           /* Manipulate packet 0 */
 
 	  /* Find callline */
-	  // srb_call = ppf_callline[srb0->call_id];
+	  c0 = &(pm->ppf_calline_table[srb0->call_id]);
 
           /* Save transaction-id and request-id in callline */
 	  /* Generate PDCP SN, map <PDCP SN> to <transaction-id + request-id> */
@@ -148,14 +149,13 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           vlib_buffer_advance (b0, sizeof(ppf_srb_header_t));
           
           /* Determine next node */
-	  next0 = PPF_SRB_NB_RX_NEXT_PDCP//PDCP-ENCAP;
+	  next0 = 0;//PDCP-ENCAP;
           sw_if_index0 = t0->sw_if_index;
           len0 = vlib_buffer_length_in_chain (vm, b0);
           
           /* Set packet input sw_if_index to unicast GTPU tunnel for learning */
           vnet_buffer(b0)->sw_if_index[VLIB_RX] = tunnel_index0;
           
-          pkts_decapsulated ++;
           stats_n_packets += 1;
           stats_n_bytes += len0;
                     
