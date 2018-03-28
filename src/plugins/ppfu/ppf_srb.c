@@ -44,6 +44,55 @@ ppf_srb_config (vlib_main_t * vm, unformat_input_t * input)
 
 VLIB_CONFIG_FUNCTION (ppf_srb_config, "ppf_srb");
 
+#define SRB_NB_RX_PORT  8888
+#define SRB_NB_TX_PORT  6666
+
+static void
+ppf_srb_ip_udp_rewrite ()
+{
+  union
+  {
+    ip4_srb_header_t *h4;
+    u8 *rw;
+  } r =
+  {
+  .rw = 0};
+  int len = sizeof *r.h4;
+
+  vec_validate_aligned (r.rw, len - 1, CLIB_CACHE_LINE_BYTES);
+
+  ip4_header_t *ip = &r.h4->ip4;
+  udp_header_t *udp = &r.h4->udp;
+  ppf_srb_header_t *srb = &r.h4->srb;
+
+  /* Fixed portion of the (outer) ip header */
+  ip->ip_version_and_header_length = 0x45;
+  ip->ttl = 254;
+  ip->protocol = IP_PROTOCOL_UDP;
+  
+  ip->src_address = ppf_sb_main.src;
+  ip->dst_address = ppf_sb_main.dst;
+  
+  /* we fix up the ip4 header length and checksum after-the-fact */
+  ip->checksum = ip4_header_checksum (ip);
+
+  /* UDP header, randomize src port on something, maybe? */
+  udp->src_port = clib_host_to_net_u16 (SRB_NB_RX_PORT);
+  udp->dst_port = clib_host_to_net_u16 (SRB_NB_TX_PORT);
+
+  /* SRB indata header */
+  srb->call_id = 0;
+  srb->transaction_id = 0;
+  srb->msg_type = 0;
+  srb->msg.in.request_id = 0;
+  srb->msg.in.integrity_status = 1;
+  srb->msg.in.data_l = 0;
+  
+  ppf_sb_main.rewrite = r.rw;
+  
+  return;
+}
+
 clib_error_t *
 ppf_srb_init (vlib_main_t * vm)
 {
@@ -54,6 +103,14 @@ ppf_srb_init (vlib_main_t * vm)
 	
   psm->srb_rx_next_index = PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB;
   psm->sb_lb_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
+
+  psm->src = 0x01010101;
+  psm->dst = 0x02020202;
+
+  ppf_srb_ip_udp_rewrite ();
+
+  udp_register_dst_port (vm, SRB_NB_RX_PORT,
+			 ppf_srb_nb_rx_node.index, /* is_ip4 */ 1);
   
   return 0;
 }
