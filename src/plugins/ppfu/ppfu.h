@@ -87,11 +87,13 @@ typedef enum {
 } ppf_sb_path_lb_next_t;
 
 #define foreach_ppf_srb_nb_rx_next        \
-_(DROP, "error-drop")   			\
+_(DROP, "error-drop")   		  \
+_(PPF_PDCP_ENCRYPT, "ppf_pdcp_encrypt")   \
 _(PPF_SB_PATH_LB, "ppf_sb_path_lb")  
   
 typedef enum {
     PPF_SRB_NB_RX_NEXT_DROP,
+    PPF_SRB_NB_RX_NEXT_PPF_PDCP_ENCRYPT,
     PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB,
     PPF_SRB_NB_RX_N_NEXT,
 } ppf_srb_nb_rx_next_t;
@@ -173,6 +175,14 @@ typedef struct
   ppf_gtpu_tunnel_type_t tunnel_type;
   u32 tunnel_id;
 } ppf_gtpu_tunnel_id_type_t;
+
+typedef union {
+  struct {
+    u32 transaction_id;
+    u32 request_id;
+  };
+  u64 as_u64;
+} ppf_srb_msg_id_t;
 
 typedef struct
 {

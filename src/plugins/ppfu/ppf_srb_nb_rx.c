@@ -64,14 +64,14 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
   u32 n_left_from, next_index, * from, * to_next;
   ppf_main_t *pm = &ppf_main;
   ppf_sb_main_t *psm = &ppf_sb_main;
-  CLIB_UNUSED(ppf_pdcp_main_t *ppm) = &ppf_pdcp_main;
+  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
   CLIB_UNUSED(vnet_main_t * vnm) = psm->vnet_main;
   u32 stats_n_packets, stats_n_bytes;
     
   from = vlib_frame_vector_args (from_frame);
   n_left_from = from_frame->n_vectors;
   
-  next_index = node->cached_next_index;
+  next_index = psm->srb_rx_next_index;
   stats_n_packets = stats_n_bytes = 0;
   
   while (n_left_from > 0)
@@ -88,11 +88,13 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           u32 next0;
           ip4_header_t * ip4_0;
           ppf_srb_header_t * srb0;
-	  CLIB_UNUSED(ppf_callline_t * c0);
+          ppf_callline_t * c0;
+          ppf_pdcp_session_t * pdcp0;
+          u64 key0;
+	  ppf_srb_msg_id_t msg0;
           u32 tunnel_index0;
-          ppf_gtpu_tunnel_t * t0;
           u32 error0;
-          CLIB_UNUSED(u32 sw_if_index0), len0;
+          u32 len0;
                     
           bi0 = from[0];
           to_next[0] = bi0;
@@ -138,24 +140,33 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
 
           /* Save transaction-id and request-id in callline */
 	  /* Generate PDCP SN, map <PDCP SN> to <transaction-id + request-id> */
-	  // TBD
-
+          pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
+	  key0 = (uword)(pdcp0->out_sn++);
+	  msg0.transaction_id = srb0->transaction_id;
+	  msg0.request_id = srb0->msg.out.request_id;
+	  hash_set (c0->rb.srb.nb_out_msg_by_sn, key0, msg0.as_u64);
+          
 	  /* Determine downlink tunnel */
-	  // tunnel_index0 = srb_call->tunnel_index;
-	  
-          t0 = pool_elt_at_index (ppf_gtpu_main.tunnels, tunnel_index0);
                     
           /* Pop gtpu header */
           vlib_buffer_advance (b0, sizeof(ppf_srb_header_t));
           
           /* Determine next node */
-	  next0 = 0;//PDCP-ENCAP;
-          sw_if_index0 = t0->sw_if_index;
+	  if (PREDICT_TRUE(1 == srb0->msg.out.sb_num)) {
+	    tunnel_index0 = c0->rb.srb.sb_tunnel[srb0->msg.out.sb_id[0]].tunnel_id;	    
+	    next0 = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
+	  } else {
+	    next0 = PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB;
+	    vnet_buffer2(b0)->ppf_srb_out.sb_num = srb0->msg.out.sb_num;
+	    clib_memcpy (vnet_buffer2(b0)->ppf_srb_out.sb_id, srb0->msg.out.sb_id, 3);
+	  }
+	  
+          /* Set parameters in buffer */
+          vnet_buffer(b0)->sw_if_index[VLIB_TX] = tunnel_index0;
+	  vnet_buffer2(b0)->ppf_srb_out.pdcp.out_sn = (u32)key0;	  
+
+	  /* Counter here */
           len0 = vlib_buffer_length_in_chain (vm, b0);
-          
-          /* Set packet input sw_if_index to unicast GTPU tunnel for learning */
-          vnet_buffer(b0)->sw_if_index[VLIB_RX] = tunnel_index0;
-          
           stats_n_packets += 1;
           stats_n_bytes += len0;
                     
@@ -166,7 +177,8 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           {
             ppf_srb_nb_rx_trace_t *tr
               = vlib_add_trace (vm, node, b0, sizeof (*tr));
-	    // TBD
+	    tr->tunnel_index = tunnel_index0;
+	    clib_memcpy (&tr->srb, srb0, sizeof (*srb0));
           }
                     
           vlib_validate_buffer_enqueue_x1 (vm, node, next_index,

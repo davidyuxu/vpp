@@ -368,6 +368,19 @@ typedef struct
       u16 *trajectory_trace;
     };
 #endif
+
+    struct
+    {
+      u8 sb_num;
+      u8 sb_id[3];
+      
+      struct
+      {
+        u32 in_sn;
+	u32 out_sn;
+      } pdcp;
+    } ppf_srb_out;
+
     u32 unused[12];
   };
 } vnet_buffer_opaque2_t;
