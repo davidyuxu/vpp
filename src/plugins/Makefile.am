@@ -44,7 +44,7 @@ endif
 
 
 if ENABLE_GTPU_PLUGIN
-#include gtpu.am
+include gtpu.am
 endif
 
 if ENABLE_ILA_PLUGIN
@@ -113,10 +113,6 @@ endif
 
 if ENABLE_GTPLO_PLUGIN
 include gtplo.am
-endif
-
-if ENABLE_PPF_GTPU_PLUGIN
-#include ppf_gtpu.am
 endif
 
 if ENABLE_PPFU_PLUGIN

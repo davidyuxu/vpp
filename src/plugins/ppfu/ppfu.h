@@ -117,6 +117,8 @@ typedef enum {
 typedef struct
 {
   u32 pdcp_input_next_index;
+  u32 pdcp_decrypt_next_index;
+  u32 pdcp_encrypt_next_index;
 
    /**
    * Node type for registering to fib changes.

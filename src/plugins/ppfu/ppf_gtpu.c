@@ -35,6 +35,9 @@
 
 ppf_gtpu_main_t ppf_gtpu_main;
 
+ppf_callline_t ppf_calline_table[MAX_SESSION_NUM];
+
+
 /* *INDENT-OFF* */
 VNET_FEATURE_INIT (ip4_ppf_gtpu_bypass, static) = {
   .arc_name = "ip4-unicast",
@@ -223,6 +226,7 @@ _(src)                                          \
 _(dst)							\
 _(call_id)							\
 _(tunnel_type)						\
+_(sb_id)							\
 
 
 static void
@@ -378,9 +382,12 @@ int vnet_ppf_gtpu_add_del_tunnel
   uword *p;
   u32 hw_if_index = ~0;
   u32 sw_if_index = ~0;
-  ppf_gtpu4_tunnel_key_t key4, call_key4;
+  ppf_gtpu4_tunnel_key_t key4;
   ppf_gtpu6_tunnel_key_t key6;
   u32 is_ip6 = a->is_ip6;
+  ppf_callline_t *callline;
+  ppf_gtpu_tunnel_id_type_t *it;
+  u32 tunnel_id;
 
   if (!is_ip6)
     {
@@ -394,6 +401,10 @@ int vnet_ppf_gtpu_add_del_tunnel
       key6.teid = clib_host_to_net_u32 (a->in_teid);
       p = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6);
     }
+    
+  if (a->call_id >= MAX_SESSION_NUM) {
+	return VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+  }
 
   if (a->is_add)
     {
@@ -417,6 +428,28 @@ int vnet_ppf_gtpu_add_del_tunnel
       foreach_copy_field;
 #undef _
 
+	tunnel_id = t - gtm->tunnels;
+
+	//add by lollita for ppf gtpu tunnel swap
+	callline = &ppf_calline_table[t->call_id]; 
+
+	if (t->tunnel_type == PPF_GTPU_NB) {
+	
+		callline->nb_tunnel.tunnel_id = tunnel_id;
+		callline->nb_tunnel.tunnel_type = t->tunnel_type;
+		
+	} else if (t->tunnel_type == PPF_GTPU_SB) {
+
+		it = &(callline->sb_tunnel[t->sb_id]);
+
+		if (it->tunnel_id != ~0 && it->tunnel_id != tunnel_id) {
+			pool_put (gtm->tunnels, t);
+			return VNET_API_ERROR_TUNNEL_EXIST;
+		}
+		it->tunnel_id = tunnel_id;
+		it->tunnel_type = t->tunnel_type;
+	} 
+
       ip_udp_ppf_gtpu_rewrite (t, is_ip6);
 
       /* copy the key */
@@ -426,14 +459,9 @@ int vnet_ppf_gtpu_add_del_tunnel
       else
 	hash_set (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64, t - gtm->tunnels);
 
-	//add by lollita for ppf gtpu tunnel swap
-	call_key4.call_id = t->call_id;
-	call_key4.tunnel_type = t->tunnel_type;
-	hash_set (gtm->ppf_gtpu4_tunnel_by_callid_dir, call_key4.as_u64, t - gtm->tunnels);
-
 	if (t->tunnel_type == PPF_GTPU_SB ) {
 		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_PDCP_INPUT;
-	} else if (t->tunnel_type == PPF_GTPU_NB ||t->tunnel_type == PPF_GTPU_SRB || t->tunnel_type == PPF_GTPU_LBO) {
+	} else {
 		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_SB_PATH_LB;
 	}
 
@@ -609,6 +637,25 @@ int vnet_ppf_gtpu_add_del_tunnel
       t = pool_elt_at_index (gtm->tunnels, p[0]);
       sw_if_index = t->sw_if_index;
 
+      tunnel_id = t - gtm->tunnels;
+
+	//add by lollita for ppf gtpu tunnel swap
+	callline = &ppf_calline_table[t->call_id]; 
+
+	if (t->tunnel_type == PPF_GTPU_NB) {
+	
+		callline->nb_tunnel.tunnel_id = ~0;
+		
+	} else if (t->tunnel_type == PPF_GTPU_SB) {
+
+		it = &(callline->sb_tunnel[t->sb_id]);
+
+		if (it->tunnel_id != ~0 && it->tunnel_id != tunnel_id) {
+			return VNET_API_ERROR_TUNNEL_EXIST;
+		}
+		it->tunnel_id = ~0;
+	} 
+
       vnet_sw_interface_set_flags (vnm, t->sw_if_index, 0 /* down */ );
       vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, t->sw_if_index);
       si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
@@ -726,6 +773,7 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
   u32 in_teid = 0;
   u32 out_teid = 0;
   u32 decap_next_index = ~0;
+  u32 sb_id = 0;
   u32 tmp;
   int rv;
   vnet_ppf_gtpu_add_del_tunnel_args_t _a, *a = &_a;
@@ -807,6 +855,8 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 	;
 	else if (unformat (line_input, "outteid %d", &out_teid))
 	;
+	else if (unformat (line_input, "sb_id %d", &sb_id))
+	;
       else
 	{
 	  error = clib_error_return (0, "parse error: '%U'",
@@ -866,8 +916,8 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
   foreach_copy_field;
 #undef _
 
-  vlib_cli_output (vm, "call_id: %d, tunnel_type: %d, in_teid %d, out_teid %d\n", 
-		   a->call_id, a->tunnel_type, a->in_teid, a->out_teid);
+  vlib_cli_output (vm, "call_id: %d, tunnel_type: %d, in_teid %d, out_teid %d, sb_id %d\n", 
+		   a->call_id, a->tunnel_type, a->in_teid, a->out_teid, a->sb_id);
 
   rv = vnet_ppf_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
 
@@ -1159,6 +1209,7 @@ ppf_gtpu_tunnels_init()
   u32 i;
   u32 call_id = 0;
   u32 tunnel_type = 0;
+  u32 sb_id = 0;
 
   /* Cant "universally zero init" (={0}) due to GCC bug 53119 */
   memset (&src, 0, sizeof src);
