@@ -16,7 +16,7 @@ vppplugins_LTLIBRARIES += ppfu_plugin.la
 
 ppfu_plugin_la_SOURCES =		\
 	ppfu/ppf_gtpu_encap.c		    \
-        ppfu/ppf_gtpu_decap.c		    \
+    ppfu/ppf_gtpu_decap.c		    \
 	ppfu/ppf_gtpu.c				    \
 	ppfu/ppf_gtpu_api.c			\
 	ppfu/ppf_pdcp_decrypt.c		\
@@ -26,7 +26,8 @@ ppfu_plugin_la_SOURCES =		\
 	ppfu/ppf_srb_nb_rx.c			\
 	ppfu/ppf_srb_nb_tx.c		\	
 	ppfu/ppf_srb.c		\
-	ppfu/ppf_pdcp.c
+	ppfu/ppf_pdcp.c     \
+	ppfu/ppfu.c
 
 BUILT_SOURCES +=			\
 	ppfu/ppf_gtpu.api.h		    \

@@ -17,6 +17,7 @@
 #include <vnet/vnet.h>
 #include <vnet/ip/ip.h>
 #include <vnet/ethernet/ethernet.h>
+#include <ppfu/ppfu.h>
 #include <ppfu/ppf_gtpu.h>
 
 
