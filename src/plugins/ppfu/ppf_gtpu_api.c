@@ -24,7 +24,7 @@
 
 #include <vppinfra/byte_order.h>
 #include <vlibmemory/api.h>
-
+#include <ppfu/ppfu.h>
 #include <ppfu/ppf_gtpu.h>
 
 

@@ -31,39 +31,46 @@
 #include <vpp/app/version.h>
 #include <ppfu/ppfu.h>
 
-ppf_pdcp_main_t ppf_pdcp_main; 
-
-static clib_error_t *
-ppf_pdcp_config (vlib_main_t * vm, unformat_input_t * input)
-{
-  //ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
-  clib_error_t *error = 0;
-  
-
-  return error;
-}
-
-VLIB_CONFIG_FUNCTION (ppf_pdcp_config, "ppf_pdcp");
+ppf_main_t ppf_main;
 
 clib_error_t *
-ppf_pdcp_init (vlib_main_t * vm)
+ppf_init (vlib_main_t * vm)
 {
-  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
+  ppf_main_t *pm = &ppf_main;
+  
+  if (pm->max_capacity == 0)
+    pm->max_capacity = DEF_MAX_PPF_SESSION;
 
-  ppm->vnet_main = vnet_get_main ();
-  ppm->vlib_main = vm;
-	
-  ppm->pdcp_input_next_index = PPF_PDCP_INPUT_NEXT_PPF_PDCP_DECRYPT;
-  ppm->pdcp_decrypt_next_index = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+  pm->ppf_calline_table = clib_mem_alloc (pm->max_capacity * sizeof (ppf_callline_t));
+  ASSERT(pm->ppf_calline_table != NULL);
+  
+  return 0;
+}
 
-  if (ppf_main.max_capacity) {
-    pool_init_fixed (ppm->sessions, ppf_main.max_capacity);
-  }
+VLIB_INIT_FUNCTION (ppf_init);
+
+static clib_error_t *
+ppf_config (vlib_main_t * vm, unformat_input_t * input)
+{
+  uword capacity = 0;
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "capacity %d", &capacity))
+	;
+      else
+	return clib_error_return (0,
+				  "invalid capacity parameter `%U'",
+				  format_unformat_error, input);
+    }
+
+  ppf_main.max_capacity = capacity;
 
   return 0;
 }
 
-VLIB_INIT_FUNCTION (ppf_pdcp_init);
+VLIB_EARLY_CONFIG_FUNCTION (ppf_config, "ppf_config");
+
 
 /*
  * fd.io coding-style-patch-verification: ON

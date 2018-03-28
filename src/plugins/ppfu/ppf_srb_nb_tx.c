@@ -73,6 +73,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
 		    u32 is_ip4)
 {
   ppf_sb_main_t *psm = &ppf_sb_main;
+  u16 old_l0 = 0, old_l1 = 0, old_l2 = 0, old_l3 = 0;
   u32 n_left_from, next_index, * from, * to_next;
   u32 stats_n_packets, stats_n_bytes;
   u32 next0 = 0, next1 = 0, next2 = 0, next3 = 0;
@@ -316,7 +317,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
 	  u32 len0;
           ip4_header_t * ip4_0;
           udp_header_t * udp0;
-          ppf_srb_in_data_t * srb0;
+          ppf_srb_header_t * srb0;
           u64 * copy_src0, * copy_dst0;
           u32 * copy_src_last0, * copy_dst_last0;
           u16 new_l0;

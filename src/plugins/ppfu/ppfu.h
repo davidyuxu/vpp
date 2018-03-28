@@ -35,7 +35,6 @@
 #include <vnet/fib/fib_table.h>
 
 
-
 #define foreach_ppf_pdcp_input_next        \
 _(DROP, "error-drop")                  \
 _(PPF_PDCP_DECRYPT, "ppf_pdcp_decrypt")          
@@ -47,8 +46,6 @@ typedef enum {
     PPF_PDCP_INPUT_N_NEXT,
 } ppf_pdcp_input_next_t;
 
-
-
 #define foreach_ppf_pdcp_decrypt_next        \
 _(DROP, "error-drop")                  \
 _(IP4_LOOKUP, "ip4-lookup")		    \
@@ -56,7 +53,6 @@ _(IP6_LOOKUP, "ip6-lookup")		    \
 _(PPF_GTPU4_ENCAP, "ppf_gtpu4-encap")    \
 _(PPF_GTPU6_ENCAP, "ppf_gtpu6-encap") 	\
 _(PPF_SRB_NB_TX, "ppf_srb_nb_tx")
-
 
 typedef enum {
     PPF_PDCP_DECRYPT_NEXT_DROP,
@@ -68,13 +64,10 @@ typedef enum {
     PPF_PDCP_DECRYPT_N_NEXT,
 } ppf_pdcp_decrypt_next_t;
 
-
-
 #define foreach_ppf_pdcp_encrypt_next        \
 _(DROP, "error-drop")                  \
 _(PPF_GTPU4_ENCAP, "ppf_gtpu4-encap")    \
 _(PPF_GTPU6_ENCAP, "ppf_gtpu6-encap")    
-
 
 typedef enum {
     PPF_PDCP_ENCRYPT_NEXT_DROP,
@@ -82,8 +75,6 @@ typedef enum {
     PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU6_ENCAP,
     PPF_PDCP_ENCRYPT_N_NEXT,
 } ppf_pdcp_encrypt_next_t;
-
-
 
 #define foreach_ppf_sb_path_lb_next        \
 _(DROP, "error-drop")                  \
@@ -94,7 +85,6 @@ typedef enum {
     PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT,
     PPF_SB_PATH_LB_N_NEXT,
 } ppf_sb_path_lb_next_t;
-
 
 #define foreach_ppf_srb_nb_rx_next        \
 _(DROP, "error-drop")   			\
@@ -118,6 +108,14 @@ _(IP4_LOOKUP, "ip4-lookup")
 
 typedef struct
 {
+  u32 out_sn;   /* outgoing sequence number */
+  u32 in_sn;    /* incoming sequence number */
+} ppf_pdcp_session_t;
+
+typedef struct
+{
+  ppf_pdcp_session_t * sessions;
+  
   u32 pdcp_input_next_index;
   u32 pdcp_decrypt_next_index;
   u32 pdcp_encrypt_next_index;
@@ -133,7 +131,6 @@ typedef struct
   /* convenience */
   vlib_main_t *vlib_main;
   vnet_main_t *vnet_main;
-
 } ppf_pdcp_main_t;
 
 extern ppf_pdcp_main_t ppf_pdcp_main;
@@ -149,11 +146,6 @@ typedef struct
   u32 srb_rx_next_index;
   u32 sb_lb_next_index;  
 
-   /**
-   * Node type for registering to fib changes.
-   */
-  fib_node_type_t fib_node_type;
-
   /* API message ID base */
   u16 msg_id_base;
 
@@ -161,6 +153,61 @@ typedef struct
   vlib_main_t *vlib_main;
   vnet_main_t *vnet_main;
 } ppf_sb_main_t;
+
+#define DEF_MAX_PPF_SESSION 100000
+#define MAX_SB_PER_DRB  3
+
+#define INVALID_TUNNEL_ID ~0
+
+typedef enum
+{
+  PPF_GTPU_SB = 0, 			//The DRB SB GTP tunnel
+  PPF_GTPU_NB,			//The DRB NB GTP tunnel
+  PPF_GTPU_LBO,			//The GTP tunnel for PPF LBO
+  PPF_GTPU_SRB,			//The GTP SRB SB GTP tunnel
+  PPF_GTPU_NORMAL
+} ppf_gtpu_tunnel_type_t;
+
+typedef struct
+{
+  ppf_gtpu_tunnel_type_t tunnel_type;
+  u32 tunnel_id;
+} ppf_gtpu_tunnel_id_type_t;
+
+typedef struct
+{
+  uword *nb_out_msg_by_sn;   /* hash <PDCP SN> -> <transaction-id + request-id> */
+  ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_DRB];
+} ppf_srb_callline_t;
+
+typedef struct
+{	
+  ppf_gtpu_tunnel_id_type_t nb_tunnel;
+  ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_DRB];
+} ppf_drb_callline_t;
+
+typedef struct
+{
+  u32 session_id;
+} ppf_pdcp_callline_t;
+
+typedef struct 
+{	
+  u32 call_index;
+  union {
+    ppf_drb_callline_t drb;
+    ppf_srb_callline_t srb;
+  } rb;
+  ppf_pdcp_callline_t pdcp;
+} ppf_callline_t;
+
+typedef struct
+{
+  u32 max_capacity;
+  ppf_callline_t * ppf_calline_table;
+} ppf_main_t;
+
+extern ppf_main_t ppf_main;
 
 extern ppf_sb_main_t ppf_sb_main;
 
@@ -170,7 +217,6 @@ extern vlib_node_registration_t ppf_pdcp_input_node;
 extern vlib_node_registration_t ppf_sb_path_lb_node;
 extern vlib_node_registration_t ppf_srb_nb_rx_node;
 extern vlib_node_registration_t ppf_srb_nb_tx_node;
-
 
 typedef struct
 {
