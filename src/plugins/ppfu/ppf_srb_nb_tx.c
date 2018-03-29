@@ -39,11 +39,8 @@ typedef enum {
 } ppf_srb_nb_tx_error_t;
 
 typedef struct {
-  u32 gtpu_tunnel_index;
-  u32 dst;
-  u32 src;
-  u16 src_port;
-  u16 dst_port;
+  ppf_srb_header_t srb;
+  u32 tunnel_index;
 } ppf_srb_nb_tx_trace_t;
 
 u8 * format_ppf_srb_nb_tx_trace  (u8 * s, va_list * args)
@@ -53,11 +50,11 @@ u8 * format_ppf_srb_nb_tx_trace  (u8 * s, va_list * args)
   ppf_srb_nb_tx_trace_t * t
       = va_arg (*args, ppf_srb_nb_tx_trace_t *);
 
-  s = format (s, "PPF SRB-NB TX: tunneling signaling received from tunnel %d \n",
-	      t->gtpu_tunnel_index);
-  s = format (s, "  src %U:%d -> dst %U:%d \n",
-              format_ip4_address, &t->src, t->src_port,
-              format_ip4_address, &t->dst, t->dst_port);
+  s = format (s, "PPF SRB-NB TX: srb incoming msg from sb tunnel %d \n",
+	      t->tunnel_index);
+  s = format (s, "  call-id %d, transaction-id %d, request-id %d, integrity_status %d, length %d \n",
+              t->srb.call_id, t->srb.transaction_id, t->srb.msg.in.request_id, t->srb.msg.in.integrity_status,
+              t->srb.msg.in.data_l);
   
   return s;
 }
