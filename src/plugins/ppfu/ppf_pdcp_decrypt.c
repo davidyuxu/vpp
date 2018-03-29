@@ -137,10 +137,10 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    b2 = vlib_get_buffer (vm, bi2);
 	    b3 = vlib_get_buffer (vm, bi3);
 
-	    ASSERT (b0->current_data == 0);
-	    ASSERT (b1->current_data == 0);
-	    ASSERT (b2->current_data == 0);
-	    ASSERT (b3->current_data == 0);
+	    // ASSERT (b0->current_data == 0);
+	    // ASSERT (b1->current_data == 0);
+	    // ASSERT (b2->current_data == 0);
+	    // ASSERT (b3->current_data == 0);
 
 	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
 	    sw_if_index1 = vnet_buffer(b1)->sw_if_index[VLIB_RX];
@@ -257,7 +257,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 
 	    b0 = vlib_get_buffer (vm, bi0);
 
-	    ASSERT (b0->current_data == 0);
+	    // ASSERT (b0->current_data == 0);
 
 	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
 
