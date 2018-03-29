@@ -425,32 +425,51 @@ int vnet_ppf_gtpu_add_del_tunnel
       foreach_copy_field;
 #undef _
 
-	tunnel_id = t - gtm->tunnels;
+      tunnel_id = t - gtm->tunnels;
+      
+      //add by lollita for ppf gtpu tunnel swap
+      callline = &(pm->ppf_calline_table[t->call_id]); 
+      callline->call_index = t->call_id;
+      callline->call_type  = (t->tunnel_type == PPF_GTPU_SRB) ? PPF_SRB_CALL : PPF_DRB_CALL;
 
-	//add by lollita for ppf gtpu tunnel swap
-	callline = &(pm->ppf_calline_table[t->call_id]); 
+      switch (t->tunnel_type) {
+        case PPF_GTPU_NB:
+          callline->rb.drb.nb_tunnel.tunnel_id = tunnel_id;
+          callline->rb.drb.nb_tunnel.tunnel_type = t->tunnel_type;
+          break;
 
-	if (t->tunnel_type == PPF_GTPU_NB) {
-	
-		callline->rb.drb.nb_tunnel.tunnel_id = tunnel_id;
-		callline->rb.drb.nb_tunnel.tunnel_type = t->tunnel_type;
+        case PPF_GTPU_SB:
+          {
+            it = &(callline->rb.drb.sb_tunnel[t->sb_id]);
+            
+            if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
+              pool_put (gtm->tunnels, t);
+              return VNET_API_ERROR_TUNNEL_EXIST;
+            }
+            
+            it->tunnel_id = tunnel_id;
+            it->tunnel_type = t->tunnel_type;
+          }
+          break;
 
-		callline->call_type = PPF_DRB_CALL;
-		
-	} else if (t->tunnel_type == PPF_GTPU_SB) {
+        case PPF_GTPU_SRB:
+          {
+            it = &(callline->rb.srb.sb_tunnel[t->sb_id]);
+            
+            if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
+              pool_put (gtm->tunnels, t);
+              return VNET_API_ERROR_TUNNEL_EXIST;
+            }
+            
+            it->tunnel_id = tunnel_id;
+            it->tunnel_type = t->tunnel_type;
+          }
+          break;
 
-		it = &(callline->rb.drb.sb_tunnel[t->sb_id]);
-
-		callline->call_type = PPF_SRB_CALL;
-
-		if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
-			pool_put (gtm->tunnels, t);
-			return VNET_API_ERROR_TUNNEL_EXIST;
-		}
-		it->tunnel_id = tunnel_id;
-		it->tunnel_type = t->tunnel_type;
-	} 
-
+        default:
+          break;
+      }
+      
       ip_udp_ppf_gtpu_rewrite (t, is_ip6);
 
       /* copy the key */
@@ -640,22 +659,31 @@ int vnet_ppf_gtpu_add_del_tunnel
 
       tunnel_id = t - gtm->tunnels;
 
-	//add by lollita for ppf gtpu tunnel swap
-	callline = &(pm->ppf_calline_table[t->call_id]); 
-
-	if (t->tunnel_type == PPF_GTPU_NB) {
+      //add by lollita for ppf gtpu tunnel swap
+      callline = &(pm->ppf_calline_table[t->call_id]); 
+      callline->call_index = ~0;
+      
+      if (t->tunnel_type == PPF_GTPU_NB) {
+        callline->rb.drb.nb_tunnel.tunnel_id = INVALID_TUNNEL_ID;;
+      } else if (t->tunnel_type == PPF_GTPU_SB) {
+        it = &(callline->rb.drb.sb_tunnel[t->sb_id]);
+        
+        if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
+          return VNET_API_ERROR_TUNNEL_EXIST;
+        }
 	
-		callline->rb.drb.nb_tunnel.tunnel_id = INVALID_TUNNEL_ID;;
-		
-	} else if (t->tunnel_type == PPF_GTPU_SB) {
+        it->tunnel_id = INVALID_TUNNEL_ID;
+      } else if (t->tunnel_type == PPF_GTPU_SRB) {
+        it = &(callline->rb.srb.sb_tunnel[t->sb_id]);
+        
+        if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
+          return VNET_API_ERROR_TUNNEL_EXIST;
+        }
+        
+        it->tunnel_id = INVALID_TUNNEL_ID;
 
-		it = &(callline->rb.drb.sb_tunnel[t->sb_id]);
-
-		if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
-			return VNET_API_ERROR_TUNNEL_EXIST;
-		}
-		it->tunnel_id = INVALID_TUNNEL_ID;
-	} 
+        hash_free(callline->rb.srb.nb_out_msg_by_sn);
+      }
 
       vnet_sw_interface_set_flags (vnm, t->sw_if_index, 0 /* down */ );
       vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, t->sw_if_index);
