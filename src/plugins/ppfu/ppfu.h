@@ -157,7 +157,7 @@ typedef struct
 } ppf_sb_main_t;
 
 #define DEF_MAX_PPF_SESSION 100000
-#define MAX_SB_PER_DRB  3
+#define MAX_SB_PER_CALL  3
 
 #define INVALID_TUNNEL_ID ~0
 
@@ -195,13 +195,13 @@ typedef union {
 typedef struct
 {
   uword *nb_out_msg_by_sn;   /* hash <PDCP SN> -> <transaction-id + request-id> */
-  ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_DRB];
+  ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_CALL];
 } ppf_srb_callline_t;
 
 typedef struct
 {	
   ppf_gtpu_tunnel_id_type_t nb_tunnel;
-  ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_DRB];
+  ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_CALL];
 } ppf_drb_callline_t;
 
 typedef struct
