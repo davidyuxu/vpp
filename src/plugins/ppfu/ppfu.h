@@ -224,6 +224,8 @@ typedef struct
 {
   u32 max_capacity;
   ppf_callline_t * ppf_calline_table;
+
+  u16 msg_id_base;
 } ppf_main_t;
 
 extern ppf_main_t ppf_main;

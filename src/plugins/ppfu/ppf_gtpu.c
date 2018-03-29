@@ -434,10 +434,14 @@ int vnet_ppf_gtpu_add_del_tunnel
 	
 		callline->rb.drb.nb_tunnel.tunnel_id = tunnel_id;
 		callline->rb.drb.nb_tunnel.tunnel_type = t->tunnel_type;
+
+		callline->call_type = PPF_DRB_CALL;
 		
 	} else if (t->tunnel_type == PPF_GTPU_SB) {
 
 		it = &(callline->rb.drb.sb_tunnel[t->sb_id]);
+
+		callline->call_type = PPF_SRB_CALL;
 
 		if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
 			pool_put (gtm->tunnels, t);

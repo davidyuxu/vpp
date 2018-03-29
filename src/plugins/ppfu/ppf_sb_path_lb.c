@@ -53,7 +53,7 @@ u8 * format_ppf_sb_path_lb_trace  (u8 * s, va_list * args)
 
   ppf_sb_path_lb_trace_t * t = va_arg (*args, ppf_sb_path_lb_trace_t *);
   
-  s = format (s, "SB PATH_LOADBALANCE: sw_if_index %d, next index %d\n",
+  s = format (s, "SB PATH_LOADBALANCE: sw_if_index %d, next index %d",
 		  t->sw_if_index, t->next_index);
   return s;
 }
@@ -262,7 +262,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	
 	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
 	    
-	    t0 = pool_elt_at_index (gtm->tunnels, sw_if_index0);
+	    t0 = &(gtm->tunnels[sw_if_index0]);
 	    call_id0 = t0->call_id;	    
 	    callline0 = &(pm->ppf_calline_table[call_id0]);
 
