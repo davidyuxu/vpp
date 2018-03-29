@@ -18,6 +18,7 @@
 #include <vnet/ip/ip.h>
 #include <vnet/ethernet/ethernet.h>
 #include <ppfu/ppfu.h>
+#include <ppfu/ppf_gtpu.h>
 
 
 /* Statistics (not all errors) */
@@ -53,8 +54,11 @@ u8 * format_ppf_srb_nb_tx_trace  (u8 * s, va_list * args)
   s = format (s, "PPF SRB-NB TX: srb incoming msg from sb tunnel %d \n",
 	      t->tunnel_index);
   s = format (s, "  call-id %d, transaction-id %d, request-id %d, integrity_status %d, length %d \n",
-              t->srb.call_id, t->srb.transaction_id, t->srb.msg.in.request_id, t->srb.msg.in.integrity_status,
-              t->srb.msg.in.data_l);
+              clib_net_to_host_u32(t->srb.call_id),
+              clib_net_to_host_u32(t->srb.transaction_id),
+              clib_net_to_host_u32(t->srb.msg.in.request_id),
+              clib_net_to_host_u32(t->srb.msg.in.integrity_status),
+              clib_net_to_host_u32(t->srb.msg.in.data_l));
   
   return s;
 }
@@ -70,6 +74,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
 		    u32 is_ip4)
 {
   ppf_sb_main_t *psm = &ppf_sb_main;
+  ppf_gtpu_main_t *pgm = &ppf_gtpu_main;
   u16 old_l0 = 0, old_l1 = 0, old_l2 = 0, old_l3 = 0;
   u32 n_left_from, next_index, * from, * to_next;
   u32 stats_n_packets, stats_n_bytes;
@@ -108,6 +113,8 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           u32 * copy_src_last3, * copy_dst_last3;
           u16 new_l0, new_l1, new_l2, new_l3;
           ip_csum_t sum0, sum1, sum2, sum3;
+	  u32 tunnel_index0, tunnel_index1, tunnel_index2, tunnel_index3;
+	  ppf_gtpu_tunnel_t * t0, * t1, * t2, * t3;
           
           /* Prefetch next iteration. */
           {
@@ -256,28 +263,48 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
 
 	  /* Fix srb data length */
 	  srb0 = (ppf_srb_header_t *)(udp0+1);
-	  new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
+	  len0 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b0)
 					 - sizeof (*ip4_0) - sizeof(*udp0) - sizeof(*srb0));
-	  srb0->msg.in.data_l = new_l0;
-	  srb0->call_id = vnet_buffer(b0)->sw_if_index[VLIB_TX]; // call-id
+	  srb0->msg.in.data_l = len0;
+	  tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
+	  t0 = pool_elt_at_index (pgm->tunnels, tunnel_index0);
+	  srb0->call_id = clib_host_to_net_u32(t0->call_id);
+	  srb0->transaction_id = clib_host_to_net_u32(0);
+	  srb0->msg.in.request_id = clib_host_to_net_u32(0);
+	  srb0->msg.in.integrity_status = clib_host_to_net_u32(1);
 	  
 	  srb1 = (ppf_srb_header_t *)(udp1+1);
-	  new_l1 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1)
+	  len1 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b1)
 					 - sizeof (*ip4_1) - sizeof(*udp1) - sizeof(*srb1));
-	  srb1->msg.in.data_l = new_l1;
-	  srb1->call_id = vnet_buffer(b1)->sw_if_index[VLIB_TX]; // call-id
+	  srb1->msg.in.data_l = len1;
+	  tunnel_index1 = vnet_buffer(b1)->sw_if_index[VLIB_RX];
+	  t1 = pool_elt_at_index (pgm->tunnels, tunnel_index1);
+	  srb1->call_id = clib_host_to_net_u32(t1->call_id);
+	  srb1->transaction_id = clib_host_to_net_u32(0);
+	  srb1->msg.in.request_id = clib_host_to_net_u32(0);
+	  srb1->msg.in.integrity_status = clib_host_to_net_u32(1);
 
 	  srb2 = (ppf_srb_header_t *)(udp2+1);
-	  new_l2 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
+	  len2 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b2)
 					 - sizeof (*ip4_2) - sizeof(*udp2) - sizeof(*srb2));
-	  srb2->msg.in.data_l = new_l2;
-	  srb2->call_id = vnet_buffer(b2)->sw_if_index[VLIB_TX]; // call-id
+	  srb2->msg.in.data_l = len2;
+	  tunnel_index2 = vnet_buffer(b2)->sw_if_index[VLIB_RX];
+	  t2 = pool_elt_at_index (pgm->tunnels, tunnel_index2);
+	  srb2->call_id = clib_host_to_net_u32(t2->call_id);
+	  srb2->transaction_id = clib_host_to_net_u32(0);
+	  srb2->msg.in.request_id = clib_host_to_net_u32(0);
+	  srb2->msg.in.integrity_status = clib_host_to_net_u32(1);
 
 	  srb3 = (ppf_srb_header_t *)(udp1+3);
-	  new_l3 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
+	  len3 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b3)
 					 - sizeof (*ip4_3) - sizeof(*udp3) - sizeof(*srb3));
-	  srb3->msg.in.data_l = new_l3;
-	  srb3->call_id = vnet_buffer(b3)->sw_if_index[VLIB_TX]; // call-id
+	  srb3->msg.in.data_l = len3;
+	  tunnel_index3 = vnet_buffer(b3)->sw_if_index[VLIB_RX];
+	  t3 = pool_elt_at_index (pgm->tunnels, tunnel_index3);
+	  srb3->call_id = clib_host_to_net_u32(t3->call_id);
+	  srb3->transaction_id = clib_host_to_net_u32(0);
+	  srb3->msg.in.request_id = clib_host_to_net_u32(0);
+	  srb3->msg.in.integrity_status = clib_host_to_net_u32(1);
 
           /* counter here */
           len0 = vlib_buffer_length_in_chain (vm, b0);
@@ -291,14 +318,16 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           {
             ppf_srb_nb_tx_trace_t *tr
               = vlib_add_trace (vm, node, b0, sizeof (*tr));
-	    // TBD
+	    tr->tunnel_index = tunnel_index0;
+	    clib_memcpy (&tr->srb, srb0, sizeof (*srb0));
           }
           
           if (PREDICT_FALSE(b1->flags & VLIB_BUFFER_IS_TRACED))
           {
             ppf_srb_nb_tx_trace_t *tr
               = vlib_add_trace (vm, node, b1, sizeof (*tr));
-	    // TBD
+	    tr->tunnel_index = tunnel_index1;
+	    clib_memcpy (&tr->srb, srb1, sizeof (*srb1));
           }
           
 	  vlib_validate_buffer_enqueue_x4 (vm, node, next_index,
@@ -319,6 +348,8 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           u32 * copy_src_last0, * copy_dst_last0;
           u16 new_l0;
           ip_csum_t sum0;
+	  u32 tunnel_index0;
+	  ppf_gtpu_tunnel_t * t0;
           
           bi0 = from[0];
           to_next[0] = bi0;
@@ -366,10 +397,15 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
 
 	  /* Fix srb data length */
 	  srb0 = (ppf_srb_header_t *)(udp0+1);
-	  new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
+	  len0 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b0)
 					 - sizeof (*ip4_0) - sizeof(*udp0) - sizeof(*srb0));
-	  srb0->msg.in.data_l = new_l0;
-	  srb0->call_id = vnet_buffer(b0)->sw_if_index[VLIB_TX]; // call-id
+	  srb0->msg.in.data_l = len0;
+	  tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
+	  t0 = pool_elt_at_index (pgm->tunnels, tunnel_index0);
+	  srb0->call_id = clib_host_to_net_u32(t0->call_id);
+	  srb0->transaction_id = clib_host_to_net_u32(0);
+	  srb0->msg.in.request_id = clib_host_to_net_u32(0);
+	  srb0->msg.in.integrity_status = clib_host_to_net_u32(1);
 
           /* counter here */
           len0 = vlib_buffer_length_in_chain (vm, b0);
@@ -380,7 +416,8 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           {
             ppf_srb_nb_tx_trace_t *tr
               = vlib_add_trace (vm, node, b0, sizeof (*tr));
-            // TBD
+	    tr->tunnel_index = tunnel_index0;
+	    clib_memcpy (&tr->srb, srb0, sizeof (*srb0));
           }
                       
           vlib_validate_buffer_enqueue_x1 (vm, node, next_index,

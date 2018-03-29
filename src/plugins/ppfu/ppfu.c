@@ -49,15 +49,19 @@ ppf_init (vlib_main_t * vm)
 
   for (i = 0; i < pm->max_capacity; i++) {
     callline = &(pm->ppf_calline_table[i]);
-    callline->rb.drb.nb_tunnel.tunnel_id = ~0;
+    callline->call_index = ~0;
     
-    for (j=0; j<MAX_SB_PER_CALL; j++) {
+    callline->rb.drb.nb_tunnel.tunnel_id = ~0;    
+    for (j = 0; j < MAX_SB_PER_CALL; j++) {
       callline->rb.drb.sb_tunnel[j].tunnel_id = ~0;
     }
     
-    for (j=0; j<MAX_SB_PER_CALL; j++) {
+    callline->rb.srb.nb_out_msg_by_sn = 0;
+    for (j = 0; j < MAX_SB_PER_CALL; j++) {
       callline->rb.srb.sb_tunnel[j].tunnel_id = ~0;
     }
+
+    callline->pdcp.session_id = ~0;
   }
   
   return 0;
@@ -70,10 +74,21 @@ ppf_config (vlib_main_t * vm, unformat_input_t * input)
 {
   uword capacity = 0;
 
+  ppf_sb_main.src = clib_host_to_net_u32(0x01010102);
+  ppf_sb_main.dst = clib_host_to_net_u32(0x01010101);
+
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (input, "capacity %d", &capacity))
 	;
+      else if (unformat (input, "srb-src %U",
+    		     unformat_ip4_address, &ppf_sb_main.src))
+        {
+        }
+      else if (unformat (input, "srb-dst %U",
+    		     unformat_ip4_address, &ppf_sb_main.dst))
+        {
+        }
       else
 	return clib_error_return (0,
 				  "invalid capacity parameter `%U'",

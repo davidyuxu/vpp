@@ -374,7 +374,9 @@ int vnet_ppf_gtpu_add_del_tunnel
 {
   ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
   ppf_main_t *pm = &ppf_main;
+  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
   ppf_gtpu_tunnel_t *t = 0;
+  ppf_pdcp_session_t *pdcp_sess = 0;
   vnet_main_t *vnm = gtm->vnet_main;
   uword *p;
   u32 hw_if_index = ~0;
@@ -463,6 +465,11 @@ int vnet_ppf_gtpu_add_del_tunnel
             
             it->tunnel_id = tunnel_id;
             it->tunnel_type = t->tunnel_type;
+
+            /* FIX later!!! should be moved to callline initiator */
+	    pool_get (ppm->sessions, pdcp_sess);
+	    memset (pdcp_sess, 0, sizeof (*pdcp_sess));
+	    callline->pdcp.session_id = (u32)(pdcp_sess - ppm->sessions);
           }
           break;
 
@@ -481,8 +488,10 @@ int vnet_ppf_gtpu_add_del_tunnel
 
 	if (t->tunnel_type == PPF_GTPU_SB ) {
 		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_PDCP_INPUT;
-	} else {
+	} else if (t->tunnel_type == PPF_GTPU_NB) {
 		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_SB_PATH_LB;
+	} else if (t->tunnel_type == PPF_GTPU_SRB) {
+		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_PDCP_INPUT;
 	}
 
 	if (is_ip6) 
@@ -682,6 +691,9 @@ int vnet_ppf_gtpu_add_del_tunnel
         
         it->tunnel_id = INVALID_TUNNEL_ID;
 
+	/* FIX later!!! should be moved to callline initiator */
+	pool_put (ppm->sessions, pdcp_sess);
+	callline->pdcp.session_id = ~0;
         hash_free(callline->rb.srb.nb_out_msg_by_sn);
       }
 

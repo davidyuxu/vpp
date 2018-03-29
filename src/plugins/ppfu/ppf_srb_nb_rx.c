@@ -55,10 +55,13 @@ u8 * format_ppf_srb_nb_rx_trace  (u8 * s, va_list * args)
       = va_arg (*args, ppf_srb_nb_rx_trace_t *);
 
   s = format (s, "PPF SRB-NB RX: srb outgoing msg received for the call %d \n",
-	      t->srb.call_id);
+	      clib_net_to_host_u32(t->srb.call_id));
   s = format (s, "  transaction-id %d, request-id %d, sb_num %d, sb_id %d %d %d, length %d \n",
-              t->srb.transaction_id, t->srb.msg.out.request_id, t->srb.msg.out.sb_num,
-              t->srb.msg.out.sb_id[0], t->srb.msg.out.sb_id[1], t->srb.msg.out.sb_id[2], t->srb.msg.out.data_l);
+              clib_net_to_host_u32(t->srb.transaction_id),
+              clib_net_to_host_u32(t->srb.msg.out.request_id),
+              t->srb.msg.out.sb_num,
+              t->srb.msg.out.sb_id[0], t->srb.msg.out.sb_id[1], t->srb.msg.out.sb_id[2],
+              clib_net_to_host_u32(t->srb.msg.out.data_l));
   s = format (s, "  outgoing sb tunnel %d \n", t->tunnel_index);
 
   return s;
@@ -145,14 +148,14 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           /* Manipulate packet 0 */
 
 	  /* Find callline */
-	  c0 = &(pm->ppf_calline_table[srb0->call_id]);
+	  c0 = &(pm->ppf_calline_table[clib_net_to_host_u32(srb0->call_id)]);
 
           /* Save transaction-id and request-id in callline */
 	  /* Generate PDCP SN, map <PDCP SN> to <transaction-id + request-id> */
           pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
 	  key0 = (uword)(pdcp0->out_sn++);
-	  msg0.transaction_id = srb0->transaction_id;
-	  msg0.request_id = srb0->msg.out.request_id;
+	  msg0.transaction_id = clib_net_to_host_u32(srb0->transaction_id);
+	  msg0.request_id = clib_net_to_host_u32(srb0->msg.out.request_id);
 	  hash_set (c0->rb.srb.nb_out_msg_by_sn, key0, msg0.as_u64);
           
 	  /* Determine downlink tunnel */
