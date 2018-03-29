@@ -47,18 +47,17 @@ ppf_init (vlib_main_t * vm)
   pm->ppf_calline_table = clib_mem_alloc (pm->max_capacity * sizeof (ppf_callline_t));
   ASSERT(pm->ppf_calline_table != NULL);
 
-  for (i = 0; i < pm->max_capacity; i ++) {
-  	callline = &(pm->ppf_calline_table[i]);
-   	callline->rb.drb.nb_tunnel.tunnel_id = ~0;
-
-   	for (j=0; j<MAX_SB_PER_DRB; j++) {
-	   	callline->rb.drb.sb_tunnel[j].tunnel_id = ~0;
-	}
-	 
-	for (j=0; j<MAX_SB_PER_DRB; j++) {
-		callline->rb.srb.sb_tunnel[j].tunnel_id = ~0;
-	}
-
+  for (i = 0; i < pm->max_capacity; i++) {
+    callline = &(pm->ppf_calline_table[i]);
+    callline->rb.drb.nb_tunnel.tunnel_id = ~0;
+    
+    for (j=0; j<MAX_SB_PER_CALL; j++) {
+      callline->rb.drb.sb_tunnel[j].tunnel_id = ~0;
+    }
+    
+    for (j=0; j<MAX_SB_PER_CALL; j++) {
+      callline->rb.srb.sb_tunnel[j].tunnel_id = ~0;
+    }
   }
   
   return 0;
