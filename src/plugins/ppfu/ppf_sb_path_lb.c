@@ -138,10 +138,10 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	    b2 = vlib_get_buffer (vm, bi2);
 	    b3 = vlib_get_buffer (vm, bi3);
 
-	    ASSERT (b0->current_data == 0);
-	    ASSERT (b1->current_data == 0);
-	    ASSERT (b2->current_data == 0);
-	    ASSERT (b3->current_data == 0);
+	   //ASSERT (b0->current_data == 0);
+	   // ASSERT (b1->current_data == 0);
+	   // ASSERT (b2->current_data == 0);
+	   // ASSERT (b3->current_data == 0);
 
 	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
 	    sw_if_index1 = vnet_buffer(b1)->sw_if_index[VLIB_RX];
@@ -157,7 +157,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	    else if (callline0->call_type == PPF_DRB_CALL)
 	    	vnet_buffer(b0)->sw_if_index[VLIB_TX] = callline0->rb.drb.sb_tunnel[DEFAULT_SB_INDEX].tunnel_id;
 
-	    if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
+	    if (PREDICT_FALSE(node->flags & VLIB_NODE_FLAG_TRACE))
 	    {
 		  if (b0->flags & VLIB_BUFFER_IS_TRACED) 
 		  {
@@ -168,7 +168,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   }
 	     }
 
-	    t1 = pool_elt_at_index (gtm->tunnels, sw_if_index1);
+	    t1 = &(gtm->tunnels[sw_if_index1]);
 	    call_id1 = t1->call_id;	    
 	    callline1 = &(pm->ppf_calline_table[call_id1]);
 
@@ -258,8 +258,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 
 	    b0 = vlib_get_buffer (vm, bi0);
 
-	    ASSERT (b0->current_data == 0);
-
+	    //ASSERT (b0->current_data == 0);
 	
 	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
 	    

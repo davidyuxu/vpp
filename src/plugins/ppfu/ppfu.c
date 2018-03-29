@@ -37,12 +37,29 @@ clib_error_t *
 ppf_init (vlib_main_t * vm)
 {
   ppf_main_t *pm = &ppf_main;
+  ppf_callline_t * callline;
+
+  u32 i, j;
   
   if (pm->max_capacity == 0)
     pm->max_capacity = DEF_MAX_PPF_SESSION;
 
   pm->ppf_calline_table = clib_mem_alloc (pm->max_capacity * sizeof (ppf_callline_t));
   ASSERT(pm->ppf_calline_table != NULL);
+
+  for (i = 0; i < pm->max_capacity; i ++) {
+  	callline = &(pm->ppf_calline_table[i]);
+   	callline->rb.drb.nb_tunnel.tunnel_id = ~0;
+
+   	for (j=0; j<MAX_SB_PER_DRB; j++) {
+	   	callline->rb.drb.sb_tunnel[j].tunnel_id = ~0;
+	}
+	 
+	for (j=0; j<MAX_SB_PER_DRB; j++) {
+		callline->rb.srb.sb_tunnel[j].tunnel_id = ~0;
+	}
+
+  }
   
   return 0;
 }
