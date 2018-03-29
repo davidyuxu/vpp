@@ -83,7 +83,7 @@ ppf_srb_ip_udp_rewrite ()
   srb->call_id = 0;
   srb->transaction_id = 0;
   srb->msg.in.request_id = 0;
-  srb->msg.in.integrity_status = 1;
+  srb->msg.in.integrity_status = clib_host_to_net_u32(1);
   srb->msg.in.data_l = 0;
   
   ppf_sb_main.rewrite = r.rw;
@@ -101,9 +101,6 @@ ppf_srb_init (vlib_main_t * vm)
 	
   psm->srb_rx_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
   psm->sb_lb_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
-
-  psm->src = 0x01010101;
-  psm->dst = 0x02020202;
 
   ppf_srb_ip_udp_rewrite ();
 
