@@ -212,6 +212,7 @@ typedef struct
 typedef struct 
 {	
   u32 call_index;
+  u32 valid;
   ppf_calline_type_t call_type; 
   union {
     ppf_drb_callline_t drb;

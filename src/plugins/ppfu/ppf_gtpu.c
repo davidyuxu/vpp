@@ -255,6 +255,8 @@ ip_udp_ppf_gtpu_rewrite (ppf_gtpu_tunnel_t * t, bool is_ip6)
       ip->src_address = t->src.ip4;
       ip->dst_address = t->dst.ip4;
 
+      ip->tos = t->dscp;
+
       /* we fix up the ip4 header length and checksum after-the-fact */
       ip->checksum = ip4_header_checksum (ip);
     }
@@ -274,7 +276,7 @@ ip_udp_ppf_gtpu_rewrite (ppf_gtpu_tunnel_t * t, bool is_ip6)
 
   /* UDP header, randomize src port on something, maybe? */
   udp->src_port = clib_host_to_net_u16 (2152);
-  udp->dst_port = clib_host_to_net_u16 (UDP_DST_PORT_GTPU);
+  udp->dst_port = clib_host_to_net_u16 (t->dst_port);
 
   /* PPF_GTPU header */
   ppf_gtpu->ver_flags = PPF_GTPU_V1_VER | PPF_GTPU_PT_GTP;
@@ -431,8 +433,6 @@ int vnet_ppf_gtpu_add_del_tunnel
       
       //add by lollita for ppf gtpu tunnel swap
       callline = &(pm->ppf_calline_table[t->call_id]); 
-      callline->call_index = t->call_id;
-      callline->call_type  = (t->tunnel_type == PPF_GTPU_SRB) ? PPF_SRB_CALL : PPF_DRB_CALL;
 
       switch (t->tunnel_type) {
         case PPF_GTPU_NB:
