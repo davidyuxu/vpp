@@ -50,7 +50,7 @@ u8 * format_ppf_pdcp_encrypt_trace  (u8 * s, va_list * args)
 
   ppf_pdcp_encrypt_trace_t * t = va_arg (*args, ppf_pdcp_encrypt_trace_t *);
   
-  s = format (s, "PDCP_ENCRYPT: sw_if_index %d, next index %d\n",
+  s = format (s, "PDCP_ENCRYPT: sw_if_index %d, next index %d",
 		  t->sw_if_index, t->next_index);
   return s;
 }

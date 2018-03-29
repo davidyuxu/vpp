@@ -109,10 +109,13 @@ typeonly define nb_path_context
  * NB_TYPE_DEV = 2,
 */
   u32 type;
-  u32 teid;
-  u32 ip_address;
+  u32 out_teid;
+  u32 dst_ip_address;
   u32 port;
   u32 dscp;
+
+  u32 src_ip_address;
+  u32 in_teid;
 };
 
 typeonly define sb_path_context
@@ -128,6 +131,9 @@ typeonly define sb_path_context
   u32 sec_ip_address;
   u32 sec_port;
   u32 sec_dscp;
+ 
+  u32 src_ip_address;
+  u32 in_teid;
 /*
  * INTERNAL_DATA_RELAY = 1,
  * INTERNAL_NXMH_GTP_UDP = 2,
@@ -149,10 +155,6 @@ typeonly define sb_path_context
 };
 
 
-
-
-
-
 /** \brief Bearer install from client to api server request
     @param client_index - opaque cookie to identify the sender
     @param context - sender context, to match reply w/ request
@@ -161,6 +163,7 @@ define ppfu_plugin_bearer_install
 {
   u32 client_index;
   u32 context;
+  u32 call_id;
   u32 ue_bearer_id;
   u32 transaction_id;
   vl_api_pdcp_entity_t entity;
@@ -184,6 +187,7 @@ define ppfu_plugin_bearer_install_reply
 {
   u32 context;
   i32 retval;
+  u32 call_id;
   u32 client_index;
   u32 ue_bearer_id;
   u32 transaction_id;
@@ -201,6 +205,7 @@ define ppfu_plugin_bearer_update
 {
   u32 client_index;
   u32 context;
+  u32 call_id;
   u32 ue_bearer_id;
   u32 transaction_id;
   vl_api_pdcpsecurity_parameters_t secparam;
@@ -218,6 +223,7 @@ define ppfu_plugin_bearer_update_reply
 {
   u32 context;
   i32 retval;
+  u32 call_id;
   u32 ue_bearer_id;
   u32 transaction_id;
   u32 msg_result;
@@ -244,6 +250,7 @@ define ppfu_plugin_bearer_release
 /*
  * ue_bearer_id = 0
 */
+  u32 call_id;
   u32 ue_bearer_id;
   u32 transaction_id;
 };
@@ -258,6 +265,7 @@ define ppfu_plugin_bearer_release_reply
 {
   u32 context;
   i32 retval;
+  u32 call_id;
   u32 ue_bearer_id;
   u32 transaction_id;
   u32 msg_result;
@@ -294,66 +302,4 @@ define ppfu_plugin_system_reset_reply
   u32 msg_result;
 };
 
-
-/** \brief Outgoing data from client to api server request
-    @param client_index - opaque cookie to identify the sender
-    @param context - sender context, to match reply w/ request
-*/
-define ppfu_plugin_outgoing_data
-{
-  u32 client_index;
-  u32 context;
-  u32 ue_bearer_id;
-  u32 transaction_id;
-  u32 request_id;
-  u8 sb_id[3];
-  u8 sb_num;
-  u32 data_l;
-  u8 date[data_l];
-};
-
-/** \brief Reply to outgoing data
-    @param client_index - opaque cookie to identify the sender
-    @param context - sender context, to match reply w/ request
-    @param retval - return code for the request
-    @param ue_bearer_id - the bearer id, returned by the server
-*/
-define ppfu_plugin_outgoing_data_reply
-{
-  u32 context;
-  i32 retval;
-  u32 ue_bearer_id;
-  u32 transaction_id;
-  u32 msg_result;
-  u32 request_id;
-};
-
-
-/** \brief Incomming data from api server to client
-    @param client_index - opaque cookie to identify the sender
-    @param context - sender context, to match reply w/ request
-*/
-autoreply define ppfu_plugin_incomming_data
-{
-  u32 client_index;
-  u32 context;
-  u32 ue_bearer_id;
-  u32 data_l;
-  u8 date[data_l];
-};
-
-
-/** \brief Error indication from api server to client
-    @param client_index - opaque cookie to identify the sender
-    @param context - sender context, to match reply w/ request
-*/
-autoreply define ppfu_plugin_error_indication
-{
-  u32 client_index;
-  u32 context;
-  u32 ue_bearer_id;
-  u32 sb_id;
-  u32 error_code;
-  u8 error_message[128];
-};
 
