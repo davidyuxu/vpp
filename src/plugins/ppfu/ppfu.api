@@ -110,30 +110,30 @@ typeonly define nb_path_context
 */
   u32 type;
   u32 out_teid;
-  u32 dst_ip_address;
+  u8 dst_ip_address[16];
   u32 port;
   u32 dscp;
 
-  u32 src_ip_address;
-  u32 in_teid;
+  u32 encap_vrf_id;
+  u8 src_ip_address[16];
 };
 
 typeonly define sb_path_context
 {  
   u32 sb_id;   
 
-  u32 pri_teid;
-  u32 pri_ip_address;
+  u32 pri_out_teid;
+  u8 pri_ip_address[16];
   u32 pri_port;
   u32 pri_dscp;
 
-  u32 sec_teid;
-  u32 sec_ip_address;
+  u32 sec_out_teid;
+  u8 sec_ip_address[16];
   u32 sec_port;
   u32 sec_dscp;
  
-  u32 src_ip_address;
-  u32 in_teid;
+  u32 encap_vrf_id;
+  u8 src_ip_address[16];
 /*
  * INTERNAL_DATA_RELAY = 1,
  * INTERNAL_NXMH_GTP_UDP = 2,
@@ -191,6 +191,8 @@ define ppfu_plugin_bearer_install_reply
   u32 client_index;
   u32 ue_bearer_id;
   u32 transaction_id;
+  u32 nb_in_teid;
+  u32 sb_in_teid[3];
   u32 msg_result;
   u32 request_id;
 };
@@ -227,15 +229,8 @@ define ppfu_plugin_bearer_update_reply
   u32 ue_bearer_id;
   u32 transaction_id;
   u32 msg_result;
-  u32 nb_ipaddress_size;
-  u32 nb_ipaddress[4];
-  u32 sb_ipaddress_size;
-  u32 sb_ipaddress[4];
-  u32 sb_ext_ipaddress_size;
-  u32 sb_ext_ipaddress[4];
-  vl_api_network_endpoint_t nb;
-  u32 sb_size;
-  vl_api_network_endpoint_t sb[3];
+  u8 sb_id [3];
+  u32 in_teid [3];
 };
 
 

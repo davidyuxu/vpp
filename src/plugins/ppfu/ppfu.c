@@ -50,6 +50,7 @@ ppf_init (vlib_main_t * vm)
   for (i = 0; i < pm->max_capacity; i++) {
     callline = &(pm->ppf_calline_table[i]);
     callline->call_index = ~0;
+    callline->valid = 0;
     
     callline->rb.drb.nb_tunnel.tunnel_id = ~0;    
     for (j = 0; j < MAX_SB_PER_CALL; j++) {
