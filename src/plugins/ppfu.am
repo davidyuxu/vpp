@@ -18,7 +18,6 @@ ppfu_plugin_la_SOURCES =		\
 	ppfu/ppf_gtpu_encap.c		    \
     ppfu/ppf_gtpu_decap.c		    \
 	ppfu/ppf_gtpu.c				    \
-	ppfu/ppf_gtpu_api.c			\
 	ppfu/ppf_pdcp_decrypt.c		\
 	ppfu/ppf_pdcp_encrypt.c		\
 	ppfu/ppf_pdcp_input.c		\
@@ -28,7 +27,8 @@ ppfu_plugin_la_SOURCES =		\
 	ppfu/ppf_srb.c		\
 	ppfu/ppf_pdcp.c     \
 	ppfu/ppfu.c		\
-	ppfu/ppfu_api.c
+	ppfu/ppfu_api.c		\
+	ppfu/ppf_gtpu_api.c
 
 BUILT_SOURCES +=			\
 	ppfu/ppf_gtpu.api.h		    \

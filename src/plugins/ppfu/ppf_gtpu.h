@@ -179,6 +179,9 @@ typedef struct
   u32 call_id;
   ppf_gtpu_tunnel_type_t tunnel_type;
   u32 sb_id;
+  u32 dst_port;
+  u32 dscp;
+  u32 protocol_config;
 
 } ppf_gtpu_tunnel_t;
 
@@ -287,6 +290,11 @@ typedef struct
   u32 call_id;
   u32 tunnel_type;
   u32 sb_id;
+  u32 dst_port;
+  u32 dscp;
+  u32 protocol_config;
+  u32 ep_weight;
+  u32 traffic_state;
 } vnet_ppf_gtpu_add_del_tunnel_args_t;
 
 int vnet_ppf_gtpu_add_del_tunnel

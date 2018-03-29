@@ -25,6 +25,7 @@
 #include <vppinfra/byte_order.h>
 #include <vlibmemory/api.h>
 #include <ppfu/ppfu.h>
+#include <ppfu/ppf_gtpu.h>
 
 
 #define vl_msg_id(n,h) n,
@@ -62,7 +63,7 @@ typedef enum
 #include <ppfu/ppfu.api.h>
 #undef vl_msg_name_crc_list
 
-#define REPLY_MSG_ID_BASE gtm->msg_id_base
+#define REPLY_MSG_ID_BASE ppfm->msg_id_base
 #include <vlibapi/api_helper_macros.h>
 
 static void
@@ -98,12 +99,158 @@ static void
 vl_api_ppfu_plugin_bearer_install_t_handler 
 (vl_api_ppfu_plugin_bearer_install_t * mp)
 {
-  vl_api_registration_t *reg;
+  vl_api_ppfu_plugin_bearer_install_reply_t *rmp;
+  int rv = 0;
+  ppf_main_t *ppfm = &ppf_main;
+  ip4_main_t *im = &ip4_main;
+  ppf_callline_t *callline = NULL;
+  vl_api_nb_path_context_t *nb;
+  vl_api_sb_path_context_t *sb;
+  ppf_gtpu_tunnel_type_t tunnel_type;
+  u32 nb_in_teid, sb_in_teid[MAX_SB_PER_DRB];
+  u32 result;
+  int i = 0;
+  
+  if (mp->call_id >= ppfm->max_capacity)
+  {
+	rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+      result = 1; 
+	goto out;
+  }
+  
+  callline = &(ppfm->ppf_calline_table[mp->call_id]);
 
-  reg = vl_api_client_index_to_registration (mp->client_index);
-  if (!reg)
-    return;
+  if (callline->valid == 0) 
+  {
+	rv = VNET_API_ERROR_CALLINE_IN_USE;
+	result = 1; 
+	goto out;
+  }
+
+  nb = &(mp->nb);
+
+  if (nb->src_ip_address != 0)
+  	callline->call_type = PPF_DRB_CALL;
+  else 
+  	callline->call_type = PPF_SRB_CALL;
+
+  if (callline->call_type == PPF_DRB_CALL)
+  {
+	  uword *p = hash_get (im->fib_index_by_table_id, ntohl (nb->encap_vrf_id));
+	  if (!p)
+	  {
+		rv = VNET_API_ERROR_NO_SUCH_FIB;
+		result = 1; 
+		goto out;
+	  }
+
+	  tunnel_type = PPF_GTPU_NB;
+	  nb_in_teid = ntohl(mp->ue_bearer_id);
+
+	  vnet_ppf_gtpu_add_del_tunnel_args_t a = {
+	    .is_add = 1,
+	    .is_ip6 = 0,
+	    .mcast_sw_if_index = 0,
+	    .encap_fib_index = nb->encap_vrf_id,
+	    .decap_next_index = 0,
+	    .in_teid = nb_in_teid,
+	    .out_teid = ntohl (nb->out_teid),
+	    .dst = to_ip46 (0, nb->dst_ip_address),
+	    .src = to_ip46 (0, nb->src_ip_address),
+	    .call_id = mp->call_id,
+	    .tunnel_type = tunnel_type,
+	    .sb_id = 0,
+	    .dst_port = nb->port,
+	    .dscp = nb->dscp,
+	    .protocol_config = nb->protocol_configuration,
+	  };
+
+	  /* Check src & dst are different */
+	  if (ip46_address_cmp (&a.dst, &a.src) == 0)
+	    {
+		rv = VNET_API_ERROR_SAME_SRC_DST;
+		result = 1; 
+		goto out;
+	    }
+
+	  u32 sw_if_index = ~0;
+	  rv = vnet_ppf_gtpu_add_del_tunnel (&a, &sw_if_index);
+
+  }
+
+  for (i = 0; i<= MAX_SB_PER_DRB; i++)
+  {
+  	  sb = &(mp->sb[i]);
+
+  	  if (sb->src_ip_address != 0) {
+  	  	sb_in_teid[i] = 0;
+		break;
+	  }
+	    
+	  uword *p = hash_get (im->fib_index_by_table_id, ntohl (sb->encap_vrf_id));
+	  if (!p)
+	  {
+		rv = VNET_API_ERROR_NO_SUCH_FIB;
+		result = 1; 
+		goto out;
+	  }
+
+        if (callline->call_type == PPF_DRB_CALL)
+	  	tunnel_type = PPF_GTPU_SB;
+	  else 
+	  	tunnel_type = PPF_GTPU_SRB;
+	  	
+	  sb_in_teid[i] = ntohl( (i << 30) |mp->ue_bearer_id);
+
+	  vnet_ppf_gtpu_add_del_tunnel_args_t a = {
+	    .is_add = 1,
+	    .is_ip6 = 0,
+	    .mcast_sw_if_index = 0,
+	    .encap_fib_index = sb->encap_vrf_id,
+	    .decap_next_index = 0,
+	    .in_teid = sb_in_teid[i],
+	    .out_teid = ntohl (sb->pri_out_teid),
+	    .dst = to_ip46 (0, sb->pri_ip_address),
+	    .src = to_ip46 (0, sb->src_ip_address),
+	    .call_id = mp->call_id,
+	    .tunnel_type = tunnel_type,
+	    .sb_id = i,
+	    .dst_port = sb->pri_port,
+	    .dscp = sb->pri_dscp,
+	    .protocol_config = sb->protocol_configuration,
+	    .ep_weight = sb->ep_weight,
+	    .traffic_state = sb->traffic_state,
+	  };
+
+	  /* Check src & dst are different */
+	  if (ip46_address_cmp (&a.dst, &a.src) == 0)
+	    {
+		rv = VNET_API_ERROR_SAME_SRC_DST;
+		goto out;
+	    }
+
+	  u32 sw_if_index = ~0;
+	  rv = vnet_ppf_gtpu_add_del_tunnel (&a, &sw_if_index);
+  }
+
+  callline->valid = 1;
+  callline->call_index = mp->call_id;
+
+out:
+  /* *INDENT-OFF* */
+  REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
+  ({  
+
+     for (i = 0; i<=MAX_SB_PER_DRB; i++) {
+     	rmp->sb_in_teid[i] = sb_in_teid[i];
+     }
+      rmp->nb_in_teid = nb_in_teid;
+      rmp->msg_result = result;
+  }));
+
+  /* *INDENT-ON* */
 }
+
 
 static void
 vl_api_ppfu_plugin_bearer_update_t_handler 
