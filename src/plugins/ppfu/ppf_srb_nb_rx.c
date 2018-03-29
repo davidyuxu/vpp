@@ -51,6 +51,15 @@ u8 * format_ppf_srb_nb_rx_trace  (u8 * s, va_list * args)
 {
   CLIB_UNUSED (vlib_main_t * vm) = va_arg (*args, vlib_main_t *);
   CLIB_UNUSED (vlib_node_t * node) = va_arg (*args, vlib_node_t *);
+  ppf_srb_nb_rx_trace_t * t
+      = va_arg (*args, ppf_srb_nb_rx_trace_t *);
+
+  s = format (s, "PPF SRB-NB RX: srb outgoing msg received for the call %d \n",
+	      t->srb.call_id);
+  s = format (s, "  transaction-id %d, request-id %d, sb_num %d, sb_id %d %d %d, length %d \n",
+              t->srb.transaction_id, t->srb.msg.out.request_id, t->srb.msg.out.sb_num,
+              t->srb.msg.out.sb_id[0], t->srb.msg.out.sb_id[1], t->srb.msg.out.sb_id[2], t->srb.msg.out.data_l);
+  s = format (s, "  outgoing sb tunnel %d \n", t->tunnel_index);
 
   return s;
 }
