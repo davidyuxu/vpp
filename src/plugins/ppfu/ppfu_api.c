@@ -107,7 +107,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   vl_api_nb_path_context_t *nb;
   vl_api_sb_path_context_t *sb;
   ppf_gtpu_tunnel_type_t tunnel_type;
-  u32 nb_in_teid, sb_in_teid[MAX_SB_PER_DRB];
+  u32 nb_in_teid, sb_in_teid[MAX_SB_PER_CALL];
   u32 result;
   int i = 0;
   
@@ -178,7 +178,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   }
 
-  for (i = 0; i<= MAX_SB_PER_DRB; i++)
+  for (i = 0; i<= MAX_SB_PER_CALL; i++)
   {
   	  sb = &(mp->sb[i]);
 
@@ -241,7 +241,7 @@ out:
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
   ({  
 
-     for (i = 0; i<=MAX_SB_PER_DRB; i++) {
+     for (i = 0; i<=MAX_SB_PER_CALL; i++) {
      	rmp->sb_in_teid[i] = sb_in_teid[i];
      }
       rmp->nb_in_teid = nb_in_teid;
