@@ -80,11 +80,11 @@ ppf_srb_ip_udp_rewrite ()
   udp->dst_port = clib_host_to_net_u16 (SRB_NB_PORT);
 
   /* SRB indata header */
-  srb->call_id = 0;
-  srb->transaction_id = 0;
-  srb->msg.in.request_id = 0;
+  srb->call_id = clib_host_to_net_u32(0);
+  srb->transaction_id = clib_host_to_net_u32(0);
+  srb->msg.in.request_id = clib_host_to_net_u32(0);
   srb->msg.in.integrity_status = clib_host_to_net_u32(1);
-  srb->msg.in.data_l = 0;
+  srb->msg.in.data_l = clib_host_to_net_u32(0);
   
   ppf_sb_main.rewrite = r.rw;
   
