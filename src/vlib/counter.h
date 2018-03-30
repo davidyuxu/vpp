@@ -80,6 +80,9 @@ vlib_increment_simple_counter (vlib_simple_counter_main_t * cm,
 {
   counter_t *my_counters;
 
+  if(index >= vec_len (cm->counters[0]))
+  	return;
+
   my_counters = cm->counters[thread_index];
   my_counters[index] += increment;
 }
@@ -99,6 +102,9 @@ vlib_get_simple_counter (vlib_simple_counter_main_t * cm, u32 index)
   counter_t *my_counters;
   counter_t v;
   int i;
+
+  if(index >= vec_len (cm->counters[0]))
+  	return 0;
 
   ASSERT (index < vlib_simple_counter_n_counters (cm));
 
@@ -124,6 +130,9 @@ vlib_zero_simple_counter (vlib_simple_counter_main_t * cm, u32 index)
 {
   counter_t *my_counters;
   int i;
+
+  if(index >= vec_len (cm->counters[0]))
+  	return;
 
   ASSERT (index < vlib_simple_counter_n_counters (cm));
 
@@ -214,6 +223,9 @@ vlib_increment_combined_counter (vlib_combined_counter_main_t * cm,
 {
   vlib_counter_t *my_counters;
 
+  if(index >= vec_len (cm->counters[0]))
+  	return;
+
   /* Use this CPU's counter array */
   my_counters = cm->counters[thread_index];
 
@@ -227,6 +239,9 @@ vlib_prefetch_combined_counter (const vlib_combined_counter_main_t * cm,
 				u32 thread_index, u32 index)
 {
   vlib_counter_t *cpu_counters;
+
+  if(index >= vec_len (cm->counters[0]))
+  	return;
 
   /*
    * This CPU's index is assumed to already be in cache
@@ -256,6 +271,9 @@ vlib_get_combined_counter (const vlib_combined_counter_main_t * cm,
   result->packets = 0;
   result->bytes = 0;
 
+  if(index >= vec_len (cm->counters[0]))
+  	return;
+
   for (i = 0; i < vec_len (cm->counters); i++)
     {
       my_counters = cm->counters[i];
@@ -277,6 +295,9 @@ vlib_zero_combined_counter (vlib_combined_counter_main_t * cm, u32 index)
 {
   vlib_counter_t *my_counters, *counter;
   int i;
+
+  if(index >= vec_len (cm->counters[0]))
+  	return;
 
   for (i = 0; i < vec_len (cm->counters); i++)
     {

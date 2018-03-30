@@ -94,7 +94,7 @@ static u8 *
 format_gtpu_name (u8 * s, va_list * args)
 {
   u32 dev_instance = va_arg (*args, u32);
-  return format (s, "gtpu_tunnel%d", dev_instance);
+  return format (s, "gt%d", dev_instance);
 }
 
 static clib_error_t *
@@ -130,7 +130,7 @@ VNET_HW_INTERFACE_CLASS (gtpu_hw_class) =
   .name = "GTPU",
   .format_header = format_gtpu_header_with_length,
   .build_rewrite = default_build_rewrite,
-  .flags = VNET_HW_INTERFACE_CLASS_FLAG_P2P,
+  .flags = VNET_HW_INTERFACE_CLASS_FLAG_P2P | VNET_HW_INTERFACE_CLASS_FLAG_NO_COUNTER,
 };
 /* *INDENT-ON* */
 

@@ -558,8 +558,22 @@ vnet_create_sw_interface_no_callbacks (vnet_main_t * vnm,
   vnet_sw_interface_t *sw;
   u32 sw_if_index;
 
-  pool_get (im->sw_interfaces, sw);
-  sw_if_index = sw - im->sw_interfaces;
+  if(!template->no_counter && vec_len(im->dedicated_sw_if_indices) == 0)
+  	os_panic();
+
+  if(!template->no_counter && vec_len(im->dedicated_sw_if_indices) > 0)
+  {
+    sw_if_index = im->dedicated_sw_if_indices
+	    [vec_len (im->dedicated_sw_if_indices) - 1];
+	_vec_len (im->dedicated_sw_if_indices) -= 1;
+	  
+	sw = pool_elt_at_index(im->sw_interfaces, sw_if_index);
+  }  
+  else
+  {
+	pool_get (im->sw_interfaces, sw);
+	sw_if_index = sw - im->sw_interfaces;
+  }
 
   sw[0] = template[0];
 
@@ -569,6 +583,7 @@ vnet_create_sw_interface_no_callbacks (vnet_main_t * vnm,
     sw->sup_sw_if_index = sw->sw_if_index;
 
   /* Allocate counters for this interface. */
+  if(!sw->no_counter)
   {
     u32 i;
 
@@ -658,7 +673,10 @@ vnet_delete_sw_interface (vnet_main_t * vnm, u32 sw_if_index)
 
   call_sw_interface_add_del_callbacks (vnm, sw_if_index, /* is_create */ 0);
 
-  pool_put (im->sw_interfaces, sw);
+  if(!sw->no_counter)
+  	vec_add1(im->dedicated_sw_if_indices, sw_if_index);
+  else
+  	pool_put (im->sw_interfaces, sw);
 }
 
 static void
@@ -730,7 +748,8 @@ vnet_register_interface (vnet_main_t * vnm,
     vnet_sw_interface_t sw = {
       .type = VNET_SW_INTERFACE_TYPE_HARDWARE,
       .flood_class = VNET_FLOOD_CLASS_NORMAL,
-      .hw_if_index = hw_index
+      .hw_if_index = hw_index,
+      .no_counter = hw_class->flags & VNET_HW_INTERFACE_CLASS_FLAG_NO_COUNTER
     };
     hw->sw_if_index = vnet_create_sw_interface_no_callbacks (vnm, &sw);
   }
@@ -1270,6 +1289,19 @@ vnet_interface_init (vlib_main_t * vm)
     return error;
 
   vnm->interface_tag_by_sw_if_index = hash_create (0, sizeof (uword));
+
+  
+  // kingwel, initialize dedicated sw if index
+  vnet_sw_interface_t *sw;
+  u32 capacity = 1000;
+  vec_alloc(im->dedicated_sw_if_indices, capacity);
+  for(int i = 0; i < capacity; i++)
+  {
+    pool_get(im->sw_interfaces, sw);
+	//u32 sw_if_index = sw - im->sw_interfaces;
+	sw->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
+	vec_add1(im->dedicated_sw_if_indices, capacity - i - 1);
+  }
 
 #if VLIB_BUFFER_TRACE_TRAJECTORY > 0
   if ((error = vlib_call_init_function (vm, trajectory_trace_init)))

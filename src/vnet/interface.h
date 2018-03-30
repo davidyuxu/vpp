@@ -287,6 +287,7 @@ typedef enum vnet_hw_interface_class_flags_t_
    * @brief a point 2 point interface
    */
   VNET_HW_INTERFACE_CLASS_FLAG_P2P = (1 << 0),
+  VNET_HW_INTERFACE_CLASS_FLAG_NO_COUNTER = (1 << 1),
 } vnet_hw_interface_class_flags_t;
 
 /* Layer-2 (e.g. Ethernet) interface class. */
@@ -603,6 +604,8 @@ typedef struct
 
   u32 link_speed;
 
+  u32 no_counter;
+
   union
   {
     /* VNET_SW_INTERFACE_TYPE_HARDWARE. */
@@ -661,6 +664,8 @@ typedef struct
 
   /* Software interfaces. */
   vnet_sw_interface_t *sw_interfaces;
+  /* kingwel, vector for dedicated sw interface index */
+  u32 *dedicated_sw_if_indices;
 
   /* Hash table mapping sub intfc sw_if_index by sup sw_if_index and sub id */
   uword *sw_if_index_by_sup_and_sub;

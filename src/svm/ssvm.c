@@ -74,8 +74,8 @@ ssvm_master_init_shm (ssvm_private_t * ssvm)
     }
 
   page_size = clib_mem_vm_get_page_size (ssvm_fd);
-  if (ssvm->requested_va)
-    clib_mem_vm_randomize_va (&ssvm->requested_va, min_log2 (page_size));
+  //if (ssvm->requested_va)
+    //clib_mem_vm_randomize_va (&ssvm->requested_va, min_log2 (page_size));
 
   mapa.requested_va = ssvm->requested_va;
   mapa.size = ssvm->ssvm_size;
