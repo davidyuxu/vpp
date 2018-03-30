@@ -291,6 +291,9 @@ typedef CLIB_PACKED(struct
 }) ip4_srb_header_t;
 /* *INDENT-ON* */
 
+u8 *format_ppf_pdcp_session (u8 * s, va_list * va);
+u8 *format_ppf_callline (u8 * s, va_list * va);
+
 
 #endif /* included_vnet_ppfu_h */
 

@@ -302,6 +302,9 @@ int vnet_ppf_gtpu_add_del_tunnel
 
 void vnet_int_ppf_gtpu_bypass_mode (u32 sw_if_index, u8 is_ip6, u8 is_enable);
 
+u8 *format_ppf_gtpu_tunnel (u8 * s, va_list * args);
+
+
 #endif /* included_vnet_ppf_gtpu_h */
 
 
