@@ -116,6 +116,17 @@ get_time_string(char *str, size_t len)
   return strftime(str, len, "%Y-%m-%d-%H-%M-%S", tm);
 }
 
+static int
+unsetup_signal_handlers (int sig)
+{
+  struct sigaction sa;
+
+  sa.sa_handler = SIG_DFL;
+  sa.sa_flags = 0;
+  sigemptyset (&sa.sa_mask);
+  return sigaction (sig, &sa, 0);
+}
+
 static void
 unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
 {
@@ -147,6 +158,7 @@ unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
     case SIGSEGV:
     case SIGHUP:
     case SIGFPE:
+    case SIGABRT:
       fatal = 1;
       break;
 
@@ -179,6 +191,9 @@ unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
 
 	 backtrace_full(bt_state, 0, full_callback, error_callback, &bt_state);
       }
+      if (signum == SIGABRT)
+      	unsetup_signal_handlers(signum);
+
       os_exit (1);
     }
   else
@@ -202,7 +217,6 @@ setup_signal_handlers (unix_main_t * um)
       switch (i)
 	{
 	  /* these signals take the default action */
-	case SIGABRT:
 	case SIGKILL:
 	case SIGSTOP:
 	case SIGUSR1:
