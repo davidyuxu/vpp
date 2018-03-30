@@ -66,6 +66,18 @@ ppf_pdcp_init (vlib_main_t * vm)
 
 VLIB_INIT_FUNCTION (ppf_pdcp_init);
 
+u8 *
+format_ppf_pdcp_session (u8 * s, va_list * va)
+{
+  ppf_pdcp_session_t * pdcp_session = va_arg (*va, ppf_pdcp_session_t *);
+
+  s = format (s, "in-sn %d, out-sn %d\n", pdcp_session->in_sn, pdcp_session->out_sn);
+
+  return s;
+}
+
+
+
 /*
  * fd.io coding-style-patch-verification: ON
  *

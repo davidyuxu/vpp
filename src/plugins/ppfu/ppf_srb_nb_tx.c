@@ -63,8 +63,8 @@ u8 * format_ppf_srb_nb_tx_trace  (u8 * s, va_list * args)
   return s;
 }
 
-#define foreach_fixed_header4_offset            \
-    _(0) _(1) _(2) _(3)
+#define foreach_fixed_header_offset            \
+    _(0) _(1) _(2) _(3) _(4) _(5)
 
 /* Convery the signalings from SRB to PPF CP by encapsulated a defined UDP tunnel */
 always_inline uword
@@ -75,15 +75,14 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
 {
   ppf_sb_main_t *psm = &ppf_sb_main;
   ppf_gtpu_main_t *pgm = &ppf_gtpu_main;
-  u16 old_l0 = 0, old_l1 = 0, old_l2 = 0, old_l3 = 0;
+  u16 old_l0 = 0;
   u32 n_left_from, next_index, * from, * to_next;
   u32 stats_n_packets, stats_n_bytes;
-  u32 next0 = 0, next1 = 0, next2 = 0, next3 = 0;
+  u32 next0 = PPF_SRB_NB_TX_NEXT_IP4_LOOKUP;
    
   from = vlib_frame_vector_args (from_frame);
   n_left_from = from_frame->n_vectors;
   
-  next0 = next1 = next2 = next3 = PPF_SRB_NB_TX_NEXT_IP4_LOOKUP;
   next_index = node->cached_next_index;
 
   stats_n_packets = stats_n_bytes = 0;
@@ -95,247 +94,6 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
       vlib_get_next_frame (vm, node, next_index,
   			 to_next, n_left_to_next);
       
-      while (n_left_from >= 4 && n_left_to_next >= 2)
-        {
-          u32 bi0, bi1, bi2, bi3;
-          vlib_buffer_t * b0, * b1, * b2, * b3;
-	  u32 len0, len1, len2, len3;
-          ip4_header_t * ip4_0, * ip4_1, * ip4_2, * ip4_3;
-          udp_header_t * udp0, * udp1, * udp2, * udp3;
-          ppf_srb_header_t * srb0, * srb1, * srb2, * srb3;
-          u64 * copy_src0, * copy_dst0;
-          u64 * copy_src1, * copy_dst1;
-          u64 * copy_src2, * copy_dst2;
-          u64 * copy_src3, * copy_dst3;
-          u32 * copy_src_last0, * copy_dst_last0;
-          u32 * copy_src_last1, * copy_dst_last1;
-          u32 * copy_src_last2, * copy_dst_last2;
-          u32 * copy_src_last3, * copy_dst_last3;
-          u16 new_l0, new_l1, new_l2, new_l3;
-          ip_csum_t sum0, sum1, sum2, sum3;
-	  u32 tunnel_index0, tunnel_index1, tunnel_index2, tunnel_index3;
-	  ppf_gtpu_tunnel_t * t0, * t1, * t2, * t3;
-          
-          /* Prefetch next iteration. */
-          {
-            vlib_buffer_t * p4, * p5, * p6, * p7;
-                  
-            p4 = vlib_get_buffer (vm, from[4]);
-            p5 = vlib_get_buffer (vm, from[5]);
-            p6 = vlib_get_buffer (vm, from[6]);
-            p7 = vlib_get_buffer (vm, from[7]);
-                  
-            vlib_prefetch_buffer_header (p4, LOAD);
-            vlib_prefetch_buffer_header (p5, LOAD);
-            vlib_prefetch_buffer_header (p6, LOAD);
-            vlib_prefetch_buffer_header (p7, LOAD);
-                  
-            CLIB_PREFETCH (p4->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
-            CLIB_PREFETCH (p5->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
-            CLIB_PREFETCH (p6->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
-            CLIB_PREFETCH (p7->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
-          }
-          
-          bi0 = from[0];
-          bi1 = from[1];
-          bi2 = from[2];
-          bi3 = from[3];
-          to_next[0] = bi0;
-          to_next[1] = bi1;
-          to_next[2] = bi2;
-          to_next[3] = bi3;
-          from += 4;
-          to_next += 4;
-          n_left_to_next -= 4;
-          n_left_from -= 4;
-          
-          b0 = vlib_get_buffer (vm, bi0);
-          b1 = vlib_get_buffer (vm, bi1);
-          b2 = vlib_get_buffer (vm, bi2);
-          b3 = vlib_get_buffer (vm, bi3);
-                     
-          /* Apply the rewrite string. $$$$ vnet_rewrite? */
-          vlib_buffer_advance (b0, -(word)_vec_len(psm->rewrite));
-          vlib_buffer_advance (b1, -(word)_vec_len(psm->rewrite));
-          vlib_buffer_advance (b2, -(word)_vec_len(psm->rewrite));
-          vlib_buffer_advance (b3, -(word)_vec_len(psm->rewrite));
-          
-          ip4_0 = vlib_buffer_get_current(b0);
-          ip4_1 = vlib_buffer_get_current(b1);
-          ip4_2 = vlib_buffer_get_current(b2);
-          ip4_3 = vlib_buffer_get_current(b3);
-          
-          /* Copy the fixed header */
-          copy_dst0 = (u64 *) ip4_0;
-          copy_src0 = (u64 *) psm->rewrite;
-          copy_dst1 = (u64 *) ip4_1;
-          copy_src1 = (u64 *) psm->rewrite;
-          copy_dst2 = (u64 *) ip4_2;
-          copy_src2 = (u64 *) psm->rewrite;
-          copy_dst3 = (u64 *) ip4_3;
-          copy_src3 = (u64 *) psm->rewrite;
-          
-          /* Copy first 32 octets 8-bytes at a time */
-          #define _(offs) copy_dst0[offs] = copy_src0[offs];
-          foreach_fixed_header4_offset;
-          #undef _
-          #define _(offs) copy_dst1[offs] = copy_src1[offs];
-          foreach_fixed_header4_offset;
-          #undef _
-          #define _(offs) copy_dst2[offs] = copy_src2[offs];
-          foreach_fixed_header4_offset;
-          #undef _
-          #define _(offs) copy_dst3[offs] = copy_src3[offs];
-          foreach_fixed_header4_offset;
-          #undef _
-	  
-          /* Last 4 octets. Hopefully gcc will be our friend */
-          copy_dst_last0 = (u32 *)(&copy_dst0[4]);
-          copy_src_last0 = (u32 *)(&copy_src0[4]);
-          copy_dst_last0[0] = copy_src_last0[0];
-          copy_dst_last1 = (u32 *)(&copy_dst1[4]);
-          copy_src_last1 = (u32 *)(&copy_src1[4]);
-          copy_dst_last1[0] = copy_src_last1[0];
-          copy_dst_last2 = (u32 *)(&copy_dst2[4]);
-          copy_src_last2 = (u32 *)(&copy_src2[4]);
-          copy_dst_last2[0] = copy_src_last2[0];
-          copy_dst_last3 = (u32 *)(&copy_dst3[4]);
-          copy_src_last3 = (u32 *)(&copy_src3[4]);
-          copy_dst_last3[0] = copy_src_last3[0];
-          
-          /* Fix the IP4 checksum and length */
-          sum0 = ip4_0->checksum;
-          new_l0 = /* old_l0 always 0, see the rewrite setup */
-            clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
-          sum0 = ip_csum_update (sum0, old_l0, new_l0, ip4_header_t,
-          		       length /* changed member */);
-          ip4_0->checksum = ip_csum_fold (sum0);
-          ip4_0->length = new_l0;
-	  
-          sum1 = ip4_1->checksum;
-          new_l1 = /* old_l1 always 0, see the rewrite setup */
-            clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b1));
-          sum1 = ip_csum_update (sum1, old_l1, new_l1, ip4_header_t,
-          		       length /* changed member */);
-          ip4_1->checksum = ip_csum_fold (sum1);
-          ip4_1->length = new_l1;
-	  
-          sum2 = ip4_2->checksum;
-          new_l2 = /* old_l0 always 0, see the rewrite setup */
-            clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b2));
-          sum2 = ip_csum_update (sum2, old_l2, new_l2, ip4_header_t,
-          		       length /* changed member */);
-          ip4_2->checksum = ip_csum_fold (sum2);
-          ip4_2->length = new_l2;
-	  
-          sum3 = ip4_3->checksum;
-          new_l3 = /* old_l1 always 0, see the rewrite setup */
-            clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b3));
-          sum3 = ip_csum_update (sum3, old_l3, new_l3, ip4_header_t,
-          		       length /* changed member */);
-          ip4_3->checksum = ip_csum_fold (sum3);
-          ip4_3->length = new_l3;
-          
-          /* Fix UDP length and set source port */
-          udp0 = (udp_header_t *)(ip4_0+1);
-          new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-          			       - sizeof (*ip4_0));
-          udp0->length = new_l0;
-          //udp0->src_port = flow_hash0;
-          
-          udp1 = (udp_header_t *)(ip4_1+1);
-          new_l1 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1)
-          			       - sizeof (*ip4_1));
-          udp1->length = new_l1;
-          //udp1->src_port = flow_hash1;
-
-	  udp2 = (udp_header_t *)(ip4_2+1);
-          new_l2 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
-          			       - sizeof (*ip4_2));
-          udp2->length = new_l2;
-          //udp2->src_port = flow_hash2;
-
-	  udp3 = (udp_header_t *)(ip4_3+1);
-          new_l3 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
-          			       - sizeof (*ip4_3));
-          udp3->length = new_l3;
-          //udp3->src_port = flow_hash3;
-
-	  /* Fix srb data length */
-	  srb0 = (ppf_srb_header_t *)(udp0+1);
-	  len0 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b0)
-					 - sizeof (*ip4_0) - sizeof(*udp0) - sizeof(*srb0));
-	  srb0->msg.in.data_l = len0;
-	  tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
-	  t0 = pool_elt_at_index (pgm->tunnels, tunnel_index0);
-	  srb0->call_id = clib_host_to_net_u32(t0->call_id);
-	  srb0->transaction_id = clib_host_to_net_u32(0);
-	  srb0->msg.in.request_id = clib_host_to_net_u32(0);
-	  srb0->msg.in.integrity_status = clib_host_to_net_u32(1);
-	  
-	  srb1 = (ppf_srb_header_t *)(udp1+1);
-	  len1 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b1)
-					 - sizeof (*ip4_1) - sizeof(*udp1) - sizeof(*srb1));
-	  srb1->msg.in.data_l = len1;
-	  tunnel_index1 = vnet_buffer(b1)->sw_if_index[VLIB_RX];
-	  t1 = pool_elt_at_index (pgm->tunnels, tunnel_index1);
-	  srb1->call_id = clib_host_to_net_u32(t1->call_id);
-	  srb1->transaction_id = clib_host_to_net_u32(0);
-	  srb1->msg.in.request_id = clib_host_to_net_u32(0);
-	  srb1->msg.in.integrity_status = clib_host_to_net_u32(1);
-
-	  srb2 = (ppf_srb_header_t *)(udp2+1);
-	  len2 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b2)
-					 - sizeof (*ip4_2) - sizeof(*udp2) - sizeof(*srb2));
-	  srb2->msg.in.data_l = len2;
-	  tunnel_index2 = vnet_buffer(b2)->sw_if_index[VLIB_RX];
-	  t2 = pool_elt_at_index (pgm->tunnels, tunnel_index2);
-	  srb2->call_id = clib_host_to_net_u32(t2->call_id);
-	  srb2->transaction_id = clib_host_to_net_u32(0);
-	  srb2->msg.in.request_id = clib_host_to_net_u32(0);
-	  srb2->msg.in.integrity_status = clib_host_to_net_u32(1);
-
-	  srb3 = (ppf_srb_header_t *)(udp1+3);
-	  len3 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b3)
-					 - sizeof (*ip4_3) - sizeof(*udp3) - sizeof(*srb3));
-	  srb3->msg.in.data_l = len3;
-	  tunnel_index3 = vnet_buffer(b3)->sw_if_index[VLIB_RX];
-	  t3 = pool_elt_at_index (pgm->tunnels, tunnel_index3);
-	  srb3->call_id = clib_host_to_net_u32(t3->call_id);
-	  srb3->transaction_id = clib_host_to_net_u32(0);
-	  srb3->msg.in.request_id = clib_host_to_net_u32(0);
-	  srb3->msg.in.integrity_status = clib_host_to_net_u32(1);
-
-          /* counter here */
-          len0 = vlib_buffer_length_in_chain (vm, b0);
-          len1 = vlib_buffer_length_in_chain (vm, b1);
-          len2 = vlib_buffer_length_in_chain (vm, b2);
-          len3 = vlib_buffer_length_in_chain (vm, b3);
-          stats_n_packets += 4;
-          stats_n_bytes += len0 + len1 + len2 + len3;
-
-          if (PREDICT_FALSE(b0->flags & VLIB_BUFFER_IS_TRACED))
-          {
-            ppf_srb_nb_tx_trace_t *tr
-              = vlib_add_trace (vm, node, b0, sizeof (*tr));
-	    tr->tunnel_index = tunnel_index0;
-	    clib_memcpy (&tr->srb, srb0, sizeof (*srb0));
-          }
-          
-          if (PREDICT_FALSE(b1->flags & VLIB_BUFFER_IS_TRACED))
-          {
-            ppf_srb_nb_tx_trace_t *tr
-              = vlib_add_trace (vm, node, b1, sizeof (*tr));
-	    tr->tunnel_index = tunnel_index1;
-	    clib_memcpy (&tr->srb, srb1, sizeof (*srb1));
-          }
-          
-	  vlib_validate_buffer_enqueue_x4 (vm, node, next_index,
-					   to_next, n_left_to_next,
-					   bi0, bi1, bi2, bi3,
-					   next0, next1, next2, next3);
-        }
-  
       while (n_left_from > 0 && n_left_to_next > 0)
         {
           u32 bi0;
@@ -371,7 +129,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           
           /* Copy first 32 octets 8-bytes at a time */
           #define _(offs) copy_dst0[offs] = copy_src0[offs];
-          foreach_fixed_header4_offset;
+          foreach_fixed_header_offset;
           #undef _
           
           /* Last 4 octets. Hopefully gcc will be our friend */
@@ -393,7 +151,6 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
           			     - sizeof (*ip4_0));
           udp0->length = new_l0;
-          //udp0->src_port = flow_hash0;
 
 	  /* Fix srb data length */
 	  srb0 = (ppf_srb_header_t *)(udp0+1);

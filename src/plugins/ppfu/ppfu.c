@@ -30,6 +30,7 @@
 #include <vnet/plugin/plugin.h>
 #include <vpp/app/version.h>
 #include <ppfu/ppfu.h>
+#include <ppfu/ppf_gtpu.h>
 
 ppf_main_t ppf_main;
 
@@ -102,6 +103,172 @@ ppf_config (vlib_main_t * vm, unformat_input_t * input)
 }
 
 VLIB_EARLY_CONFIG_FUNCTION (ppf_config, "ppf_config");
+
+#define foreach_ppf_callline_type    \
+_(PPF_SRB_CALL, "SRB")    \
+_(PPF_DRB_CALL, "DRB")
+
+static char * ppf_callline_type_strings[] = {
+#define _(sym,string) string,
+  foreach_ppf_callline_type
+#undef _
+};
+
+#define foreach_ppf_gtpu_tunnel_type    \
+_(PPF_GTPU_SB, "DRB-SB")      \
+_(PPF_GTPU_NB, "DRB-NB")      \
+_(PPF_GTPU_LBO, "DRB-LBO")    \
+_(PPF_GTPU_SRB, "SRB-SB")     \
+_(PPF_GTPU_NORMAL, "Normal")
+
+static char * ppf_gtpu_tunnel_type_strings[] = {
+#define _(sym,string) string,
+  foreach_ppf_gtpu_tunnel_type
+#undef _
+};
+
+u8 *
+format_ppf_gtpu_tunnel_type (u8 * s, va_list * va)
+{
+  int type = va_arg (*va, int);
+  if ((type < 0) || (type > PPF_GTPU_NORMAL))
+    s = format (s, "invalid");
+  else
+    s = format (s, "%s", ppf_gtpu_tunnel_type_strings[type]);
+  return s;
+}
+
+u8 *
+format_ppf_gtpu_tunnel_simple (u8 * s, va_list * va)
+{
+  ppf_gtpu_tunnel_id_type_t *it = va_arg (*va, ppf_gtpu_tunnel_id_type_t *);
+  int verbose = va_arg (*va, int);
+  ppf_gtpu_tunnel_t * t = 0;
+  ppf_gtpu_main_t * gtm = &ppf_gtpu_main;
+
+  s = format (s, "id %d, type %U", it->tunnel_id, format_ppf_gtpu_tunnel_type, it->tunnel_type);
+  if ((verbose > 0) && (~0 != it->tunnel_id)) {
+    t = pool_elt_at_index (gtm->tunnels, it->tunnel_id);
+    if (t) {
+      s = format (s, "\ndetails %U\n", format_ppf_gtpu_tunnel, t);
+    }
+  }
+
+  return s;
+}
+
+u8 *
+format_ppf_pdcp_simple (u8 * s, va_list * va)
+{
+  ppf_pdcp_callline_t * pdcp = va_arg (*va, ppf_pdcp_callline_t *);
+  int verbose = va_arg (*va, int);
+  ppf_pdcp_session_t * pdcp_session = 0;
+  ppf_pdcp_main_t * ppm = &ppf_pdcp_main;
+
+  s = format (s, "sess-id %d", pdcp->session_id);
+  if (verbose > 0) {
+    pdcp_session= pool_elt_at_index (ppm->sessions, pdcp->session_id);
+    if (pdcp_session) {
+      s = format (s, "\ndetails %U\n", format_ppf_pdcp_session, pdcp_session);
+    }
+  }
+
+  return s;
+}
+
+u8 *
+format_ppf_callline (u8 * s, va_list * va)
+{
+  ppf_callline_t * callline = va_arg (*va, ppf_callline_t *);
+  int verbose = va_arg (*va, int);
+  u8 sb = 0;
+
+  if (~0 == callline->call_index) {
+    return s;
+  }
+
+  s = format (s, "[%d]type %s ", callline->call_index, ppf_callline_type_strings[callline->call_type]);
+
+  if (PPF_SRB_CALL == callline->call_type) {    
+    if (verbose > 0) {
+      s = format (s, "\nnb msg hash: %U\n", format_hash, callline->rb.srb.nb_out_msg_by_sn, verbose);
+      
+      for (sb = 0; sb < MAX_SB_PER_CALL; sb++) {
+        s = format (s, "\nsb tunnel %U\n", format_ppf_gtpu_tunnel_simple, &(callline->rb.srb.sb_tunnel[sb]), verbose);
+      }
+    } else {
+      for (sb = 0; sb < MAX_SB_PER_CALL; sb++) {
+  	s = format (s, "sb tunnel {%U} ", format_ppf_gtpu_tunnel_simple, &(callline->rb.srb.sb_tunnel[sb]), verbose);
+      }      
+    }
+  } else {
+    if (verbose > 0) {
+      s = format (s, "\nnb tunnel %U\n", format_ppf_gtpu_tunnel_simple, &(callline->rb.drb.nb_tunnel), verbose);
+      
+      for (sb = 0; sb < MAX_SB_PER_CALL; sb++) {
+        s = format (s, "\nsb tunnel %U\n", format_ppf_gtpu_tunnel_simple, &(callline->rb.drb.sb_tunnel[sb]), verbose);
+      }    
+    } else {
+      s = format (s, "nb tunnel {%U}\n", format_ppf_gtpu_tunnel_simple, &(callline->rb.drb.nb_tunnel), verbose);
+
+      for (sb = 0; sb < MAX_SB_PER_CALL; sb++) {
+        s = format (s, "sb tunnel {%U} ", format_ppf_gtpu_tunnel_simple, &(callline->rb.drb.sb_tunnel[sb]), verbose);
+      }      
+    }
+  }
+
+  if (verbose > 0)
+    s = format (s, "\npdcp %U\n", format_ppf_pdcp_simple, &(callline->pdcp), verbose);
+  else
+    s = format (s, "pdcp {%U}\n", format_ppf_pdcp_simple, &(callline->pdcp), verbose);
+  
+  return s;
+}
+
+
+static clib_error_t *
+ppf_show_callline (vlib_main_t * vm,
+             unformat_input_t * input, vlib_cli_command_t * cmd)
+{
+  ppf_main_t *pm = &ppf_main;
+  ppf_callline_t * callline;
+  u32 call_id = ~0;
+  int verbose = 0;
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat (input, "%d", &call_id))
+	;
+    else if (unformat (input, "verbose"))
+	verbose++;
+    else
+    	break;
+  }
+
+  if (~0 == call_id) { /* show all */
+    for (call_id = 0; call_id < pm->max_capacity; call_id++) {
+      callline = &(pm->ppf_calline_table[call_id]);
+      if (~0 != callline->call_index)
+        vlib_cli_output (vm, "%U", format_ppf_callline, callline, verbose);
+    }
+
+    return 0;
+  }
+
+  if (call_id < pm->max_capacity) {
+    callline = &(pm->ppf_calline_table[call_id]);
+    vlib_cli_output (vm, "%U", format_ppf_callline, callline, verbose);
+  } else
+    vlib_cli_output (vm, "Please input a correct call-id, range[0, %d]\n", pm->max_capacity - 1);
+  
+  return 0;
+}
+
+VLIB_CLI_COMMAND (ppf_show_callline_command, static) = {
+    .path = "show ppf-callline",
+    .short_help = "show ppf-callline [index] [verbose]",
+    .function = ppf_show_callline,
+};
+
 
 
 /*
