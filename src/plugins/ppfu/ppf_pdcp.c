@@ -66,17 +66,164 @@ ppf_pdcp_init (vlib_main_t * vm)
 
 VLIB_INIT_FUNCTION (ppf_pdcp_init);
 
+
 u8 *
 format_ppf_pdcp_session (u8 * s, va_list * va)
 {
   ppf_pdcp_session_t * pdcp_session = va_arg (*va, ppf_pdcp_session_t *);
 
-  s = format (s, "in-sn %d, out-sn %d\n", pdcp_session->in_sn, pdcp_session->out_sn);
+  s = format (s, "sn-length %d, header-length %d, in-flight-limit %ld\n", 
+  	pdcp_session->sn_length, 
+  	pdcp_session->header_length,
+  	pdcp_session->in_flight_limit);
+
+  s = format (s, "tx-hfn %d, tx-next %d\n", 
+  	pdcp_session->tx_hfn, 
+  	pdcp_session->tx_next_sn);
+
+  s = format (s, "rx-hfn %d, rx-next-expected %d, rx-last-forwarded %d\n", 
+  	pdcp_session->rx_hfn, 
+  	pdcp_session->rx_next_expected_sn, 
+  	pdcp_session->rx_last_forwarded_sn);
+
+  s = format (s, "security-alg %x, intergity-key %U, crypto-key %U\n", 
+  	pdcp_session->security_algorithms, 
+  	format_hex_bytes, pdcp_session->integrity_key, MAX_PDCP_KEY_LEN,
+  	format_hex_bytes, pdcp_session->crypto_key, MAX_PDCP_KEY_LEN);
 
   return s;
 }
 
+u32
+ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight_limit)
+{
+  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
+  ppf_pdcp_session_t *pdcp_sess = NULL;
+  u32 session_id = ~0;
+  u32 max_sn = ~0;
 
+  pool_get (ppm->sessions, pdcp_sess);
+  memset (pdcp_sess, 0, sizeof (*pdcp_sess));
+
+  pdcp_sess->sn_length = sn_length;
+  pdcp_sess->tx_next_sn = tx_count; //(~(0xFFFFFFFF<<sn_length))&tx_count;
+  pdcp_sess->tx_hfn = tx_count >> sn_length;
+  pdcp_sess->rx_next_expected_sn = rx_count; //(~(0xFFFFFFFF<<sn_length))&rx_count;
+  pdcp_sess->rx_last_forwarded_sn = (((pdcp_sess->rx_next_expected_sn - 1) & ((1 << sn_length) - 1)) & max_sn);
+  pdcp_sess->rx_hfn = ((rx_count >> sn_length) - 1) & (max_sn >> sn_length);
+
+  if (in_flight_limit == max_sn) // no value configured by upper layers
+    pdcp_sess->in_flight_limit = 0x1 << (sn_length - 1); //use default value: SN-range/2 - 1
+  else if (in_flight_limit != 0)
+    pdcp_sess->in_flight_limit = in_flight_limit;
+  else //in_flight_limit == 0
+    pdcp_sess->in_flight_limit = 0x1FFFFFFFF; //0 means no in-flight limit, set limit to 2^32 + 1
+
+  clib_warning("ppf_pdcp_create_session: configuring in-flight-limit to 0x%lx, received configuration value 0x%x \n",
+		  pdcp_sess->in_flight_limit, in_flight_limit);
+
+  switch (pdcp_sess->sn_length) {
+    case 5:
+      pdcp_sess->header_length = 1;
+      break;
+    case 7:
+      pdcp_sess->header_length = 1;
+      break;
+    case 12:
+      pdcp_sess->header_length = 2;
+      break;
+    case 15:
+      pdcp_sess->header_length = 2;
+      break;
+    case 18:
+      pdcp_sess->header_length = 3;
+      break;
+    default:
+      clib_warning("ERROR: Unknown sequence number length %u.\n",pdcp_sess->sn_length);
+      pool_put (ppm->sessions, pdcp_sess);
+      return session_id;
+  }
+  
+  session_id = (u32)(pdcp_sess - ppm->sessions);
+  return session_id;
+}
+
+u32 
+ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_config_t * config)
+{
+  if (config->flags & INTEGRITY_KEY_VALID)
+    clib_memcpy (pdcp_sess->integrity_key, config->integrity_key, MAX_PDCP_KEY_LEN);
+  
+  if (config->flags & CRYPTO_KEY_VALID)
+    clib_memcpy (pdcp_sess->crypto_key, config->crypto_key, MAX_PDCP_KEY_LEN);
+  
+  if (config->flags & INTEGRITY_ALG_VALID)
+  {
+    switch(config->integrity_algorithm)
+    {
+      case PDCP_EIA_NONE:
+        break;
+	
+      case PDCP_EIA0:
+        pdcp_sess->security_algorithms |= PDCP_NULL_INTEGRITY;
+        break;
+	
+      case PDCP_EIA1:
+        pdcp_sess->security_algorithms |= PDCP_SNOW3G_INTEGRITY;
+        break;
+
+      case PDCP_EIA2:
+        pdcp_sess->security_algorithms |= PDCP_AES_INTEGRITY;
+        break;
+
+      case PDCP_EIA3:
+	pdcp_sess->security_algorithms |= PDCP_ZUC_INTEGRITY;
+        break;
+
+      default:
+        clib_warning ("ERROR: Unknown integrity algorithm %u.\n", config->integrity_algorithm);
+        return -1;
+    }
+  }
+  
+  if (config->flags & CRYPTO_ALG_VALID)
+  {
+    switch (config->crypto_algorithm)
+    {
+      case PDCP_EEA0:
+      	pdcp_sess->security_algorithms |= PDCP_NULL_CIPHERING;
+        break;
+	
+      case PDCP_EEA1:
+	pdcp_sess->security_algorithms |= PDCP_SNOW3G_CIPHERING;
+        break;
+
+      case PDCP_EEA2:
+	pdcp_sess->security_algorithms |= PDCP_AES_CIPHERING;
+        break;
+
+      case PDCP_EEA3:
+      	pdcp_sess->security_algorithms |= PDCP_ZUC_CIPHERING;
+        break;
+
+      default:
+        clib_warning ("ERROR: Unknown crypto algorithm %u.\n", config->crypto_algorithm);
+        return -1;
+    }
+  }
+  
+  return 0;
+}
+
+u32
+ppf_pdcp_clear_session (ppf_pdcp_session_t * pdcp_sess)
+{
+  if (pdcp_sess) {
+    pool_put (ppf_pdcp_main.sessions, pdcp_sess);
+  }
+
+  return 0;
+}
 
 /*
  * fd.io coding-style-patch-verification: ON
