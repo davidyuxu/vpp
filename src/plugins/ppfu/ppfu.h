@@ -108,10 +108,71 @@ _(IP4_LOOKUP, "ip4-lookup")
     PPF_SRB_NB_TX_N_NEXT,
 } ppf_srb_nb_tx_next_t;
 
+#define MAX_PDCP_KEY_LEN   16
+
+enum pdcp_security_alg_t 
+{ 
+  PDCP_NULL_CIPHERING   = 0x01,
+  PDCP_SNOW3G_CIPHERING = 0x02,
+  PDCP_AES_CIPHERING    = 0x04,
+  PDCP_ZUC_CIPHERING    = 0x08,
+  PDCP_NULL_INTEGRITY   = 0x10,
+  PDCP_SNOW3G_INTEGRITY = 0x20,
+  PDCP_AES_INTEGRITY    = 0x40,
+  PDCP_ZUC_INTEGRITY    = 0x80
+};
+
+enum pdcp_integrity_alg_t 
+{ 
+  PDCP_EIA_NONE,
+  PDCP_EIA0,
+  PDCP_EIA1,
+  PDCP_EIA2,
+  PDCP_EIA3
+};
+
+enum pdcp_crypt_alg_t 
+{ 
+  PDCP_EEA_NONE,
+  PDCP_EEA0,
+  PDCP_EEA1,
+  PDCP_EEA2,
+  PDCP_EEA3
+};
+
+enum _config_flags_{
+  INTEGRITY_KEY_VALID = 0x1,
+  CRYPTO_KEY_VALID = 0x2,
+  INTEGRITY_ALG_VALID = 0x4,
+  CRYPTO_ALG_VALID = 0x8
+};
+
+typedef struct _ppf_pdcp_config_t_
+{
+  u16 flags;
+  u8  integrity_key[MAX_PDCP_KEY_LEN];
+  u8  crypto_key[MAX_PDCP_KEY_LEN];
+  u8  integrity_algorithm;
+  u8  crypto_algorithm;
+  //u8 valid_paths;
+  //u8 removed_paths;
+  //PathContext paths[MAX_PATHS];
+} ppf_pdcp_config_t;
+
+
 typedef struct
 {
-  u32 out_sn;   /* outgoing sequence number */
-  u32 in_sn;    /* incoming sequence number */
+  u8  integrity_key[MAX_PDCP_KEY_LEN];
+  u8  crypto_key[MAX_PDCP_KEY_LEN];
+  u8  security_algorithms;
+  u8  sn_length;
+  u8  header_length;
+  u32 tx_hfn;
+  u32 tx_next_sn;
+  u32 rx_hfn;
+  u32 rx_next_expected_sn;
+  u32 rx_last_forwarded_sn;
+  u64 in_flight_limit;
 } ppf_pdcp_session_t;
 
 typedef struct
@@ -293,8 +354,22 @@ typedef CLIB_PACKED(struct
 }) ip4_srb_header_t;
 /* *INDENT-ON* */
 
+typedef struct _ppf_pdcp_header_t
+{
+  u8 sn;
+  u8 sn_cont[0];  // depends on the sn length
+} ppf_pdcp_header_t;
+
+// typedef u32 ppf_pdcp_mac_i_t;
+
+
 u8 *format_ppf_pdcp_session (u8 * s, va_list * va);
 u8 *format_ppf_callline (u8 * s, va_list * va);
+
+u32 ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight_limit);
+u32 ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_config_t * config);
+u32 ppf_pdcp_clear_session (ppf_pdcp_session_t * pdcp_sess);
+
 
 
 #endif /* included_vnet_ppfu_h */
