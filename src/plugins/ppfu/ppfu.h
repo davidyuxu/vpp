@@ -212,20 +212,22 @@ typedef struct
 typedef struct 
 {	
   u32 call_index;
-  u32 valid;
   ppf_calline_type_t call_type; 
   union {
     ppf_drb_callline_t drb;
     ppf_srb_callline_t srb;
   } rb;
   ppf_pdcp_callline_t pdcp;
+  u32 sb_policy;
+  u32 ue_bearer_id;
 } ppf_callline_t;
 
 typedef struct
 {
   u32 max_capacity;
   ppf_callline_t * ppf_calline_table;
-
+  
+  
   u16 msg_id_base;
 } ppf_main_t;
 

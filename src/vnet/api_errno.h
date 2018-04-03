@@ -138,7 +138,9 @@ _(NETLINK_ERROR, -145, "netlink error")                                 \
 _(BIER_BSL_UNSUP, -146, "BIER bit-string-length unsupported")		\
 _(INSTANCE_IN_USE, -147, "Instance in use")					\
 _(WRONG_MAX_SESSION_NUM, -148, "Wrong max session number")			\
-_(CALLINE_IN_USE, -149, "Calline is not empty")
+_(CALLLNE_IN_USE, -149, "Calline is not empty")				\
+_(EMPTY_CALLINE, -150, "Calline is empty")				
+
 
 
 
