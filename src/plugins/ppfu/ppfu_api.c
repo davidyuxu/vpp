@@ -103,36 +103,44 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   int rv = 0;
   ppf_main_t *ppfm = &ppf_main;
   ip4_main_t *im = &ip4_main;
-  ppf_callline_t *callline = NULL;
+  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
+
   vl_api_nb_path_context_t *nb;
   vl_api_sb_path_context_t *sb;
+
+  ppf_callline_t *callline = NULL;
+  ppf_pdcp_session_t *pdcp_sess = NULL;
   ppf_gtpu_tunnel_type_t tunnel_type;
-  u32 nb_in_teid, sb_in_teid[MAX_SB_PER_CALL];
-  u32 result;
+  u32 nb_tunnel_added = 0, sb_tunnel_added[MAX_SB_PER_CALL] = {0};         //mark which tunnel has been added
+  u32 nb_in_teid = 0, sb_in_teid[MAX_SB_PER_CALL] = {0};	     //mark return teid
+  u32 nb_tunnel_id, sb_tunnel_id[MAX_SB_PER_CALL] = {0};
+  u32 sw_if_index = ~0;
+  u32 tunnel_id = ~0;
+
   int i = 0;
-  
+
   if (mp->call_id >= ppfm->max_capacity)
   {
 	rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
-      result = 1; 
 	goto out;
   }
   
   callline = &(ppfm->ppf_calline_table[mp->call_id]);
 
-  if (callline->valid == 0) 
+  if (callline->call_index != ~0) 
   {
-	rv = VNET_API_ERROR_CALLINE_IN_USE;
-	result = 1; 
+	rv = VNET_API_ERROR_CALLLNE_IN_USE;
 	goto out;
   }
 
   nb = &(mp->nb);
 
+  // the source ip of nb is 0, means the nb is invalid, the call is SRB
   if (nb->src_ip_address != 0)
   	callline->call_type = PPF_DRB_CALL;
   else 
   	callline->call_type = PPF_SRB_CALL;
+
 
   if (callline->call_type == PPF_DRB_CALL)
   {
@@ -140,41 +148,47 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  if (!p)
 	  {
 		rv = VNET_API_ERROR_NO_SUCH_FIB;
-		result = 1; 
 		goto out;
 	  }
 
 	  tunnel_type = PPF_GTPU_NB;
 	  nb_in_teid = ntohl(mp->ue_bearer_id);
-
-	  vnet_ppf_gtpu_add_del_tunnel_args_t a = {
-	    .is_add = 1,
+  
+	  vnet_ppf_gtpu_add_del_tunnel_args_t nb_tunnel = {
 	    .is_ip6 = 0,
-	    .mcast_sw_if_index = 0,
+	    .mcast_sw_if_index = 0,		//to be delete	    
+	    .decap_next_index = 0,		//to be delete
 	    .encap_fib_index = nb->encap_vrf_id,
-	    .decap_next_index = 0,
 	    .in_teid = nb_in_teid,
 	    .out_teid = ntohl (nb->out_teid),
 	    .dst = to_ip46 (0, nb->dst_ip_address),
 	    .src = to_ip46 (0, nb->src_ip_address),
 	    .call_id = mp->call_id,
 	    .tunnel_type = tunnel_type,
-	    .sb_id = 0,
+	    .sb_id = 0,				//only valid for sb
 	    .dst_port = nb->port,
 	    .dscp = nb->dscp,
 	    .protocol_config = nb->protocol_configuration,
+	    .type = nb->type,
 	  };
 
 	  /* Check src & dst are different */
-	  if (ip46_address_cmp (&a.dst, &a.src) == 0)
+	  if (ip46_address_cmp (&nb_tunnel.dst, &nb_tunnel.src) == 0)
 	    {
 		rv = VNET_API_ERROR_SAME_SRC_DST;
-		result = 1; 
 		goto out;
 	    }
 
-	  u32 sw_if_index = ~0;
-	  rv = vnet_ppf_gtpu_add_del_tunnel (&a, &sw_if_index);
+	  sw_if_index = ~0;
+	  tunnel_id = ~0;
+	  rv = vnet_ppf_gtpu_add_tunnel (&nb_tunnel, &sw_if_index, &tunnel_id);
+
+	  if (rv == 0) {
+	  	nb_tunnel_added = 1;
+	  	nb_tunnel_id = tunnel_id;
+	  } else {
+	  	goto out;
+	  }
 
   }
 
@@ -182,16 +196,13 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   {
   	  sb = &(mp->sb[i]);
 
-  	  if (sb->src_ip_address != 0) {
-  	  	sb_in_teid[i] = 0;
-		break;
-	  }
-	    
+  	  if (sb->src_ip_address == 0) 
+		continue;
+
 	  uword *p = hash_get (im->fib_index_by_table_id, ntohl (sb->encap_vrf_id));
 	  if (!p)
 	  {
 		rv = VNET_API_ERROR_NO_SUCH_FIB;
-		result = 1; 
 		goto out;
 	  }
 
@@ -200,10 +211,9 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  else 
 	  	tunnel_type = PPF_GTPU_SRB;
 	  	
-	  sb_in_teid[i] = ntohl( (i << 30) |mp->ue_bearer_id);
+	  sb_in_teid [i] = ((i + 1) << 30) |ntohl(mp->ue_bearer_id);
 
-	  vnet_ppf_gtpu_add_del_tunnel_args_t a = {
-	    .is_add = 1,
+	  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
 	    .is_ip6 = 0,
 	    .mcast_sw_if_index = 0,
 	    .encap_fib_index = sb->encap_vrf_id,
@@ -223,21 +233,55 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  };
 
 	  /* Check src & dst are different */
-	  if (ip46_address_cmp (&a.dst, &a.src) == 0)
+	  if (ip46_address_cmp (&(sb_tunnel.dst), &(sb_tunnel.src)) == 0)
 	    {
 		rv = VNET_API_ERROR_SAME_SRC_DST;
 		goto out;
 	    }
 
-	  u32 sw_if_index = ~0;
-	  rv = vnet_ppf_gtpu_add_del_tunnel (&a, &sw_if_index);
+	  sw_if_index = ~0;
+	  tunnel_id = ~0;
+	  rv = vnet_ppf_gtpu_add_tunnel (&(sb_tunnel), &sw_if_index, &tunnel_id);
+	
+	  if (rv == 0) {
+	  	sb_tunnel_added[i] = 1;
+	  	sb_tunnel_id[i] = tunnel_id;
+	  	
+	  } else {
+	  	goto out;
+	  }
+	  
   }
 
-  callline->valid = 1;
+  pool_get (ppm->sessions, pdcp_sess);
+  memset (pdcp_sess, 0, sizeof (*pdcp_sess));
+  callline->pdcp.session_id = (u32)(pdcp_sess - ppm->sessions);
+
+  callline->sb_policy = mp->sb_policy;
+  callline->ue_bearer_id = mp->ue_bearer_id;
   callline->call_index = mp->call_id;
 
+  
 out:
   /* *INDENT-OFF* */
+  if (rv != 0) {
+  	if (nb_tunnel_added == 1) {
+	    vnet_ppf_gtpu_del_tunnel (nb_tunnel_id);
+	    nb_tunnel_added = 0;
+	}
+
+	nb_in_teid = 0;
+
+ 	for (i = 0; i<= MAX_SB_PER_CALL; i++) {
+ 	    if (sb_tunnel_added[i] == 1) {
+ 	    	vnet_ppf_gtpu_del_tunnel (sb_tunnel_id[i]);
+ 	      sb_tunnel_added[i] = 0;
+ 	    }
+ 	    
+ 	    sb_in_teid[i] = 0;
+ 	} 		
+  }
+  
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
   ({  
 
@@ -245,7 +289,10 @@ out:
      	rmp->sb_in_teid[i] = sb_in_teid[i];
      }
       rmp->nb_in_teid = nb_in_teid;
-      rmp->msg_result = result;
+      rmp->call_id = mp->call_id;
+      rmp->ue_bearer_id = mp->ue_bearer_id;
+      rmp->transaction_id = mp->transaction_id;
+  
   }));
 
   /* *INDENT-ON* */
@@ -254,25 +301,259 @@ out:
 
 static void
 vl_api_ppfu_plugin_bearer_update_t_handler 
-(vl_api_ppfu_plugin_bearer_update_t * mp)
+ (vl_api_ppfu_plugin_bearer_update_t * mp)
 {
-  vl_api_registration_t *reg;
+  vl_api_ppfu_plugin_bearer_update_reply_t *rmp;
+  int rv = 0;
+  ppf_main_t *ppfm = &ppf_main;
+  ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
+  ip4_main_t *im = &ip4_main;
 
-  reg = vl_api_client_index_to_registration (mp->client_index);
-  if (!reg)
-    return;
+  vl_api_sb_path_context_t *sb;
+    
+  ppf_callline_t *callline = NULL;
+  ppf_gtpu_tunnel_type_t tunnel_type;
+  ppf_gtpu_tunnel_id_type_t *sb_key;
+  u32 sw_if_index = ~0;
+  u32 tunnel_id = ~0;
+  u32 sb_in_teid[MAX_SB_PER_CALL];
+  u32 sb_tunnel_added[MAX_SB_PER_CALL]={0};
+  u32 sb_tunnel_id[MAX_SB_PER_CALL] = {0};
+  ppf_gtpu_tunnel_t *t = NULL;
+
+  int i = 0;
+
+  if (mp->call_id >= ppfm->max_capacity)
+  {
+	rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+	goto out;
+  }
+  
+  callline = &(ppfm->ppf_calline_table[mp->call_id]);
+
+  if (callline->call_index == ~0) 
+  {
+	rv = VNET_API_ERROR_EMPTY_CALLINE;
+	goto out;
+  }
+
+  //first, remove sbs 
+  for (i = 0; i<= MAX_SB_PER_CALL; i++) 
+  {
+	if (callline->call_type == PPF_DRB_CALL)
+	    sb_key = &(callline->rb.drb.sb_tunnel[i]);
+	else 
+	    sb_key = &(callline->rb.srb.sb_tunnel[i]);
+
+	if (sb_key->tunnel_id != ~0)  {
+
+		if (mp->removal_sb_id[i] != 0) {
+
+		  rv = vnet_ppf_gtpu_del_tunnel (sb_key->tunnel_id);
+		  
+		} else {
+		  t = &(gtm->tunnels[sb_key->tunnel_id]);
+		  
+		  sb_in_teid[i] = t->in_teid;
+		}
+	}	  
+  }
+
+  //second, update or add sbs
+  //To be done: how to rollback if updated failded in progress??
+  for (i = 0; i<= MAX_SB_PER_CALL; i++)
+  {
+	  sb = &(mp->sb[i]);
+
+	  if (sb->src_ip_address == 0) 
+		continue;
+
+	  uword *p = hash_get (im->fib_index_by_table_id, ntohl (sb->encap_vrf_id));
+	  if (!p)
+	  {
+		rv = VNET_API_ERROR_NO_SUCH_FIB;
+		goto out;
+	  }
+
+	  if (callline->call_type == PPF_DRB_CALL)
+	    sb_key = &(callline->rb.drb.sb_tunnel[i]);
+	  else 
+	    sb_key = &(callline->rb.srb.sb_tunnel[i]);
+	    
+	  if (sb_key->tunnel_id != ~0) {
+	  
+	  	//update sb_tunnel
+		vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
+		    .out_teid = ntohl (sb->pri_out_teid),
+		    .dst = to_ip46 (0, sb->pri_ip_address),
+		    .dst_port = sb->pri_port,
+		    .dscp = sb->pri_dscp,
+		    .protocol_config = sb->protocol_configuration,
+		    .ep_weight = sb->ep_weight,
+		    .traffic_state = sb->traffic_state,
+		  };
+
+	    rv = vnet_ppf_gtpu_update_tunnel (sb_key->tunnel_id, &(sb_tunnel));
+
+	    if (rv != 0)
+	    	goto out;
+
+	 } else {
+
+		//add sb_tunnel
+		  if (callline->call_type == PPF_DRB_CALL)
+			tunnel_type = PPF_GTPU_SB;
+		  else 
+			tunnel_type = PPF_GTPU_SRB;
+			
+		  sb_in_teid [i] = ((i + 1) << 30) |ntohl(mp->ue_bearer_id);
+
+		  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
+		    .is_ip6 = 0,
+		    .mcast_sw_if_index = 0,
+		    .encap_fib_index = sb->encap_vrf_id,
+		    .decap_next_index = 0,
+		    .in_teid = sb_in_teid[i],
+		    .out_teid = ntohl (sb->pri_out_teid),
+		    .dst = to_ip46 (0, sb->pri_ip_address),
+		    .src = to_ip46 (0, sb->src_ip_address),
+		    .call_id = mp->call_id,
+		    .tunnel_type = tunnel_type,
+		    .sb_id = i,
+		    .dst_port = sb->pri_port,
+		    .dscp = sb->pri_dscp,
+		    .protocol_config = sb->protocol_configuration,
+		    .ep_weight = sb->ep_weight,
+		    .traffic_state = sb->traffic_state,
+		  };
+
+		  /* Check src & dst are different */
+		  if (ip46_address_cmp (&(sb_tunnel.dst), &(sb_tunnel.src)) == 0)
+		    {
+			rv = VNET_API_ERROR_SAME_SRC_DST;
+			goto out;
+		    }
+
+		  sw_if_index = ~0;
+		  tunnel_id = ~0;
+		  rv = vnet_ppf_gtpu_add_tunnel (&(sb_tunnel), &sw_if_index, &tunnel_id);
+		  
+		  if (rv == 0) {
+			sb_tunnel_added[i] = 1;
+			sb_tunnel_id[i] = tunnel_id;
+		  } else 
+		  	goto out;
+
+	  }
+	  
+  }
+
+out:
+  /* *INDENT-OFF* */
+  if (rv != 0) {
+	for (i = 0; i<= MAX_SB_PER_CALL; i++) {
+	    if (sb_tunnel_added[i] != 0) {
+	    	vnet_ppf_gtpu_del_tunnel (sb_tunnel_id[i]);
+	    	sb_tunnel_added[i] = 0;
+	    }
+	    sb_in_teid[i] = 0;
+	}
+  }
+  
+  REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
+  ({	
+
+     for (i = 0; i<=MAX_SB_PER_CALL; i++) {
+	rmp->sb_in_teid[i] = sb_in_teid[i];
+     }
+	rmp->call_id = mp->call_id;
+	rmp->ue_bearer_id = mp->ue_bearer_id;
+	rmp->transaction_id = mp->transaction_id;
+  
+  }));
+
+  /* *INDENT-ON* */
 }
+
 
 static void
 vl_api_ppfu_plugin_bearer_release_t_handler 
 (vl_api_ppfu_plugin_bearer_release_t * mp)
 {
-  vl_api_registration_t *reg;
+  vl_api_ppfu_plugin_bearer_release_reply_t *rmp;
+  int rv = 0;
+  ppf_main_t *ppfm = &ppf_main;
+  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
+  ppf_callline_t *callline = NULL;
+  ppf_pdcp_session_t *pdcp_sess = NULL;
+  int i = 0;
+  ppf_gtpu_tunnel_id_type_t *nb_tunnel, *sb_tunnel[MAX_SB_PER_CALL];
 
-  reg = vl_api_client_index_to_registration (mp->client_index);
-  if (!reg)
-    return;
+  if (mp->call_id >= ppfm->max_capacity)
+  {
+	rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+	goto out;
+  }
+  
+  callline = &(ppfm->ppf_calline_table[mp->call_id]);
+
+  if (callline->call_index == ~0) 
+  {
+	rv = VNET_API_ERROR_EMPTY_CALLINE;
+	goto out;
+  }
+
+  if (callline->call_type == PPF_DRB_CALL)
+  {
+	  nb_tunnel = &(callline->rb.drb.nb_tunnel);
+
+	  rv = vnet_ppf_gtpu_del_tunnel (nb_tunnel->tunnel_id);
+
+	  if (rv != 0)
+	  	goto out;
+
+  }
+
+  for (i = 0; i<= MAX_SB_PER_CALL; i++)
+  {
+
+	  if (callline->call_type == PPF_DRB_CALL)
+		sb_tunnel[i] = &(callline->rb.drb.sb_tunnel[i]);
+	  else 
+		sb_tunnel[i] = &(callline->rb.srb.sb_tunnel[i]);
+
+        if (sb_tunnel[i]->tunnel_id != ~0) {	  
+	  	rv = vnet_ppf_gtpu_del_tunnel (sb_tunnel[i]->tunnel_id);
+	  	
+	  	if (rv != 0)
+	  		goto out;
+	  }
+	  
+  }
+
+  callline->pdcp.session_id = ~0;
+  pool_put (ppm->sessions, pdcp_sess);
+
+  if (callline->call_type == PPF_SRB_CALL)
+  	hash_free(callline->rb.srb.nb_out_msg_by_sn);
+
+  callline->ue_bearer_id = ~0;
+  callline->call_index = ~0;
+  
+out:
+  /* *INDENT-OFF* */
+  REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_RELEASE_REPLY,
+  ({	
+
+	rmp->call_id = mp->call_id;
+	rmp->ue_bearer_id = mp->ue_bearer_id;
+	rmp->transaction_id = mp->transaction_id;
+  
+  }));
+
+  /* *INDENT-ON* */
 }
+
 
 static void
 vl_api_ppfu_plugin_system_reset_t_handler 
@@ -284,270 +565,6 @@ vl_api_ppfu_plugin_system_reset_t_handler
   if (!reg)
     return;
 }
-
-
-#if 0
-static void
-  vl_api_ppfu_plugin_get_version_t_handler
-  (vl_api_sw_interface_set_ppf_gtpu_bypass_t * mp)
-{
-  vl_api_sw_interface_set_ppf_gtpu_bypass_reply_t *rmp;
-  int rv = 0;
-  u32 sw_if_index = ntohl (mp->sw_if_index);
-  ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
-
-  VALIDATE_SW_IF_INDEX (mp);
-
-  vnet_int_ppf_gtpu_bypass_mode (sw_if_index, mp->is_ipv6, mp->enable);
-  BAD_SW_IF_INDEX_LABEL;
-
-  REPLY_MACRO (VL_API_SW_INTERFACE_SET_PPF_GTPU_BYPASS_REPLY);
-}
-
-static void vl_api_ppf_gtpu_add_del_tunnel_t_handler
-  (vl_api_ppf_gtpu_add_del_tunnel_t * mp)
-{
-  vl_api_ppf_gtpu_add_del_tunnel_reply_t *rmp;
-  int rv = 0;
-  ip4_main_t *im = &ip4_main;
-  ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
-
-  uword *p = hash_get (im->fib_index_by_table_id, ntohl (mp->encap_vrf_id));
-  if (!p)
-    {
-      rv = VNET_API_ERROR_NO_SUCH_FIB;
-      goto out;
-    }
-
-  vnet_ppf_gtpu_add_del_tunnel_args_t a = {
-    .is_add = mp->is_add,
-    .is_ip6 = mp->is_ipv6,
-    .mcast_sw_if_index = ntohl (mp->mcast_sw_if_index),
-    .encap_fib_index = p[0],
-    .decap_next_index = ntohl (mp->decap_next_index),
-    .in_teid = ntohl (mp->in_teid),
-    .out_teid = ntohl (mp->out_teid),
-    .dst = to_ip46 (mp->is_ipv6, mp->dst_address),
-    .src = to_ip46 (mp->is_ipv6, mp->src_address),
-    .call_id = 0,
-    .tunnel_type = 0,
-    .sb_id = 0,
-  };
-
-  /* Check src & dst are different */
-  if (ip46_address_cmp (&a.dst, &a.src) == 0)
-    {
-      rv = VNET_API_ERROR_SAME_SRC_DST;
-      goto out;
-    }
-  if (ip46_address_is_multicast (&a.dst) &&
-      !vnet_sw_if_index_is_api_valid (a.mcast_sw_if_index))
-    {
-      rv = VNET_API_ERROR_INVALID_SW_IF_INDEX;
-      goto out;
-    }
-
-  u32 sw_if_index = ~0;
-  rv = vnet_ppf_gtpu_add_del_tunnel (&a, &sw_if_index);
-
-out:
-  /* *INDENT-OFF* */
-  REPLY_MACRO2(VL_API_PPF_GTPU_ADD_DEL_TUNNEL_REPLY,
-  ({
-    rmp->sw_if_index = ntohl (sw_if_index);
-  }));
-  /* *INDENT-ON* */
-}
-
-extern int ip4_add_del_route_t_handler (vl_api_ip_add_del_route_t * mp);
-extern int ip6_add_del_route_t_handler (vl_api_ip_add_del_route_t * mp);
-
-static int
-vl_api_ppf_gtpu_add_del_route (vl_api_ip_add_del_route_t * mp)
-{
-//  vl_api_ip_add_del_route_reply_t *rmp;
-  int rv;
-  vnet_main_t *vnm = vnet_get_main ();
-
-  vnm->api_errno = 0;
-
-  if (mp->is_ipv6)
-    rv = ip6_add_del_route_t_handler (mp);
-  else
-    rv = ip4_add_del_route_t_handler (mp);
-
-  rv = (rv == 0) ? vnm->api_errno : rv;
-
-  return rv;
-}
-
-
-/*Added by brant */
-static void vl_api_ppf_gtpu_add_del_tunnel_v2_t_handler
-  (vl_api_ppf_gtpu_add_del_tunnel_v2_t * mp)
-{
-  vl_api_ppf_gtpu_add_del_tunnel_v2_reply_t *rmp;
-  int rv = 0;
-  ip4_main_t *im = &ip4_main;
-  ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
-
-  uword *p = hash_get (im->fib_index_by_table_id, ntohl (mp->encap_vrf_id));
-  if (!p)
-    {
-      rv = VNET_API_ERROR_NO_SUCH_FIB;
-      goto out;
-    }
-
-  vnet_ppf_gtpu_add_del_tunnel_args_t a = {
-    .is_add = mp->is_add,
-    .is_ip6 = mp->is_ipv6,
-    .mcast_sw_if_index = ntohl (mp->mcast_sw_if_index),
-    .encap_fib_index = p[0],
-    .decap_next_index = ntohl (mp->decap_next_index),
-    .in_teid = ntohl (mp->in_teid),
-    .out_teid = ntohl (mp->out_teid),   
-    .dst = to_ip46 (mp->is_ipv6, mp->dst_address),
-    .src = to_ip46 (mp->is_ipv6, mp->src_address),
-    .call_id = 0,
-    .tunnel_type = 0,
-    .sb_id = 0,
-  };
-
-  /* Check src & dst are different */
-  if (ip46_address_cmp (&a.dst, &a.src) == 0)
-    {
-      rv = VNET_API_ERROR_SAME_SRC_DST;
-      goto out;
-    }
-  if (ip46_address_is_multicast (&a.dst) &&
-      !vnet_sw_if_index_is_api_valid (a.mcast_sw_if_index))
-    {
-      rv = VNET_API_ERROR_INVALID_SW_IF_INDEX;
-      goto out;
-    }
-
-  u32 sw_if_index = ~0;
-
-	rv = vnet_ppf_gtpu_add_del_tunnel (&a, &sw_if_index);
-	if (rv != 0) {
-		goto out;
-	}
-
-	
-	vl_api_ip_add_del_route_t r;
-    memset (&r, 0, sizeof(r));
-    r.client_index = mp->client_index;
-    r.context = mp->context;
-	r.is_add = mp->is_add;
-	r.table_id = mp->table_id;
-	r.classify_table_index = mp->classify_table_index;
-	r.next_hop_table_id = mp->next_hop_table_id;
-	r.next_hop_id = mp->next_hop_id;
-	r.is_drop = mp->is_drop;
-	r.is_unreach = mp->is_unreach;
-	r.is_prohibit = mp->is_prohibit;
-	r.is_ipv6 = mp->is_ipv6;
-	r.is_local = mp->is_local;
-	r.is_classify = mp->is_classify;
-	r.is_multipath = mp->is_multipath;
-	r.is_resolve_host = mp->is_resolve_host;
-	r.is_resolve_attached = mp->is_resolve_attached;
-
-	r.is_source_lookup = mp->is_source_lookup;
-	r.is_udp_encap = mp->is_udp_encap;
-	r.next_hop_weight = mp->next_hop_weight;
-	r.next_hop_preference = mp->next_hop_preference;
-	r.next_hop_proto = mp->next_hop_proto;
-	r.dst_address_length = mp->dst_address_length;
-	memcpy (r.dst_address, mp->dst_address_r, sizeof(r.dst_address));
-	memcpy (r.next_hop_address, mp->next_hop_address, sizeof(r.next_hop_address));
-	r.next_hop_n_out_labels = mp->next_hop_n_out_labels;
-	r.next_hop_via_label  = mp->next_hop_via_label;
-	memcpy (r.next_hop_out_label_stack, mp->next_hop_out_label_stack, sizeof(r.next_hop_out_label_stack));
-	r.next_hop_sw_if_index = htonl(sw_if_index);
-	
-	rv = vl_api_ppf_gtpu_add_del_route(&r);
-
-out:
-  /* *INDENT-OFF* */
-  REPLY_MACRO2(VL_API_PPF_GTPU_ADD_DEL_TUNNEL_V2_REPLY,
-  ({
-    rmp->sw_if_index = ntohl (sw_if_index);
-  }));
-  /* *INDENT-ON* */
-}
-
-
-static void send_ppf_gtpu_tunnel_details
-  (ppf_gtpu_tunnel_t * t, vl_api_registration_t * reg, u32 context)
-{
-  vl_api_ppf_gtpu_tunnel_details_t *rmp;
-  ip4_main_t *im4 = &ip4_main;
-  ip6_main_t *im6 = &ip6_main;
-  u8 is_ipv6 = !ip46_address_is_ip4 (&t->dst);
-
-  rmp = vl_msg_api_alloc (sizeof (*rmp));
-  memset (rmp, 0, sizeof (*rmp));
-  rmp->_vl_msg_id = ntohs (VL_API_PPF_GTPU_TUNNEL_DETAILS);
-  if (is_ipv6)
-    {
-      memcpy (rmp->src_address, t->src.ip6.as_u8, 16);
-      memcpy (rmp->dst_address, t->dst.ip6.as_u8, 16);
-      rmp->encap_vrf_id = htonl (im6->fibs[t->encap_fib_index].ft_table_id);
-    }
-  else
-    {
-      memcpy (rmp->src_address, t->src.ip4.as_u8, 4);
-      memcpy (rmp->dst_address, t->dst.ip4.as_u8, 4);
-      rmp->encap_vrf_id = htonl (im4->fibs[t->encap_fib_index].ft_table_id);
-    }
-  rmp->mcast_sw_if_index = htonl (t->mcast_sw_if_index);
-  rmp->in_teid = htonl (t->in_teid);
-  rmp->out_teid = htonl (t->out_teid);
-  rmp->decap_next_index = htonl (t->decap_next_index);
-  rmp->sw_if_index = htonl (t->sw_if_index);
-  rmp->is_ipv6 = is_ipv6;
-  rmp->context = context;
-
-  vl_api_send_msg (reg, (u8 *) rmp);
-}
-
-static void
-vl_api_ppf_gtpu_tunnel_dump_t_handler (vl_api_ppf_gtpu_tunnel_dump_t * mp)
-{
-  vl_api_registration_t *reg;
-  ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
-  ppf_gtpu_tunnel_t *t;
-  u32 sw_if_index;
-
-  reg = vl_api_client_index_to_registration (mp->client_index);
-  if (!reg)
-    return;
-
-  sw_if_index = ntohl (mp->sw_if_index);
-
-  if (~0 == sw_if_index)
-    {
-      /* *INDENT-OFF* */
-      pool_foreach (t, gtm->tunnels,
-      ({
-        send_ppf_gtpu_tunnel_details(t, reg, mp->context);
-      }));
-      /* *INDENT-ON* */
-    }
-  else
-    {
-      if ((sw_if_index >= vec_len (gtm->tunnel_index_by_sw_if_index)) ||
-	  (~0 == gtm->tunnel_index_by_sw_if_index[sw_if_index]))
-	{
-	  return;
-	}
-      t = &gtm->tunnels[gtm->tunnel_index_by_sw_if_index[sw_if_index]];
-      send_ppf_gtpu_tunnel_details (t, reg, mp->context);
-    }
-}
-
-#endif 
 
 static clib_error_t *
 ppfu_api_hookup (vlib_main_t * vm)

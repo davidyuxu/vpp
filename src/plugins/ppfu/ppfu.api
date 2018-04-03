@@ -115,12 +115,14 @@ typeonly define nb_path_context
   u32 dscp;
 
   u32 encap_vrf_id;
+/* 
+ * src_ip_address = 0 means the pash is invalid 
+ */
   u8 src_ip_address[16];
 };
 
 typeonly define sb_path_context
 {  
-  u32 sb_id;   
 
   u32 pri_out_teid;
   u8 pri_ip_address[16];
@@ -133,6 +135,9 @@ typeonly define sb_path_context
   u32 sec_dscp;
  
   u32 encap_vrf_id;
+/* 
+ * src_ip_address = 0 means the pash is invalid
+ */
   u8 src_ip_address[16];
 /*
  * INTERNAL_DATA_RELAY = 1,
@@ -187,14 +192,15 @@ define ppfu_plugin_bearer_install_reply
 {
   u32 context;
   i32 retval;
-  u32 call_id;
   u32 client_index;
+  u32 call_id;
   u32 ue_bearer_id;
   u32 transaction_id;
+/*
+ * in_teid = 0 means the tunnel has not been added 
+ */
   u32 nb_in_teid;
   u32 sb_in_teid[3];
-  u32 msg_result;
-  u32 request_id;
 };
 
 
@@ -228,9 +234,10 @@ define ppfu_plugin_bearer_update_reply
   u32 call_id;
   u32 ue_bearer_id;
   u32 transaction_id;
-  u32 msg_result;
-  u8 sb_id [3];
-  u32 in_teid [3];
+/*
+ * in_teid = 0 means the tunnel has not been added
+ */
+  u32 sb_in_teid [3];
 };
 
 
@@ -263,7 +270,6 @@ define ppfu_plugin_bearer_release_reply
   u32 call_id;
   u32 ue_bearer_id;
   u32 transaction_id;
-  u32 msg_result;
 };
 
 

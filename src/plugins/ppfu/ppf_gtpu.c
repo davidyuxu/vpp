@@ -222,7 +222,39 @@ _(src)                                          \
 _(dst)							\
 _(call_id)							\
 _(tunnel_type)						\
+_(sb_id)	
+
+#define install_tunnel_copy                     \
+_(is_ip6)                                   	\
+_(mcast_sw_if_index)					\
+_(decap_next_index)                            	\
+_(encap_fib_index)                             	\
+_(in_teid)                             		\
+_(out_teid)                                    	\
+_(dst)							\
+_(src)							\
+_(call_id)							\
+_(tunnel_type)						\
 _(sb_id)							\
+_(dst_port)							\
+_(dscp)							\
+_(protocol_config)					\
+_(type)							\
+_(ep_weight)						\
+_(traffic_state)						
+			
+
+
+#define update_tunnel_copy                      \
+_(out_teid)                                   	\
+_(dst)							\
+_(dst_port)                            		\
+_(dscp)                              		\
+_(protocol_config)                             	\
+_(ep_weight)                                    \
+_(traffic_state)						
+						
+
 
 
 static void
@@ -370,15 +402,13 @@ mcast_shared_remove (ip46_address_t * dst)
 
   hash_unset_mem_free (&ppf_gtpu_main.mcast_shared, dst);
 }
-
 int vnet_ppf_gtpu_add_del_tunnel
   (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp)
 {
   ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
   ppf_main_t *pm = &ppf_main;
-  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
   ppf_gtpu_tunnel_t *t = 0;
-  ppf_pdcp_session_t *pdcp_sess = 0;
+
   vnet_main_t *vnm = gtm->vnet_main;
   uword *p;
   u32 hw_if_index = ~0;
@@ -466,10 +496,7 @@ int vnet_ppf_gtpu_add_del_tunnel
             it->tunnel_id = tunnel_id;
             it->tunnel_type = t->tunnel_type;
 
-            /* FIX later!!! should be moved to callline initiator */
-	    pool_get (ppm->sessions, pdcp_sess);
-	    memset (pdcp_sess, 0, sizeof (*pdcp_sess));
-	    callline->pdcp.session_id = (u32)(pdcp_sess - ppm->sessions);
+
           }
           break;
 
@@ -670,19 +697,10 @@ int vnet_ppf_gtpu_add_del_tunnel
 
       //add by lollita for ppf gtpu tunnel swap
       callline = &(pm->ppf_calline_table[t->call_id]); 
-      callline->call_index = ~0;
       
       if (t->tunnel_type == PPF_GTPU_NB) {
         callline->rb.drb.nb_tunnel.tunnel_id = INVALID_TUNNEL_ID;;
-      } else if (t->tunnel_type == PPF_GTPU_SB) {
-        it = &(callline->rb.drb.sb_tunnel[t->sb_id]);
-        
-        if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
-          return VNET_API_ERROR_TUNNEL_EXIST;
-        }
-	
-        it->tunnel_id = INVALID_TUNNEL_ID;
-      } else if (t->tunnel_type == PPF_GTPU_SRB) {
+      } else if ((t->tunnel_type == PPF_GTPU_SB) || (t->tunnel_type == PPF_GTPU_SRB)) {
         it = &(callline->rb.srb.sb_tunnel[t->sb_id]);
         
         if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
@@ -691,10 +709,6 @@ int vnet_ppf_gtpu_add_del_tunnel
         
         it->tunnel_id = INVALID_TUNNEL_ID;
 
-	/* FIX later!!! should be moved to callline initiator */
-	pool_put (ppm->sessions, pdcp_sess);
-	callline->pdcp.session_id = ~0;
-        hash_free(callline->rb.srb.nb_out_msg_by_sn);
       }
 
       vnet_sw_interface_set_flags (vnm, t->sw_if_index, 0 /* down */ );
@@ -736,6 +750,404 @@ int vnet_ppf_gtpu_add_del_tunnel
 
   return 0;
 }
+
+int vnet_ppf_gtpu_add_tunnel
+  (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp, u32 *tunnel_id_ret)
+
+{
+  ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
+  ppf_main_t *pm = &ppf_main;
+  ppf_gtpu_tunnel_t *t = 0;
+
+  vnet_main_t *vnm = gtm->vnet_main;
+  uword *p;
+  u32 hw_if_index = ~0;
+  u32 sw_if_index = ~0;
+  ppf_gtpu4_tunnel_key_t key4;
+  ppf_gtpu6_tunnel_key_t key6;
+  u32 is_ip6 = a->is_ip6;
+  ppf_callline_t *callline;
+  ppf_gtpu_tunnel_id_type_t *it;
+  u32 tunnel_id;
+
+  if (!is_ip6)
+    {
+      key4.src = a->dst.ip4.as_u32;	/* decap src in key is encap dst in config */
+      key4.teid = clib_host_to_net_u32 (a->in_teid);
+      p = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64);
+    }
+  else
+    {
+      key6.src = a->dst.ip6;
+      key6.teid = clib_host_to_net_u32 (a->in_teid);
+      p = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6);
+    }
+    
+  if (a->call_id >= pm->max_capacity) {
+	return VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+  }
+
+    {
+      l2input_main_t *l2im = &l2input_main;
+
+      /* adding a tunnel: tunnel must not already exist */
+      if (p)
+	return VNET_API_ERROR_TUNNEL_EXIST;
+
+      /*if not set explicitly, default to l2 */
+      if (a->decap_next_index == ~0)
+	a->decap_next_index = PPF_GTPU_INPUT_NEXT_L2_INPUT;
+      if (!ppf_gtpu_decap_next_is_valid (gtm, is_ip6, a->decap_next_index))
+	return VNET_API_ERROR_INVALID_DECAP_NEXT;
+
+      pool_get_aligned (gtm->tunnels, t, CLIB_CACHE_LINE_BYTES);
+      memset (t, 0, sizeof (*t));
+
+      /* copy from arg structure */
+#define _(x) t->x = a->x;
+      install_tunnel_copy;
+#undef _
+
+      tunnel_id = t - gtm->tunnels;
+
+      //add by lollita for ppf gtpu tunnel swap
+      callline = &(pm->ppf_calline_table[t->call_id]); 
+
+      switch (t->tunnel_type) {
+        case PPF_GTPU_NB:
+          callline->rb.drb.nb_tunnel.tunnel_id = tunnel_id;
+          callline->rb.drb.nb_tunnel.tunnel_type = t->tunnel_type;
+          break;
+
+        case PPF_GTPU_SB:
+          {
+            it = &(callline->rb.drb.sb_tunnel[t->sb_id]);
+            
+            if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
+              pool_put (gtm->tunnels, t);
+              return VNET_API_ERROR_TUNNEL_EXIST;
+            }
+            
+            it->tunnel_id = tunnel_id;
+            it->tunnel_type = t->tunnel_type;
+          }
+          break;
+
+        case PPF_GTPU_SRB:
+          {
+            it = &(callline->rb.srb.sb_tunnel[t->sb_id]);
+            
+            if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
+              pool_put (gtm->tunnels, t);
+              return VNET_API_ERROR_TUNNEL_EXIST;
+            }
+            
+            it->tunnel_id = tunnel_id;
+            it->tunnel_type = t->tunnel_type;
+
+
+          }
+          break;
+
+        default:
+          break;
+      }
+      
+      ip_udp_ppf_gtpu_rewrite (t, is_ip6);
+
+      /* copy the key */
+      if (is_ip6)
+	hash_set_mem_alloc (&gtm->ppf_gtpu6_tunnel_by_key, &key6,
+			    t - gtm->tunnels);
+      else
+	hash_set (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64, t - gtm->tunnels);
+
+	if (t->tunnel_type == PPF_GTPU_SB ) {
+		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_PDCP_INPUT;
+	} else if (t->tunnel_type == PPF_GTPU_NB) {
+		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_SB_PATH_LB;
+	} else if (t->tunnel_type == PPF_GTPU_SRB) {
+		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_PDCP_INPUT;
+	}
+
+	if (is_ip6) 
+	 t->encap_next_index = PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP;
+	else
+	 t->encap_next_index = PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+
+
+	if (t->decap_next_index == ~0) {
+		return VNET_API_ERROR_NEXT_HOP_NOT_FOUND_MP;
+	}
+		
+      vnet_hw_interface_t *hi;
+      if (vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) > 0)
+	{
+	  vnet_interface_main_t *im = &vnm->interface_main;
+	  hw_if_index = gtm->free_ppf_gtpu_tunnel_hw_if_indices
+	    [vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) - 1];
+	  _vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) -= 1;
+
+	  hi = vnet_get_hw_interface (vnm, hw_if_index);
+	  hi->dev_instance = t - gtm->tunnels;
+	  hi->hw_instance = hi->dev_instance;
+
+	  /* clear old stats of freed tunnel before reuse */
+	  sw_if_index = hi->sw_if_index;
+	  vnet_interface_counter_lock (im);
+	  vlib_zero_combined_counter
+	    (&im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_TX],
+	     sw_if_index);
+	  vlib_zero_combined_counter (&im->combined_sw_if_counters
+				      [VNET_INTERFACE_COUNTER_RX],
+				      sw_if_index);
+	  vlib_zero_simple_counter (&im->sw_if_counters
+				    [VNET_INTERFACE_COUNTER_DROP],
+				    sw_if_index);
+	  vnet_interface_counter_unlock (im);
+	}
+      else
+	{
+	  hw_if_index = vnet_register_interface
+	    (vnm, ppf_gtpu_device_class.index, t - gtm->tunnels,
+	     ppf_gtpu_hw_class.index, t - gtm->tunnels);
+	  hi = vnet_get_hw_interface (vnm, hw_if_index);
+	}
+
+      /* Set ppf_gtpu tunnel output node */
+      u32 encap_index = !is_ip6 ?
+	ppf_gtpu4_encap_node.index : ppf_gtpu6_encap_node.index;
+      vnet_set_interface_output_node (vnm, hw_if_index, encap_index);
+
+      t->hw_if_index = hw_if_index;
+      t->sw_if_index = sw_if_index = hi->sw_if_index;
+
+      vec_validate_init_empty (gtm->tunnel_index_by_sw_if_index, sw_if_index,
+			       ~0);
+      gtm->tunnel_index_by_sw_if_index[sw_if_index] = t - gtm->tunnels;
+
+      /* setup l2 input config with l2 feature and bd 0 to drop packet */
+      vec_validate (l2im->configs, sw_if_index);
+      l2im->configs[sw_if_index].feature_bitmap = L2INPUT_FEAT_DROP;
+      l2im->configs[sw_if_index].bd_index = 0;
+
+      vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, sw_if_index);
+      si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
+      vnet_sw_interface_set_flags (vnm, sw_if_index,
+				   VNET_SW_INTERFACE_FLAG_ADMIN_UP);
+
+      fib_node_init (&t->node, gtm->fib_node_type);
+      fib_prefix_t tun_dst_pfx;
+      vnet_flood_class_t flood_class = VNET_FLOOD_CLASS_TUNNEL_NORMAL;
+
+      fib_prefix_from_ip46_addr (&t->dst, &tun_dst_pfx);
+      if (!ip46_address_is_multicast (&t->dst))
+	{
+	  /* Unicast tunnel -
+	   * source the FIB entry for the tunnel's destination
+	   * and become a child thereof. The tunnel will then get poked
+	   * when the forwarding for the entry updates, and the tunnel can
+	   * re-stack accordingly
+	   */
+	  vtep_addr_ref (&t->src);
+	  t->fib_entry_index = fib_table_entry_special_add
+	    (t->encap_fib_index, &tun_dst_pfx, FIB_SOURCE_RR,
+	     FIB_ENTRY_FLAG_NONE);
+	  #if 0
+	  t->sibling_index = fib_entry_child_add
+	    (t->fib_entry_index, gtm->fib_node_type, t - gtm->tunnels);
+	  #endif
+	  ppf_gtpu_tunnel_restack_dpo (t);
+	}
+      else
+	{
+	  /* Multicast tunnel -
+	   * as the same mcast group can be used for mutiple mcast tunnels
+	   * with different VNIs, create the output fib adjecency only if
+	   * it does not already exist
+	   */
+	  fib_protocol_t fp = fib_ip_proto (is_ip6);
+
+	  if (vtep_addr_ref (&t->dst) == 1)
+	    {
+	      fib_node_index_t mfei;
+	      adj_index_t ai;
+	      fib_route_path_t path = {
+		.frp_proto = fib_proto_to_dpo (fp),
+		.frp_addr = zero_addr,
+		.frp_sw_if_index = 0xffffffff,
+		.frp_fib_index = ~0,
+		.frp_weight = 0,
+		.frp_flags = FIB_ROUTE_PATH_LOCAL,
+	      };
+	      const mfib_prefix_t mpfx = {
+		.fp_proto = fp,
+		.fp_len = (is_ip6 ? 128 : 32),
+		.fp_grp_addr = tun_dst_pfx.fp_addr,
+	      };
+
+	      /*
+	       * Setup the (*,G) to receive traffic on the mcast group
+	       *  - the forwarding interface is for-us
+	       *  - the accepting interface is that from the API
+	       */
+	      mfib_table_entry_path_update (t->encap_fib_index,
+					    &mpfx,
+					    MFIB_SOURCE_GTPU,
+					    &path, MFIB_ITF_FLAG_FORWARD);
+
+	      path.frp_sw_if_index = a->mcast_sw_if_index;
+	      path.frp_flags = FIB_ROUTE_PATH_FLAG_NONE;
+	      mfei = mfib_table_entry_path_update (t->encap_fib_index,
+						   &mpfx,
+						   MFIB_SOURCE_GTPU,
+						   &path,
+						   MFIB_ITF_FLAG_ACCEPT);
+
+	      /*
+	       * Create the mcast adjacency to send traffic to the group
+	       */
+	      ai = adj_mcast_add_or_lock (fp,
+					  fib_proto_to_link (fp),
+					  a->mcast_sw_if_index);
+
+	      /*
+	       * create a new end-point
+	       */
+	      mcast_shared_add (&t->dst, mfei, ai);
+	    }
+
+	  dpo_id_t dpo = DPO_INVALID;
+	  mcast_shared_t ep = mcast_shared_get (&t->dst);
+
+	  /* Stack shared mcast dst mac addr rewrite on encap */
+	  dpo_set (&dpo, DPO_ADJACENCY_MCAST,
+		   fib_proto_to_dpo (fp), ep.mcast_adj_index);
+
+	  dpo_stack_from_node (encap_index, &t->next_dpo, &dpo);
+
+	  dpo_reset (&dpo);
+	  flood_class = VNET_FLOOD_CLASS_TUNNEL_MASTER;
+	}
+
+      vnet_get_sw_interface (vnet_get_main (), sw_if_index)->flood_class =
+	flood_class;
+    }
+    
+  if (sw_if_indexp)
+    *sw_if_indexp = sw_if_index;
+
+  * tunnel_id_ret = tunnel_id;
+
+  return 0;
+}
+
+
+
+
+int vnet_ppf_gtpu_update_tunnel
+  (u32 tunnel_id, vnet_ppf_gtpu_add_del_tunnel_args_t * a)
+
+{
+  ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
+  ppf_gtpu_tunnel_t *t = 0;
+
+  t = &(gtm->tunnels[tunnel_id]);
+   
+	{
+
+	/* copy from arg structure */
+#define _(x) t->x = a->x;
+	update_tunnel_copy;
+#undef _
+
+	ip_udp_ppf_gtpu_rewrite (t, t->is_ip6);	
+
+	}
+    
+  return 0;
+}
+
+
+int vnet_ppf_gtpu_del_tunnel
+  (u32 tunnel_id)
+{
+  ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
+  ppf_main_t *pm = &ppf_main;
+  ppf_gtpu_tunnel_t *t = NULL;
+
+  vnet_main_t *vnm = gtm->vnet_main;
+
+  ppf_gtpu4_tunnel_key_t key4;
+  ppf_gtpu6_tunnel_key_t key6;
+  ppf_callline_t *callline;
+  ppf_gtpu_tunnel_id_type_t *it;
+ 
+      t = &(gtm->tunnels[tunnel_id]);
+  
+      //add by lollita for ppf gtpu tunnel swap
+      callline = &(pm->ppf_calline_table[t->call_id]); 
+      
+      if (t->tunnel_type == PPF_GTPU_NB) {
+      
+        callline->rb.drb.nb_tunnel.tunnel_id = INVALID_TUNNEL_ID;
+        
+      } else if ((t->tunnel_type == PPF_GTPU_SB) || (t->tunnel_type == PPF_GTPU_SRB)) {
+        it = &(callline->rb.srb.sb_tunnel[t->sb_id]);
+        
+        if (it->tunnel_id != INVALID_TUNNEL_ID && it->tunnel_id != tunnel_id) {
+          return VNET_API_ERROR_TUNNEL_EXIST;
+        }
+        
+        it->tunnel_id = INVALID_TUNNEL_ID;
+
+      }
+
+      vnet_sw_interface_set_flags (vnm, t->sw_if_index, 0 /* down */ );
+      vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, t->sw_if_index);
+      si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
+
+      /* make sure tunnel is removed from l2 bd or xconnect */
+      set_int_l2_mode (gtm->vlib_main, vnm, MODE_L3, t->sw_if_index, 0, 0, 0,
+		       0);
+      vec_add1 (gtm->free_ppf_gtpu_tunnel_hw_if_indices, t->hw_if_index);
+
+      gtm->tunnel_index_by_sw_if_index[t->sw_if_index] = ~0;
+
+      if (!t->is_ip6)
+      {
+          key4.src = t->dst.ip4.as_u32;	/* decap src in key is encap dst in config */
+          key4.teid = clib_host_to_net_u32 (t->in_teid);
+          hash_unset (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64);
+      }
+      else
+      {
+          key6.src = t->dst.ip6;
+          key6.teid = clib_host_to_net_u32 (t->in_teid);
+          hash_unset_mem_free (&gtm->ppf_gtpu6_tunnel_by_key, &key6);
+      }
+
+      if (!ip46_address_is_multicast (&t->dst))
+	{
+	  vtep_addr_unref (&t->src);
+	  #if 0
+	  fib_entry_child_remove (t->fib_entry_index, t->sibling_index);
+	  #endif
+	  fib_table_entry_delete_index (t->fib_entry_index, FIB_SOURCE_RR);
+	}
+      else if (vtep_addr_unref (&t->dst) == 0)
+	{
+	  mcast_shared_remove (&t->dst);
+	}
+
+      fib_node_deinit (&t->node);
+      vec_free (t->rewrite);
+     
+      pool_put (gtm->tunnels, t);
+
+  return 0;
+}
+
 
 static uword
 get_decap_next_for_node (u32 node_index, u32 ipv4_set)

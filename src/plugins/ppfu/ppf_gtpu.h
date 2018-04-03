@@ -177,13 +177,19 @@ typedef struct
   u32 sibling_index;
 
   u32 call_id;
+  u32 is_ip6;
   ppf_gtpu_tunnel_type_t tunnel_type;
   u32 sb_id;
   u32 dst_port;
   u32 dscp;
   u32 protocol_config;
+  u32 type;
+  u32 ep_weight;
+  u32 traffic_state;  
 
 } ppf_gtpu_tunnel_t;
+
+
 
  #define foreach_ppf_gtpu_input_next        \
 _(DROP, "error-drop")                  \
@@ -295,10 +301,20 @@ typedef struct
   u32 protocol_config;
   u32 ep_weight;
   u32 traffic_state;
+  u32 type;
 } vnet_ppf_gtpu_add_del_tunnel_args_t;
 
 int vnet_ppf_gtpu_add_del_tunnel
   (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp);
+
+int vnet_ppf_gtpu_add_tunnel
+  (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp, u32 *tunnel_id_ret);
+  
+int vnet_ppf_gtpu_update_tunnel
+  (u32 tunnel_id, vnet_ppf_gtpu_add_del_tunnel_args_t * a);
+
+int vnet_ppf_gtpu_del_tunnel
+  (u32 tunnel_id);
 
 void vnet_int_ppf_gtpu_bypass_mode (u32 sw_if_index, u8 is_ip6, u8 is_enable);
 
