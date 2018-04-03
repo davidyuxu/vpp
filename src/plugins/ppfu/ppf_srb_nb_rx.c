@@ -102,8 +102,8 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           ppf_srb_header_t * srb0;
           ppf_callline_t * c0;
           ppf_pdcp_session_t * pdcp0;
-          u64 key0;
-	  ppf_srb_msg_id_t msg0;
+          uword key0;
+          ppf_srb_msg_id_t msg0;
           u32 tunnel_index0;
           u32 error0;
           u32 len0;
@@ -153,7 +153,13 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           /* Save transaction-id and request-id in callline */
 	  /* Generate PDCP SN, map <PDCP SN> to <transaction-id + request-id> */
           pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
-	  key0 = (uword)(pdcp0->out_sn++);
+	  pdcp0->tx_next_sn++;
+	  if (pdcp0->tx_next_sn == (1 << pdcp0->sn_length)) {
+	    pdcp0->tx_next_sn = 0;
+	    pdcp0->tx_hfn++;
+	  }
+	  key0 = (uword)((pdcp0->tx_hfn << pdcp0->sn_length) | pdcp0->tx_next_sn);
+	  
 	  msg0.transaction_id = clib_net_to_host_u32(srb0->transaction_id);
 	  msg0.request_id = clib_net_to_host_u32(srb0->msg.out.request_id);
 	  hash_set (c0->rb.srb.nb_out_msg_by_sn, key0, msg0.as_u64);

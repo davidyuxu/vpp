@@ -103,13 +103,11 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   int rv = 0;
   ppf_main_t *ppfm = &ppf_main;
   ip4_main_t *im = &ip4_main;
-  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
 
   vl_api_nb_path_context_t *nb;
   vl_api_sb_path_context_t *sb;
 
   ppf_callline_t *callline = NULL;
-  ppf_pdcp_session_t *pdcp_sess = NULL;
   ppf_gtpu_tunnel_type_t tunnel_type;
   u32 nb_tunnel_added = 0, sb_tunnel_added[MAX_SB_PER_CALL] = {0};         //mark which tunnel has been added
   u32 nb_in_teid = 0, sb_in_teid[MAX_SB_PER_CALL] = {0};	     //mark return teid
@@ -253,9 +251,8 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  
   }
 
-  pool_get (ppm->sessions, pdcp_sess);
-  memset (pdcp_sess, 0, sizeof (*pdcp_sess));
-  callline->pdcp.session_id = (u32)(pdcp_sess - ppm->sessions);
+  /* Create pdcp session */
+  callline->pdcp.session_id = ppf_pdcp_create_session (12, 0, 0, 0);
 
   callline->sb_policy = mp->sb_policy;
   callline->ue_bearer_id = mp->ue_bearer_id;
@@ -483,7 +480,6 @@ vl_api_ppfu_plugin_bearer_release_t_handler
   vl_api_ppfu_plugin_bearer_release_reply_t *rmp;
   int rv = 0;
   ppf_main_t *ppfm = &ppf_main;
-  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
   ppf_callline_t *callline = NULL;
   ppf_pdcp_session_t *pdcp_sess = NULL;
   int i = 0;
@@ -532,7 +528,9 @@ vl_api_ppfu_plugin_bearer_release_t_handler
   }
 
   callline->pdcp.session_id = ~0;
-  pool_put (ppm->sessions, pdcp_sess);
+
+  /* Clear pdcp session */
+  ppf_pdcp_clear_session (pdcp_sess);
 
   if (callline->call_type == PPF_SRB_CALL)
   	hash_free(callline->rb.srb.nb_out_msg_by_sn);
