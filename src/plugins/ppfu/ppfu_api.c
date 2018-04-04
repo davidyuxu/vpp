@@ -114,6 +114,8 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   u32 nb_tunnel_id, sb_tunnel_id[MAX_SB_PER_CALL] = {0};
   u32 sw_if_index = ~0;
   u32 tunnel_id = ~0;
+  ppf_calline_type_t call_type; 
+  u32 call_line_inited = 0;
 
   int i = 0;
 
@@ -135,10 +137,12 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   // the source ip of nb is 0, means the nb is invalid, the call is SRB
   if (nb->src_ip_address != 0)
-  	callline->call_type = PPF_DRB_CALL;
+  	call_type = PPF_DRB_CALL;
   else 
-  	callline->call_type = PPF_SRB_CALL;
+  	call_type = PPF_SRB_CALL;
 
+  vnet_ppf_init_calline (mp->call_id, call_type);
+  call_line_inited = 1;
 
   if (callline->call_type == PPF_DRB_CALL)
   {
@@ -256,8 +260,6 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   callline->sb_policy = mp->sb_policy;
   callline->ue_bearer_id = mp->ue_bearer_id;
-  callline->call_index = mp->call_id;
-
   
 out:
   /* *INDENT-OFF* */
@@ -276,7 +278,10 @@ out:
  	    }
  	    
  	    sb_in_teid[i] = 0;
- 	} 		
+ 	} 	
+
+      if (call_line_inited == 1) 
+ 		vnet_ppf_reset_calline (callline->call_index); 	
   }
   
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
@@ -528,10 +533,13 @@ vl_api_ppfu_plugin_bearer_release_t_handler
 	  
   }
 
-  callline->pdcp.session_id = ~0;
-
+  pdcp_sess = &(ppf_pdcp_main.sessions[callline->pdcp.session_id]);
+ 
   /* Clear pdcp session */
   ppf_pdcp_clear_session (pdcp_sess);
+
+  callline->pdcp.session_id = ~0;
+
 
   if (callline->call_type == PPF_SRB_CALL)
   	hash_free(callline->rb.srb.nb_out_msg_by_sn);

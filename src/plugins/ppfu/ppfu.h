@@ -222,6 +222,8 @@ typedef struct
 
 #define INVALID_TUNNEL_ID ~0
 
+#define INVALID_CALL_TYPE ~0
+
 #define DEFAULT_SB_INDEX 0
 
 typedef enum
@@ -282,6 +284,14 @@ typedef struct
   u32 sb_policy;
   u32 ue_bearer_id;
 } ppf_callline_t;
+
+typedef struct
+{
+  u32 call_id;
+  ppf_calline_type_t call_type;
+  u32 sb_policy;
+  u32 ue_bearer_id;
+} vnet_ppf_add_callline_args_t;
 
 typedef struct
 {
@@ -362,6 +372,11 @@ typedef struct _ppf_pdcp_header_t
 
 // typedef u32 ppf_pdcp_mac_i_t;
 
+int vnet_ppf_del_callline (u32 call_id) ;
+
+int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c);
+
+
 
 u8 *format_ppf_pdcp_session (u8 * s, va_list * va);
 u8 *format_ppf_callline (u8 * s, va_list * va);
@@ -369,6 +384,9 @@ u8 *format_ppf_callline (u8 * s, va_list * va);
 u32 ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight_limit);
 u32 ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_config_t * config);
 u32 ppf_pdcp_clear_session (ppf_pdcp_session_t * pdcp_sess);
+
+void vnet_ppf_reset_calline (u32 call_id) ;
+void vnet_ppf_init_calline (u32 call_id, ppf_calline_type_t call_type) ;
 
 
 
