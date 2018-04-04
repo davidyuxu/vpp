@@ -34,13 +34,292 @@
 
 ppf_main_t ppf_main;
 
+static uword
+unformat_ppf_call_type (unformat_input_t * input, va_list * args)
+{
+  u32 *result = va_arg (*args, u32 *);
+  
+  if (unformat (input, "srb"))
+    *result = PPF_SRB_CALL;
+  else if (unformat (input, "drb"))
+    *result = PPF_DRB_CALL;
+  else
+  	return 0;
+
+  return 1;
+}
+
+int vnet_ppf_del_callline (u32 call_id)
+{
+	ppf_main_t *pm = &ppf_main;
+	ppf_callline_t *call_line = 0;
+	ppf_gtpu_tunnel_id_type_t *tunnel = 0;
+
+	int i, rv;
+
+	if (call_id >= pm->max_capacity) {
+		return VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+  	}
+
+	call_line = &(pm->ppf_calline_table [call_id]);
+
+	if (call_line->call_index == ~0) 
+	{
+		return 0;
+	}
+
+	if (call_line->call_type == PPF_DRB_CALL)
+	{
+	  tunnel = &(call_line->rb.drb.nb_tunnel);
+
+	  if ((tunnel->tunnel_id) != INVALID_TUNNEL_ID) {
+	  	rv = vnet_ppf_gtpu_del_tunnel (tunnel->tunnel_id); 
+  	  	if (rv != 0)
+  	  	{
+  	  		// should print some error log, but the del will continue
+  	  	}
+	  }
+
+	}
+
+	for (i = 0; i<= MAX_SB_PER_CALL; i++)
+	{
+
+	  if (call_line->call_type == PPF_DRB_CALL)
+		tunnel = &(call_line->rb.drb.sb_tunnel[i]);
+	  else 
+		tunnel = &(call_line->rb.srb.sb_tunnel[i]);
+
+	  if (tunnel->tunnel_id != INVALID_TUNNEL_ID) {	  
+	  	rv = vnet_ppf_gtpu_del_tunnel (tunnel->tunnel_id);	  	
+	  	if (rv != 0)
+	  	{
+			// should print some error log, but the del will continue
+	  	}
+	  } else 
+	  	continue;	  
+	}
+
+	vnet_ppf_reset_calline (call_line->call_index);
+	
+	return 0;	
+}
+
+void vnet_ppf_reset_calline (u32 call_id) 
+{
+	ppf_main_t *pm = &ppf_main;
+	ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
+
+	ppf_callline_t *call_line = 0;
+	ppf_pdcp_session_t *pdcp_sess = 0;
+
+	call_line = &(pm->ppf_calline_table [call_id]);
+	
+	if (call_line->call_type == PPF_DRB_CALL) {
+
+		call_line->rb.drb.nb_tunnel.tunnel_id = ~0; 
+
+		for (int j = 0; j < MAX_SB_PER_CALL; j++) {
+		  	call_line->rb.drb.sb_tunnel[j].tunnel_id = ~0;
+		}
+	} else if (call_line->call_type == PPF_SRB_CALL) {
+
+		call_line->rb.srb.nb_out_msg_by_sn = 0;
+		for (int j = 0; j < MAX_SB_PER_CALL; j++) {
+			call_line->rb.srb.sb_tunnel[j].tunnel_id = ~0;
+		}
+
+  		hash_free(call_line->rb.srb.nb_out_msg_by_sn);
+	}
+
+	if (call_line->pdcp.session_id != ~0) {
+		pdcp_sess = &(ppm->sessions[call_line->pdcp.session_id]);
+		/* Clear pdcp session */
+	  	ppf_pdcp_clear_session (pdcp_sess);
+	  	call_line->pdcp.session_id = ~0;
+  	}
+
+	call_line->call_type = INVALID_CALL_TYPE;
+	call_line->call_index = ~0;
+}
+
+
+void vnet_ppf_init_calline (u32 call_id, ppf_calline_type_t call_type) 
+{
+	ppf_main_t *pm = &ppf_main;
+
+	ppf_callline_t *call_line = 0;
+
+	call_line = &(pm->ppf_calline_table [call_id]);
+	
+	call_line->call_index = call_id;
+
+	call_line->call_type = call_type;
+	
+	if (call_line->call_type == PPF_DRB_CALL) {
+
+		call_line->rb.drb.nb_tunnel.tunnel_id = ~0; 
+
+		for (int j = 0; j < MAX_SB_PER_CALL; j++) {
+		  call_line->rb.drb.sb_tunnel[j].tunnel_id = ~0;
+		}
+	} else if (call_line->call_type == PPF_SRB_CALL) {
+
+		call_line->rb.srb.nb_out_msg_by_sn = 0;
+		for (int j = 0; j < MAX_SB_PER_CALL; j++) {
+		call_line->rb.srb.sb_tunnel[j].tunnel_id = ~0;
+		}
+	}
+	
+	call_line->pdcp.session_id = ~0;
+ 	call_line->sb_policy = ~0;
+	call_line->ue_bearer_id = ~0;	
+}
+
+int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c)
+{
+
+	ppf_main_t *pm = &ppf_main;
+
+	ppf_callline_t *call_line = 0;
+
+	if (c->call_id >= pm->max_capacity) {
+		return VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+  	}
+
+	call_line = &(pm->ppf_calline_table [c->call_id]);
+
+	if (call_line->call_index != ~0) 
+	{
+		return VNET_API_ERROR_CALLLNE_IN_USE;
+	}
+
+	vnet_ppf_init_calline (c->call_id, c->call_type);
+	/* Create pdcp session */
+	call_line->pdcp.session_id = ppf_pdcp_create_session (12, 0, 0, 0);
+
+	call_line->sb_policy = c->sb_policy;
+	call_line->ue_bearer_id = c->ue_bearer_id;
+
+    return 0;
+}
+
+
+
+static clib_error_t *
+ppf_add_del_calline_command_fn (vlib_main_t * vm,
+				unformat_input_t * input,
+				vlib_cli_command_t * cmd)
+{
+  unformat_input_t _line_input, *line_input = &_line_input;
+  u8 is_add = 1;
+  u32 call_id = ~0, sb_policy = ~0, ue_bearer_id = ~0;
+  ppf_calline_type_t call_type = INVALID_CALL_TYPE;
+  int rv;
+  clib_error_t *error = NULL;
+  
+  /* Get a line of input. */
+  if (!unformat_user (input, unformat_line_input, line_input))
+    return 0;
+
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (line_input, "del"))
+	{
+	  is_add = 0;
+	}
+	else if (unformat (line_input, "call-id %d", &call_id))
+	;
+	else if (unformat (line_input, "call-type %U", unformat_ppf_call_type, &call_type))
+	;
+	else if (unformat (line_input, "ue-bear-id %d", &ue_bearer_id))
+	;
+	else if (unformat (line_input, "sb_policy %d", &sb_policy))
+	;
+      else
+	{
+	  error = clib_error_return (0, "parse error: '%U'",
+				     format_unformat_error, line_input);
+	  goto done;
+	}
+    }
+    
+  if (call_id == ~0) 
+   {
+      error = clib_error_return (0, "call id not specified");
+      goto done;
+    }
+
+  if (is_add == 1 && ue_bearer_id == ~0) 
+   {
+      error = clib_error_return (0, "ue_bearer_id not specified");
+      goto done;
+    }
+    
+  if (is_add == 1 && call_type == ~0) 
+   {
+      error = clib_error_return (0, "call type not specified");
+      goto done;
+    }
+
+  vnet_ppf_add_callline_args_t c = {
+  	.call_id = call_id,
+  	.call_type = call_type,
+  	.sb_policy = sb_policy,
+  	.ue_bearer_id = ue_bearer_id,
+  };
+
+  if (is_add == 1) {
+
+  	rv = vnet_ppf_add_callline (&c);
+  }
+  else 
+  	rv = vnet_ppf_del_callline (call_id);
+
+  switch (rv)
+    {
+    case 0:
+      if (is_add)
+	vlib_cli_output (vm, "[Call line added] call-id: %d ue-bear-id: %d, call_type: %d, sb_policy: %d", 
+			 c.call_id, c.ue_bearer_id, c.call_type, c.ue_bearer_id);
+      break;
+
+    case VNET_API_ERROR_CALLLNE_IN_USE:
+      error = clib_error_return (0, "call already exists...");
+      goto done;
+
+    case VNET_API_ERROR_WRONG_MAX_SESSION_NUM:
+      error = clib_error_return (0, "wrong call id number");
+      goto done;
+ 
+     default:
+      error = clib_error_return
+	(0, "vnet_ppf_del_callline returned %d", rv);
+      goto done;
+    }
+
+done:
+  unformat_free (line_input);
+
+  return error;
+}
+
+
+VLIB_CLI_COMMAND (create_ppf_calline_command, static) = {
+  .path = "create ppf calline",
+  .short_help =	  
+  "create ppf callline call-id <nn> [ call-type <type-name>] [ue-bear-id <nn>] [sb_policy <nn>] [del]",
+  .function = ppf_add_del_calline_command_fn,
+};
+
+
 clib_error_t *
 ppf_init (vlib_main_t * vm)
 {
   ppf_main_t *pm = &ppf_main;
   ppf_callline_t * callline;
 
-  u32 i, j;
+  u32 i;
   
   if (pm->max_capacity == 0)
     pm->max_capacity = DEF_MAX_PPF_SESSION;
@@ -51,18 +330,7 @@ ppf_init (vlib_main_t * vm)
   for (i = 0; i < pm->max_capacity; i++) {
     callline = &(pm->ppf_calline_table[i]);
     callline->call_index = ~0;
-    
-    callline->rb.drb.nb_tunnel.tunnel_id = ~0;    
-    for (j = 0; j < MAX_SB_PER_CALL; j++) {
-      callline->rb.drb.sb_tunnel[j].tunnel_id = ~0;
-    }
-    
-    callline->rb.srb.nb_out_msg_by_sn = 0;
-    for (j = 0; j < MAX_SB_PER_CALL; j++) {
-      callline->rb.srb.sb_tunnel[j].tunnel_id = ~0;
-    }
 
-    callline->pdcp.session_id = ~0;
   }
   
   return 0;
