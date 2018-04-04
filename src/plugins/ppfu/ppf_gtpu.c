@@ -1358,10 +1358,6 @@ int vnet_ppf_gtpu_del_tunnel_in_call
 		return VNET_API_ERROR_UPDATE_TUNNEL_WRONG_IP;
 	 }
 
-	 if (ip_is_zero(&a->dst, t->is_ip6)) {
-	 	return VNET_API_ERROR_UPDATE_TUNNEL_WRONG_IP;
-	 }
-
 	 if (ip46_address_cmp (&(t->src), &(a->dst)) == 0)
 	 {
 	 	return VNET_API_ERROR_SAME_SRC_DST;
@@ -1858,7 +1854,7 @@ done:
 VLIB_CLI_COMMAND (modify_ppf_gtpu_tunnel_command, static) = {
   .path = "modify ppf_gtpu tunnel",
   .short_help =	  
-  "create ppf_gtpu tunnel "
+  "modify ppf_gtpu tunnel "
   " call-id <nn> tunnel-type <nn> sb_id <nn>  "  
   " [dst <remote-vtep-addr>] [outteid <nn>] ",
   " [dst_port <nn>] [dscp <nn>] [protocol_config <nn>] [ep_weight <ep_weight>] [traffic_state <nn>] [type <nn>] [del]",
