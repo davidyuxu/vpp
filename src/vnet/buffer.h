@@ -406,15 +406,20 @@ typedef struct
 
     struct
     {
-      u8 sb_num;
-      u8 sb_id[3];
-      
       struct
       {
-        u32 in_sn;
-	u32 out_sn;
+        u32 count;
+        u32 sn;
+        u32 integrity_status;
       } pdcp;
-    } ppf_srb_out;
+  
+      struct
+      {
+        u8 sb_num;
+        u8 sb_id[3];
+      } path;
+      
+    } ppf_du_metadata;
 
   };
 } vnet_buffer_opaque2_t;

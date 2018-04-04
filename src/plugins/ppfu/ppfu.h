@@ -133,7 +133,6 @@ enum pdcp_integrity_alg_t
 
 enum pdcp_crypt_alg_t 
 { 
-  PDCP_EEA_NONE,
   PDCP_EEA0,
   PDCP_EEA1,
   PDCP_EEA2,
@@ -159,7 +158,6 @@ typedef struct _ppf_pdcp_config_t_
   //PathContext paths[MAX_PATHS];
 } ppf_pdcp_config_t;
 
-
 typedef struct
 {
   u8  integrity_key[MAX_PDCP_KEY_LEN];
@@ -167,12 +165,19 @@ typedef struct
   u8  security_algorithms;
   u8  sn_length;
   u8  header_length;
+  u8  mac_length;
   u32 tx_hfn;
   u32 tx_next_sn;
   u32 rx_hfn;
   u32 rx_next_expected_sn;
   u32 rx_last_forwarded_sn;
   u64 in_flight_limit;
+  void (*encap_header)(u8 *, u8, u32);
+  void (*decap_header)(u8 *, u8 *, u32 *);
+  u32  (*protect)(u8 *, u8 *, u32, void *);
+  u32  (*validate)(u8 *, u8 *, u32, void *);
+  u32  (*encrypt)(u8 *, u8 *, u32, void *);
+  u32  (*decrypt)(u8 *, u8 *, u32, void *);
 } ppf_pdcp_session_t;
 
 typedef struct
