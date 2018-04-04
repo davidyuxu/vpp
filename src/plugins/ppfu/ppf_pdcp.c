@@ -72,9 +72,10 @@ format_ppf_pdcp_session (u8 * s, va_list * va)
 {
   ppf_pdcp_session_t * pdcp_session = va_arg (*va, ppf_pdcp_session_t *);
 
-  s = format (s, "sn-length %d, header-length %d, in-flight-limit %ld\n", 
+  s = format (s, "sn-length %d, header-length %d, mac-length %d, in-flight-limit %ld\n", 
   	pdcp_session->sn_length, 
   	pdcp_session->header_length,
+  	pdcp_session->mac_length,
   	pdcp_session->in_flight_limit);
 
   s = format (s, "tx-hfn %d, tx-next %d\n", 
@@ -92,6 +93,75 @@ format_ppf_pdcp_session (u8 * s, va_list * va)
   	format_hex_bytes, pdcp_session->crypto_key, MAX_PDCP_KEY_LEN);
 
   return s;
+}
+
+void 
+ppf_pdcp_encap_header_5bsn (u8 * buf, u8 dc, u32 sn)
+{
+  *buf = (u8)(sn & 0x1f);
+}
+
+void 
+ppf_pdcp_decap_header_5bsn (u8 * buf, u8 * dc, u32 * sn)
+{
+  *sn = (u32)(0x1f & (*buf));
+  *dc = 1;
+}
+
+void 
+ppf_pdcp_encap_header_7bsn (u8 * buf, u8 dc, u32 sn)
+{
+  *buf = (u8)((sn & 0x7f) | (dc << 7));
+}
+
+void 
+ppf_pdcp_decap_header_7bsn (u8 * buf, u8 * dc, u32 * sn)
+{
+  *sn = (u32)(0x7f & (*buf));
+  *dc = (*buf) >> 7;
+}
+
+void 
+ppf_pdcp_encap_header_12bsn (u8 * buf, u8 dc, u32 sn)
+{
+  *buf = (dc << 7) | ((sn >> 8) & 0x0f);
+  *(buf + 1) = (u8)(sn & 0xff);
+}
+
+void 
+ppf_pdcp_decap_header_12bsn (u8 * buf, u8 * dc, u32 * sn)
+{
+  *dc = (*buf) >> 7;
+  *sn = (((*buf) << 8) | ((*(buf + 1)) & 0xff)) & 0x0fff;
+}
+
+void 
+ppf_pdcp_encap_header_15bsn (u8 * buf, u8 dc, u32 sn)
+{
+  *buf = (dc << 7) | ((sn >> 8) & 0x7f);
+  *(buf + 1) = (u8)(sn & 0xff);
+}
+
+void 
+ppf_pdcp_decap_header_15bsn (u8 * buf, u8 * dc, u32 * sn)
+{
+  *dc = (*buf) >> 7;
+  *sn = (((*buf) << 8) | ((*(buf + 1)) & 0xff)) & 0x7fff;
+}
+
+void 
+ppf_pdcp_encap_header_18bsn (u8 * buf, u8 dc, u32 sn)
+{
+  *buf = (dc << 7) | ((sn >> 16) & 0x03);
+  *(buf + 1) = (u8)((sn >> 8) & 0xff);
+  *(buf + 2) = (u8)(sn & 0xff);
+}
+
+void 
+ppf_pdcp_decap_header_18bsn (u8 * buf, u8 * dc, u32 * sn)
+{
+  *dc = (*buf) >> 7;
+  *sn = (((*buf) << 16) | ((*(buf + 1)) << 8) | (*(buf + 2))) & 0x3ffff;
 }
 
 u32
@@ -125,18 +195,28 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
   switch (pdcp_sess->sn_length) {
     case 5:
       pdcp_sess->header_length = 1;
+      pdcp_sess->encap_header = &ppf_pdcp_encap_header_5bsn;
+      pdcp_sess->decap_header = &ppf_pdcp_decap_header_5bsn;
       break;
     case 7:
       pdcp_sess->header_length = 1;
+      pdcp_sess->encap_header = &ppf_pdcp_encap_header_7bsn;
+      pdcp_sess->decap_header = &ppf_pdcp_decap_header_7bsn;
       break;
     case 12:
       pdcp_sess->header_length = 2;
+      pdcp_sess->encap_header = &ppf_pdcp_encap_header_12bsn;
+      pdcp_sess->decap_header = &ppf_pdcp_decap_header_12bsn;
       break;
     case 15:
       pdcp_sess->header_length = 2;
+      pdcp_sess->encap_header = &ppf_pdcp_encap_header_15bsn;
+      pdcp_sess->decap_header = &ppf_pdcp_decap_header_15bsn;
       break;
     case 18:
       pdcp_sess->header_length = 3;
+      pdcp_sess->encap_header = &ppf_pdcp_encap_header_18bsn;
+      pdcp_sess->decap_header = &ppf_pdcp_decap_header_18bsn;
       break;
     default:
       clib_warning("ERROR: Unknown sequence number length %u.\n",pdcp_sess->sn_length);
@@ -147,6 +227,13 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
   session_id = (u32)(pdcp_sess - ppm->sessions);
   return session_id;
 }
+
+u32
+ppf_pdcp_nop (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+  return 0;
+}
+
 
 u32 
 ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_config_t * config)
@@ -162,22 +249,37 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
     switch(config->integrity_algorithm)
     {
       case PDCP_EIA_NONE:
+      	pdcp_sess->protect = &ppf_pdcp_nop;
+	pdcp_sess->validate = &ppf_pdcp_nop;
+	pdcp_sess->mac_length = 0;
         break;
 	
       case PDCP_EIA0:
         pdcp_sess->security_algorithms |= PDCP_NULL_INTEGRITY;
+      	pdcp_sess->protect = &ppf_pdcp_nop;
+	pdcp_sess->validate = &ppf_pdcp_nop;
+	pdcp_sess->mac_length = 4;
         break;
 	
       case PDCP_EIA1:
         pdcp_sess->security_algorithms |= PDCP_SNOW3G_INTEGRITY;
+      	pdcp_sess->protect = &ppf_pdcp_nop;
+	pdcp_sess->validate = &ppf_pdcp_nop;
+	pdcp_sess->mac_length = 4;
         break;
 
       case PDCP_EIA2:
         pdcp_sess->security_algorithms |= PDCP_AES_INTEGRITY;
+      	pdcp_sess->protect = &ppf_pdcp_nop;
+	pdcp_sess->validate = &ppf_pdcp_nop;
+	pdcp_sess->mac_length = 4;
         break;
 
       case PDCP_EIA3:
 	pdcp_sess->security_algorithms |= PDCP_ZUC_INTEGRITY;
+      	pdcp_sess->protect = &ppf_pdcp_nop;
+	pdcp_sess->validate = &ppf_pdcp_nop;
+	pdcp_sess->mac_length = 4;
         break;
 
       default:
@@ -191,18 +293,26 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
     switch (config->crypto_algorithm)
     {
       case PDCP_EEA0:
+        pdcp_sess->encrypt = &ppf_pdcp_nop;
+        pdcp_sess->decrypt = &ppf_pdcp_nop;
       	pdcp_sess->security_algorithms |= PDCP_NULL_CIPHERING;
         break;
 	
       case PDCP_EEA1:
+        pdcp_sess->encrypt = &ppf_pdcp_nop;
+        pdcp_sess->decrypt = &ppf_pdcp_nop;
 	pdcp_sess->security_algorithms |= PDCP_SNOW3G_CIPHERING;
         break;
 
       case PDCP_EEA2:
+        pdcp_sess->encrypt = &ppf_pdcp_nop;
+        pdcp_sess->decrypt = &ppf_pdcp_nop;
 	pdcp_sess->security_algorithms |= PDCP_AES_CIPHERING;
         break;
 
       case PDCP_EEA3:
+        pdcp_sess->encrypt = &ppf_pdcp_nop;
+        pdcp_sess->decrypt = &ppf_pdcp_nop;
       	pdcp_sess->security_algorithms |= PDCP_ZUC_CIPHERING;
         break;
 

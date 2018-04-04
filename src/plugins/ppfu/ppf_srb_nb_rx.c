@@ -153,12 +153,18 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           /* Save transaction-id and request-id in callline */
 	  /* Generate PDCP SN, map <PDCP SN> to <transaction-id + request-id> */
           pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
+	  key0 = (uword)((pdcp0->tx_hfn << pdcp0->sn_length) | pdcp0->tx_next_sn);
+
+          /* Set pdcp-info in buffer */
+	  vnet_buffer2(b0)->ppf_du_metadata.pdcp.count = (u32)key0;	  
+	  vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn = pdcp0->tx_next_sn;
+
+          /* sequence advance */
 	  pdcp0->tx_next_sn++;
 	  if (pdcp0->tx_next_sn == (1 << pdcp0->sn_length)) {
 	    pdcp0->tx_next_sn = 0;
 	    pdcp0->tx_hfn++;
 	  }
-	  key0 = (uword)((pdcp0->tx_hfn << pdcp0->sn_length) | pdcp0->tx_next_sn);
 	  
 	  msg0.transaction_id = clib_net_to_host_u32(srb0->transaction_id);
 	  msg0.request_id = clib_net_to_host_u32(srb0->msg.out.request_id);
@@ -172,17 +178,22 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           /* Determine next node */
 	  if (PREDICT_TRUE(1 == srb0->msg.out.sb_num)) {
 	    tunnel_index0 = c0->rb.srb.sb_tunnel[srb0->msg.out.sb_id[0]].tunnel_id;	    
+
+	    /* Set tunnel-id in buffer */
+	    vnet_buffer(b0)->sw_if_index[VLIB_TX] = tunnel_index0;	    
+
 	    next0 = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
 	  } else {
+	    /* Set call-id in buffer */
+	    vnet_buffer(b0)->sw_if_index[VLIB_TX] = srb0->call_id;
+
+	    /* Set path-info in buffer */
+	    vnet_buffer2(b0)->ppf_du_metadata.path.sb_num = srb0->msg.out.sb_num;
+	    clib_memcpy (vnet_buffer2(b0)->ppf_du_metadata.path.sb_id, srb0->msg.out.sb_id, 3);
+
 	    next0 = PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB;
-	    vnet_buffer2(b0)->ppf_srb_out.sb_num = srb0->msg.out.sb_num;
-	    clib_memcpy (vnet_buffer2(b0)->ppf_srb_out.sb_id, srb0->msg.out.sb_id, 3);
 	  }
 	  
-          /* Set parameters in buffer */
-          vnet_buffer(b0)->sw_if_index[VLIB_TX] = tunnel_index0;
-	  vnet_buffer2(b0)->ppf_srb_out.pdcp.out_sn = (u32)key0;	  
-
 	  /* Counter here */
           len0 = vlib_buffer_length_in_chain (vm, b0);
           stats_n_packets += 1;
