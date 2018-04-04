@@ -1085,7 +1085,7 @@ int vnet_ppf_gtpu_update_tunnel
       if (a->type != ~0) 
 		t->type = a->type;
 
-	if (ip_is_zero(&a->dst, t->is_ip6))
+	if (!ip_is_zero(&a->dst, t->is_ip6))
 		ip_copy (&(t->dst), &(a->src), t->is_ip6);
 		
 	ip_udp_ppf_gtpu_rewrite (t, t->is_ip6);	
@@ -1725,7 +1725,7 @@ ppf_gtpu_modify_tunnel_command_fn (vlib_main_t * vm,
   ip46_address_t dst;
   u8 is_ip6 = 0;
   u32 call_id = ~0, sb_id = ~0,  tunnel_type = ~0;
-  u32 out_teid = ~0, dst_port = ~0, dscp = ~0, protocol_config = ~0, ep_weight = ~0, traffic_state = ~0, type = ~0;
+  u32 out_teid = ~0, dst_port = 0, dscp = ~0, protocol_config = ~0, ep_weight = ~0, traffic_state = ~0, type = ~0;
   int rv;
   vnet_ppf_gtpu_add_del_tunnel_args_t _a, *a = &_a;
   clib_error_t *error = NULL;
