@@ -234,6 +234,18 @@ ppf_pdcp_nop (u8 * in, u8 * out, u32 size, void * security_parameters)
   return 0;
 }
 
+u32
+ppf_pdcp_eia0_protect (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+  memset (out, 0x00, 4);
+  return 0;
+}
+
+u32
+ppf_pdcp_eia0_validate (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+  return 0;
+}
 
 u32 
 ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_config_t * config)
@@ -256,8 +268,8 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
 	
       case PDCP_EIA0:
         pdcp_sess->security_algorithms |= PDCP_NULL_INTEGRITY;
-      	pdcp_sess->protect = &ppf_pdcp_nop;
-	pdcp_sess->validate = &ppf_pdcp_nop;
+      	pdcp_sess->protect = &ppf_pdcp_eia0_protect;
+	pdcp_sess->validate = &ppf_pdcp_eia0_validate;
 	pdcp_sess->mac_length = 4;
         break;
 	
