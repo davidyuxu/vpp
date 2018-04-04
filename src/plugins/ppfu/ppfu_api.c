@@ -257,6 +257,17 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   /* Create pdcp session */
   callline->pdcp.session_id = ppf_pdcp_create_session (12, 0, 0, 0);
+  if (~0 != callline->pdcp.session_id) {
+	  ppf_pdcp_config_t pdcp_config;
+  
+	  /* Fix later!!! should be from command parameters */
+	  pdcp_config.flags = INTEGRITY_KEY_VALID | CRYPTO_KEY_VALID | INTEGRITY_ALG_VALID | CRYPTO_ALG_VALID;
+	  pdcp_config.integrity_algorithm = PDCP_EIA0;
+	  pdcp_config.crypto_algorithm = PDCP_EEA0;
+	  memset (pdcp_config.integrity_key, 0x55, sizeof(pdcp_config.integrity_key));
+	  memset (pdcp_config.crypto_key, 0xaa, sizeof(pdcp_config.crypto_key));
+	  ppf_pdcp_session_update_as_security (pool_elt_at_index(ppf_pdcp_main.sessions, callline->pdcp.session_id), &pdcp_config);
+  }
 
   callline->sb_policy = mp->sb_policy;
   callline->ue_bearer_id = mp->ue_bearer_id;
