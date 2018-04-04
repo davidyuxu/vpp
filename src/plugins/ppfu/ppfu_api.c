@@ -342,7 +342,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 	else 
 	    sb_key = &(callline->rb.srb.sb_tunnel[i]);
 
-	if (sb_key->tunnel_id != ~0)  {
+	if (sb_key->tunnel_id != INVALID_TUNNEL_ID)  {
 
 		if (mp->removal_sb_id[i] != 0) {
 
@@ -377,7 +377,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 	  else 
 	    sb_key = &(callline->rb.srb.sb_tunnel[i]);
 	    
-	  if (sb_key->tunnel_id != ~0) {
+	  if (sb_key->tunnel_id != INVALID_TUNNEL_ID) {
 	  
 	  	//update sb_tunnel
 		vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
@@ -388,6 +388,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 		    .protocol_config = sb->protocol_configuration,
 		    .ep_weight = sb->ep_weight,
 		    .traffic_state = sb->traffic_state,
+		    .type = ~0,
 		  };
 
 	    rv = vnet_ppf_gtpu_update_tunnel (sb_key->tunnel_id, &(sb_tunnel));

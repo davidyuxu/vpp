@@ -139,8 +139,11 @@ _(BIER_BSL_UNSUP, -146, "BIER bit-string-length unsupported")		\
 _(INSTANCE_IN_USE, -147, "Instance in use")					\
 _(WRONG_MAX_SESSION_NUM, -148, "Wrong max session number")			\
 _(CALLLNE_IN_USE, -149, "Calline is not empty")				\
-_(EMPTY_CALLINE, -150, "Calline is empty")				
-
+_(EMPTY_CALLINE, -150, "Calline is empty")				\
+_(WRONG_TUNNEL_TYPE, -151, "Tunnel type is wrong")			\
+_(TUNNEL_IN_USE, -152, "tunnel is not empty") 				\
+_(TUNNEL_IS_EMPTY, -153, "tunnel is not existed")			\
+_(UPDATE_TUNNEL_WRONG_IP, -154, "wrong ip type for src and dst")
 
 
 
