@@ -242,20 +242,25 @@ _(protocol_config)					\
 _(type)							\
 _(ep_weight)						\
 _(traffic_state)						
-			
-
 
 #define update_tunnel_copy                      \
+_(call_id)							\
+_(tunnel_type)						\
+_(sb_id)							\
+_(is_ip6)							\
 _(out_teid)                                   	\
 _(dst)							\
 _(dst_port)                            		\
 _(dscp)                              		\
 _(protocol_config)                             	\
 _(ep_weight)                                    \
-_(traffic_state)						
-						
+_(traffic_state)						\
+_(type)
 
-
+#define delete_tunnel_copy                      \
+_(call_id)                                   	\
+_(tunnel_type)						\
+_(sb_id)							
 
 static void
 ip_udp_ppf_gtpu_rewrite (ppf_gtpu_tunnel_t * t, bool is_ip6)
@@ -751,6 +756,7 @@ int vnet_ppf_gtpu_add_del_tunnel
   return 0;
 }
 
+
 int vnet_ppf_gtpu_add_tunnel
   (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp, u32 *tunnel_id_ret)
 
@@ -1042,9 +1048,6 @@ int vnet_ppf_gtpu_add_tunnel
   return 0;
 }
 
-
-
-
 int vnet_ppf_gtpu_update_tunnel
   (u32 tunnel_id, vnet_ppf_gtpu_add_del_tunnel_args_t * a)
 
@@ -1054,16 +1057,40 @@ int vnet_ppf_gtpu_update_tunnel
 
   t = &(gtm->tunnels[tunnel_id]);
    
-	{
+  {
 
 	/* copy from arg structure */
 #define _(x) t->x = a->x;
 	update_tunnel_copy;
 #undef _
 
+      if (a->dscp != ~0) 
+      	t->dscp = a->dscp;
+
+      if (a->out_teid != ~0) 
+      	t->out_teid = a->out_teid;
+
+      if (a->protocol_config != ~0) 
+      	t->protocol_config = a->protocol_config;
+
+      if (a->dst_port != ~0) 
+      	t->dst_port = a->dst_port;
+
+      if (a->ep_weight != ~0)
+      	t->ep_weight = a->ep_weight;
+
+      if (a->traffic_state != ~0) 
+		t->traffic_state = a->traffic_state;
+
+      if (a->type != ~0) 
+		t->type = a->type;
+
+	if (ip_is_zero(&a->dst, t->is_ip6))
+		ip_copy (&(t->dst), &(a->src), t->is_ip6);
+		
 	ip_udp_ppf_gtpu_rewrite (t, t->is_ip6);	
 
-	}
+  }
     
   return 0;
 }
@@ -1148,6 +1175,201 @@ int vnet_ppf_gtpu_del_tunnel
   return 0;
 }
 
+int vnet_ppf_gtpu_add_tunnel_in_call
+  (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp, u32 *tunnel_id_ret)
+
+ {
+	ppf_main_t *pm = &ppf_main;
+
+	ppf_callline_t *call_line = 0;
+	ppf_gtpu_tunnel_id_type_t *tunnel;
+
+	if (a->call_id >= pm->max_capacity) {
+		return VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+  	}
+
+	call_line = &(pm->ppf_calline_table [a->call_id]);
+
+	if (call_line->call_index == ~0) 
+	{
+		return VNET_API_ERROR_EMPTY_CALLINE;
+	}
+
+	if (a->tunnel_type == PPF_GTPU_NB) {
+	
+		if (call_line->call_type != PPF_DRB_CALL) 		
+			return VNET_API_ERROR_WRONG_TUNNEL_TYPE;
+			
+		tunnel = &(call_line->rb.drb.nb_tunnel);
+		
+		if (tunnel->tunnel_id != INVALID_TUNNEL_ID)
+			return VNET_API_ERROR_TUNNEL_IN_USE;
+			
+	} else if (a->tunnel_type == PPF_GTPU_SB) {
+	
+		if (call_line->call_type != PPF_DRB_CALL) 		
+			return VNET_API_ERROR_WRONG_TUNNEL_TYPE;
+			
+		tunnel = &(call_line->rb.drb.sb_tunnel[a->sb_id]);
+		
+		if (tunnel->tunnel_id != INVALID_TUNNEL_ID)
+			return VNET_API_ERROR_TUNNEL_IN_USE;
+			
+	else if (a->tunnel_type == PPF_GTPU_SRB) {
+				
+			if (call_line->call_type != PPF_SRB_CALL) 		
+				return VNET_API_ERROR_WRONG_TUNNEL_TYPE;
+				
+			tunnel = &(call_line->rb.srb.sb_tunnel[a->sb_id]);
+			
+			if (tunnel->tunnel_id != INVALID_TUNNEL_ID)
+				return VNET_API_ERROR_TUNNEL_IN_USE;
+				
+		}	
+	} 
+
+	return vnet_ppf_gtpu_add_tunnel (a, sw_if_indexp, tunnel_id_ret);
+ }
+
+int vnet_ppf_gtpu_del_tunnel_in_call
+  (vnet_ppf_gtpu_add_del_tunnel_args_t * a) 
+ {
+
+	ppf_main_t *pm = &ppf_main;
+
+	ppf_callline_t *call_line = 0;
+	ppf_gtpu_tunnel_id_type_t *tunnel;
+	u32 tunnel_id = INVALID_TUNNEL_ID;
+
+	if (a->call_id >= pm->max_capacity) {
+		return VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+  	}
+
+	call_line = &(pm->ppf_calline_table [a->call_id]);
+
+	if (call_line->call_index == ~0) 
+	{
+		return VNET_API_ERROR_EMPTY_CALLINE;
+	}
+
+	if (a->tunnel_type == PPF_GTPU_NB) {
+	
+		if (call_line->call_type != PPF_DRB_CALL) 		
+			return VNET_API_ERROR_WRONG_TUNNEL_TYPE;
+			
+		tunnel = &(call_line->rb.drb.nb_tunnel);
+		
+		if (tunnel->tunnel_id == INVALID_TUNNEL_ID)
+			return VNET_API_ERROR_TUNNEL_IS_EMPTY;
+
+		tunnel_id = tunnel->tunnel_id;
+	} else if (a->tunnel_type == PPF_GTPU_SB) {
+	
+		if (call_line->call_type != PPF_DRB_CALL) 		
+			return VNET_API_ERROR_WRONG_TUNNEL_TYPE;
+			
+		tunnel = &(call_line->rb.drb.sb_tunnel[a->sb_id]);
+		
+		if (tunnel->tunnel_id == INVALID_TUNNEL_ID)
+			return VNET_API_ERROR_TUNNEL_IS_EMPTY;
+
+		tunnel_id = tunnel->tunnel_id;
+	} else if (a->tunnel_type == PPF_GTPU_SRB) {
+	
+		if (call_line->call_type != PPF_SRB_CALL) 		
+			return VNET_API_ERROR_WRONG_TUNNEL_TYPE;
+			
+		tunnel = &(call_line->rb.srb.sb_tunnel[a->sb_id]);
+		
+		if (tunnel->tunnel_id == INVALID_TUNNEL_ID)
+			return VNET_API_ERROR_TUNNEL_IS_EMPTY;
+
+		tunnel_id = tunnel->tunnel_id;
+	}
+
+ 	return vnet_ppf_gtpu_del_tunnel (tunnel_id);
+ }
+
+ 
+ int vnet_ppf_gtpu_update_tunnel_in_call
+   (vnet_ppf_gtpu_add_del_tunnel_args_t * a)
+ 
+ {
+	 ppf_main_t *pm = &ppf_main;
+	 ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
+ 
+	 ppf_callline_t *call_line = 0;
+	 ppf_gtpu_tunnel_id_type_t *tunnel = 0;
+	 u32 tunnel_id = INVALID_TUNNEL_ID;
+	 ppf_gtpu_tunnel_t *t = 0;
+ 
+	 if (a->call_id >= pm->max_capacity) {
+		 return VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+	 }
+ 
+	 call_line = &(pm->ppf_calline_table [a->call_id]);
+ 
+	 if (call_line->call_index == ~0) 
+	 {
+		 return VNET_API_ERROR_EMPTY_CALLINE;
+	 }
+ 
+	 if (a->tunnel_type == PPF_GTPU_NB) {
+	 
+		 if (call_line->call_type != PPF_DRB_CALL)		 
+			 return VNET_API_ERROR_WRONG_TUNNEL_TYPE;
+			 
+		 tunnel = &(call_line->rb.drb.nb_tunnel);
+		 
+		 if (tunnel->tunnel_id == INVALID_TUNNEL_ID)
+			 return VNET_API_ERROR_TUNNEL_IS_EMPTY;
+
+	 	 tunnel_id = tunnel->tunnel_id;
+			 
+	 } else if (a->tunnel_type == PPF_GTPU_SB) {
+	 
+		 if (call_line->call_type != PPF_DRB_CALL)		 
+			 return VNET_API_ERROR_WRONG_TUNNEL_TYPE;
+			 
+		 tunnel = &(call_line->rb.drb.sb_tunnel[a->sb_id]);
+		 
+		 if (tunnel->tunnel_id == INVALID_TUNNEL_ID)
+			 return VNET_API_ERROR_TUNNEL_IS_EMPTY;
+
+             tunnel_id = tunnel->tunnel_id;			
+			 
+	 } else if (a->tunnel_type == PPF_GTPU_SRB) {
+				 
+			 if (call_line->call_type != PPF_SRB_CALL)		 
+				 return VNET_API_ERROR_WRONG_TUNNEL_TYPE;
+				 
+			 tunnel = &(call_line->rb.srb.sb_tunnel[a->sb_id]);
+			 
+			 if (tunnel->tunnel_id == INVALID_TUNNEL_ID)
+				 return VNET_API_ERROR_TUNNEL_IN_USE;
+
+			 tunnel_id = tunnel->tunnel_id;			 
+ 
+	 } 
+
+	 t = &(gtm->tunnels[tunnel_id]);
+
+	 if (a->is_ip6 != t->is_ip6) {
+		return VNET_API_ERROR_UPDATE_TUNNEL_WRONG_IP;
+	 }
+
+	 if (ip_is_zero(&a->dst, t->is_ip6)) {
+	 	return VNET_API_ERROR_UPDATE_TUNNEL_WRONG_IP;
+	 }
+
+	 if (ip46_address_cmp (&(t->src), &(a->dst)) == 0)
+	 {
+	 	return VNET_API_ERROR_SAME_SRC_DST;
+	 }
+
+	 return vnet_ppf_gtpu_update_tunnel (tunnel_id, a);
+ }
+
 
 static uword
 get_decap_next_for_node (u32 node_index, u32 ipv4_set)
@@ -1206,6 +1428,7 @@ unformat_ppf_gtpu_tunnel_type (unformat_input_t * input, va_list * args)
 }
 
 
+
 static clib_error_t *
 ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 				unformat_input_t * input,
@@ -1218,20 +1441,19 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
   u8 dst_set = 0;
   u8 grp_set = 0;
   u8 ipv4_set = 0;
-  u8 ipv6_set = 0;
-  u32 encap_fib_index = 0;
+  u8 is_ip6 = 0;
   u32 mcast_sw_if_index = ~0;
-  u32 call_id = ~0;
-  u32 tunnel_type = ~0;
-  u32 in_teid = 0;
+  u32 call_id = ~0, sb_id = ~0, in_teid = ~0,  tunnel_type = ~0;
+  u32 encap_fib_index = 0;
   u32 out_teid = 0;
   u32 decap_next_index = ~0;
-  u32 sb_id = 0;
+  u32 dst_port = UDP_DST_PORT_GTPU, dscp = 0, protocol_config = 0, ep_weight = 0, traffic_state = 0, type = 0;
   u32 tmp;
   int rv;
   vnet_ppf_gtpu_add_del_tunnel_args_t _a, *a = &_a;
   u32 tunnel_sw_if_index;
   clib_error_t *error = NULL;
+  u32 tunnel_id = INVALID_TUNNEL_ID;
 
   /* Cant "universally zero init" (={0}) due to GCC bug 53119 */
   memset (&src, 0, sizeof src);
@@ -1263,13 +1485,13 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 			 unformat_ip6_address, &src.ip6))
 	{
 	  src_set = 1;
-	  ipv6_set = 1;
+	  is_ip6 = 1;
 	}
       else if (unformat (line_input, "dst %U",
 			 unformat_ip6_address, &dst.ip6))
 	{
 	  dst_set = 1;
-	  ipv6_set = 1;
+	  is_ip6 = 1;
 	}
       else if (unformat (line_input, "group %U %U",
 			 unformat_ip4_address, &dst.ip4,
@@ -1285,11 +1507,11 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 			 vnet_get_main (), &mcast_sw_if_index))
 	{
 	  grp_set = dst_set = 1;
-	  ipv6_set = 1;
+	  is_ip6 = 1;
 	}
       else if (unformat (line_input, "encap-vrf-id %d", &tmp))
 	{
-	  encap_fib_index = fib_table_find (fib_ip_proto (ipv6_set), tmp);
+	  encap_fib_index = fib_table_find (fib_ip_proto (is_ip6), tmp);
 	  if (encap_fib_index == ~0)
 	    {
 	      error =
@@ -1301,14 +1523,26 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 	;
 	else if (unformat (line_input, "tunnel-type %U", unformat_ppf_gtpu_tunnel_type, &tunnel_type))
 	;
+	else if (unformat (line_input, "inteid %d", &in_teid))
+	;
+	else if (unformat (line_input, "sb_id %d", &sb_id))
+	;
       else if (unformat (line_input, "decap-next %U", unformat_decap_next,
 			 &decap_next_index, ipv4_set))
 	;
-      else if (unformat (line_input, "inteid %d", &in_teid))
-	;
 	else if (unformat (line_input, "outteid %d", &out_teid))
 	;
-	else if (unformat (line_input, "sb_id %d", &sb_id))
+	else if (unformat (line_input, "dst_port %d", &dst_port))
+	;
+	else if (unformat (line_input, "dscp %d", &dscp))
+	;
+	else if (unformat (line_input, "protocol_config %d", &protocol_config))
+	;
+	else if (unformat (line_input, "ep_weight %d", &ep_weight))
+	;
+	else if (unformat (line_input, "traffic_state %d", &traffic_state))
+	;
+	else if (unformat (line_input, "type %d", &type))
 	;
       else
 	{
@@ -1348,7 +1582,7 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
       goto done;
     }
 
-  if (ipv4_set && ipv6_set)
+  if (ipv4_set && is_ip6)
     {
       error = clib_error_return (0, "both IPv4 and IPv6 addresses specified");
       goto done;
@@ -1359,21 +1593,46 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
       error = clib_error_return (0, "src and dst addresses are identical");
       goto done;
     }
+  if (call_id == ~0) 
+   {
+      error = clib_error_return (0, "tunnel call id not specified");
+      goto done;
+    }
+  if (tunnel_type == ~0) 
+   {
+      error = clib_error_return (0, "tunnel type not specified");
+      goto done;
+    }
+   if ((tunnel_type == PPF_GTPU_SRB|| tunnel_type == PPF_GTPU_SB ) && (sb_id == ~0))
+    {
+	error = clib_error_return (0, "sb_id is not specified for sb tunnel");
+      goto done;	
+    }
 
+  if (is_add == 1 && in_teid == ~0) 
+   {
+      error = clib_error_return (0, "tunnel in-teid not specified for added tunnel");
+      goto done;
+   }
+	  
   memset (a, 0, sizeof (*a));
 
-  a->is_add = is_add;
-  a->is_ip6 = ipv6_set;
+//  a->is_add = is_add;
+//  a->is_ip6 = ipv6_set;
 
-#define _(x) a->x = x;
-  foreach_copy_field;
+  if (is_add) {
+ #define _(x) a->x = x;
+  	install_tunnel_copy;
 #undef _
+  	rv = vnet_ppf_gtpu_add_tunnel_in_call (a, &tunnel_sw_if_index, &tunnel_id);
 
-  vlib_cli_output (vm, "call_id: %d, tunnel_type: %d, in_teid %d, out_teid %d, sb_id %d\n", 
-		   a->call_id, a->tunnel_type, a->in_teid, a->out_teid, a->sb_id);
-
-  rv = vnet_ppf_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
-
+  } else {
+#define _(x) a->x = x;
+  	delete_tunnel_copy;
+#undef _
+  	rv = vnet_ppf_gtpu_del_tunnel_in_call (a);
+  }
+  
   switch (rv)
     {
     case 0:
@@ -1395,6 +1654,26 @@ ppf_gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
       error = clib_error_return (0, "can not find decap next index for the tunnel");
       goto done;
 
+    case VNET_API_ERROR_WRONG_MAX_SESSION_NUM:
+      error = clib_error_return (0, "wrong call id number");
+      goto done;
+ 
+    case VNET_API_ERROR_EMPTY_CALLINE:
+	error = clib_error_return (0, "call line is not existed");
+	goto done;
+    
+    case VNET_API_ERROR_WRONG_TUNNEL_TYPE:
+    	error = clib_error_return (0, "wrong tunnel type");
+	goto done;
+		    
+    case VNET_API_ERROR_TUNNEL_IN_USE:
+      error = clib_error_return (0, "the added tunnel is not empty");
+	goto done;
+
+    case VNET_API_ERROR_TUNNEL_IS_EMPTY:
+    	error = clib_error_return (0, "the deleted tunnel is empty");
+	goto done;
+	
     default:
       error = clib_error_return
 	(0, "vnet_ppf_gtpu_add_del_tunnel returned %d", rv);
@@ -1428,15 +1707,164 @@ done:
  * @cliexcmd{create ppf_gtpu tunnel src 10.0.3.1 dst 10.0.3.3 teid 13 del}
  ?*/
 /* *INDENT-OFF* */
+
 VLIB_CLI_COMMAND (create_ppf_gtpu_tunnel_command, static) = {
   .path = "create ppf_gtpu tunnel",
-  .short_help =
+  .short_help =	  
   "create ppf_gtpu tunnel src <local-vtep-addr>"
-  " {dst <remote-vtep-addr>|group <mcast-vtep-addr> <intf-name>} inteid <nn> outteid <nn>"
-  " [encap-vrf-id <nn>] [decap-next [l2|ip4|ip6|node <name>]] [call-id <nn>] [tunnel-type <nn>] [del]",
+  " {dst <remote-vtep-addr>|group <mcast-vtep-addr> <intf-name>} "  
+  " call-id <nn> tunnel-type <nn> sb_id <nn> "
+  " [inteid <nn>] [outteid <nn>] [encap-vrf-id <nn>] [decap-next [l2|ip4|ip6|node <name>]] ",
+  " [dst_port <nn>] [dscp <nn>] [protocol_config <nn>] [ep_weight <ep_weight>] [traffic_state <nn>] [type <nn>] [del]",
   .function = ppf_gtpu_add_del_tunnel_command_fn,
 };
 /* *INDENT-ON* */
+
+static clib_error_t *
+ppf_gtpu_modify_tunnel_command_fn (vlib_main_t * vm,
+				unformat_input_t * input,
+				vlib_cli_command_t * cmd)
+{
+  unformat_input_t _line_input, *line_input = &_line_input;
+  ip46_address_t dst;
+  u8 is_ip6 = 0;
+  u32 call_id = ~0, sb_id = ~0,  tunnel_type = ~0;
+  u32 out_teid = ~0, dst_port = ~0, dscp = ~0, protocol_config = ~0, ep_weight = ~0, traffic_state = ~0, type = ~0;
+  int rv;
+  vnet_ppf_gtpu_add_del_tunnel_args_t _a, *a = &_a;
+  clib_error_t *error = NULL;
+
+  /* Cant "universally zero init" (={0}) due to GCC bug 53119 */
+  memset (&dst, 0, sizeof dst);
+
+  /* Get a line of input. */
+  if (!unformat_user (input, unformat_line_input, line_input))
+    return 0;
+
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+    {
+    	if (unformat (line_input, "call-id %d", &call_id))
+	;
+	else if (unformat (line_input, "tunnel-type %U", unformat_ppf_gtpu_tunnel_type, &tunnel_type))
+	;
+	else if (unformat (line_input, "sb_id %d", &sb_id))
+	;
+      else if (unformat (line_input, "dst %U",
+			 unformat_ip4_address, &dst.ip4))
+	;
+      else if (unformat (line_input, "dst %U",
+			 unformat_ip6_address, &dst.ip6))
+	{
+	  is_ip6 = 1;
+	}
+	else if (unformat (line_input, "outteid %d", &out_teid))
+	;
+	else if (unformat (line_input, "dst_port %d", &dst_port))
+	;
+	else if (unformat (line_input, "dscp %d", &dscp))
+	;
+	else if (unformat (line_input, "protocol_config %d", &protocol_config))
+	;
+	else if (unformat (line_input, "ep_weight %d", &ep_weight))
+	;
+	else if (unformat (line_input, "traffic_state %d", &traffic_state))
+	;
+	else if (unformat (line_input, "type %d", &type))
+	;
+      else
+	{
+	  error = clib_error_return (0, "parse error: '%U'",
+				     format_unformat_error, line_input);
+	  goto done;
+	}
+    } 
+
+  if (call_id == ~0) 
+   {
+      error = clib_error_return (0, "tunnel call id not specified");
+      goto done;
+    }
+  if (tunnel_type == ~0) 
+   {
+      error = clib_error_return (0, "tunnel type not specified");
+      goto done;
+    }
+   if ((tunnel_type == PPF_GTPU_SRB|| tunnel_type == PPF_GTPU_SB ) && (sb_id == ~0))
+    {
+	error = clib_error_return (0, "sb_id is not specified for sb tunnel");
+      goto done;	
+    }
+    
+  memset (a, 0, sizeof (*a));
+
+#define _(x) a->x = x;
+  update_tunnel_copy;
+#undef _
+  rv = vnet_ppf_gtpu_update_tunnel_in_call (a);
+
+  switch (rv)
+    {
+    case 0:
+	vlib_cli_output (vm, "%U call_id: %d, tunnel_type: %d", format_vnet_sw_if_index_name,
+			 vnet_get_main (), 
+			 a->decap_next_index, a->call_id, a->tunnel_type);
+      break;
+
+    case VNET_API_ERROR_TUNNEL_EXIST:
+      error = clib_error_return (0, "tunnel already exists...");
+      goto done;
+
+    case VNET_API_ERROR_NO_SUCH_ENTRY:
+      error = clib_error_return (0, "tunnel does not exist...");
+      goto done;
+
+    case VNET_API_ERROR_NEXT_HOP_NOT_FOUND_MP:
+      error = clib_error_return (0, "can not find decap next index for the tunnel");
+      goto done;
+
+    case VNET_API_ERROR_WRONG_MAX_SESSION_NUM:
+      error = clib_error_return (0, "wrong call id number");
+      goto done;
+ 
+    case VNET_API_ERROR_EMPTY_CALLINE:
+	error = clib_error_return (0, "call line is not existed");
+	goto done;
+    
+    case VNET_API_ERROR_WRONG_TUNNEL_TYPE:
+    	error = clib_error_return (0, "wrong tunnel type");
+	goto done;
+		    
+    case VNET_API_ERROR_TUNNEL_IN_USE:
+      error = clib_error_return (0, "the added tunnel is not empty");
+	goto done;
+
+    case VNET_API_ERROR_TUNNEL_IS_EMPTY:
+    	error = clib_error_return (0, "the deleted tunnel is empty");
+	goto done;
+	
+    default:
+      error = clib_error_return
+	(0, "vnet_ppf_gtpu_add_del_tunnel returned %d", rv);
+      goto done;
+    }
+
+done:
+  unformat_free (line_input);
+
+  return error;
+}
+
+
+VLIB_CLI_COMMAND (modify_ppf_gtpu_tunnel_command, static) = {
+  .path = "modify ppf_gtpu tunnel",
+  .short_help =	  
+  "create ppf_gtpu tunnel "
+  " call-id <nn> tunnel-type <nn> sb_id <nn>  "  
+  " [dst <remote-vtep-addr>] [outteid <nn>] ",
+  " [dst_port <nn>] [dscp <nn>] [protocol_config <nn>] [ep_weight <ep_weight>] [traffic_state <nn>] [type <nn>] [del]",
+  .function = ppf_gtpu_modify_tunnel_command_fn,
+};
+
 
 static clib_error_t *
 show_ppf_gtpu_tunnel_command_fn (vlib_main_t * vm,

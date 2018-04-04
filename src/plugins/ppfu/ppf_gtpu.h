@@ -316,6 +316,12 @@ int vnet_ppf_gtpu_update_tunnel
 int vnet_ppf_gtpu_del_tunnel
   (u32 tunnel_id);
 
+int vnet_ppf_gtpu_add_tunnel_in_call
+  (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp, u32 *tunnel_id_ret);
+
+ int vnet_ppf_gtpu_del_tunnel_in_call
+  (vnet_ppf_gtpu_add_del_tunnel_args_t * a);
+
 void vnet_int_ppf_gtpu_bypass_mode (u32 sw_if_index, u8 is_ip6, u8 is_enable);
 
 u8 *format_ppf_gtpu_tunnel (u8 * s, va_list * args);
