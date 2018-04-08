@@ -38,12 +38,12 @@ static u8 * format_ppf_gtpu_rx_trace (u8 * s, va_list * args)
 
   if (t->tunnel_index != ~0)
     {
-      s = format (s, "PPF_GTPU decap from ppf_gtpu_tunnel%d teid %d next %d error %d",
+      s = format (s, "PPF_GTPU decap from ppf_gtpu_tunnel%d teid %u next %d error %d",
                   t->tunnel_index, t->teid, t->next_index, t->error);
     }
   else
     {
-      s = format (s, "PPF_GTPU decap error - tunnel for teid %d does not exist",
+      s = format (s, "PPF_GTPU decap error - tunnel for teid %u does not exist",
 		  t->teid);
     }
   return s;
