@@ -49,6 +49,7 @@
 static void mheap_get_trace (void *v, uword offset, uword size);
 static void mheap_put_trace (void *v, uword offset, uword size);
 static int mheap_trace_sort (const void *t1, const void *t2);
+static int mheap_trace_sort2 (const void *t1, const void *t2);
 
 always_inline void
 mheap_maybe_lock (void *v)
@@ -1235,15 +1236,19 @@ format_mheap (u8 * s, va_list * va)
     s = format (s, "\n%U%U",
 		format_white_space, indent + 2, format_mheap_stats, h);
 
-  if ((h->flags & MHEAP_FLAG_TRACE) && vec_len (h->trace_main.traces) > 0)
+  if (verbose >= 8 && (h->flags & MHEAP_FLAG_TRACE) && vec_len (h->trace_main.traces) > 0)
     {
       /* Make a copy of traces since we'll be sorting them. */
       mheap_trace_t *t, *traces_copy;
       u32 indent, total_objects_traced;
 
       traces_copy = vec_dup (h->trace_main.traces);
-      qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
-	     mheap_trace_sort);
+	  if(verbose == 8)
+        qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
+	       mheap_trace_sort);
+	  else
+        qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
+	       mheap_trace_sort2);
 
       total_objects_traced = 0;
       s = format (s, "\n");
@@ -1260,16 +1265,16 @@ format_mheap (u8 * s, va_list * va)
 	  continue;
 
 	if (t == traces_copy)
-	  s = format (s, "%=9s%=9s %=10s Traceback\n", "Bytes", "Count",
+	  s = format (s, "%=9s%=9s%=9s %=10s Traceback\n", "Bytes", "Allocs", "Count",
 		      "Sample");
-	s = format (s, "%9d%9d %p", t->n_bytes, t->n_allocations,
+	s = format (s, "%9d%9d%9d %p", t->n_bytes, t->n_gets, t->n_allocations,
 		    t->offset + v);
 	indent = format_get_indent (s);
 	for (i = 0; i < ARRAY_LEN (t->callers) && t->callers[i]; i++)
 	  {
 	    if (i > 0)
 	      s = format (s, "%U", format_white_space, indent);
-#if CLIB_DEBUG > 0//#ifdef CLIB_UNIX
+#ifdef CLIB_UNIX
 	    s =
 	      format (s, " %U\n", format_clib_elf_symbol_with_address,
 		      t->callers[i]);
@@ -1596,11 +1601,13 @@ mheap_get_trace (void *v, uword offset, uword size)
       t = tm->traces + trace_index;
       t[0] = trace;
       t->n_allocations = 0;
+      t->n_gets = 0;
       t->n_bytes = 0;
       hash_set_mem (tm->trace_by_callers, t->callers, trace_index);
     }
 
   t->n_allocations += 1;
+  t->n_gets += 1;
   t->n_bytes += size;
   t->offset = offset;		/* keep a sample to autopsy */
   hash_set (tm->trace_index_by_offset, offset, t - tm->traces);
@@ -1647,6 +1654,19 @@ mheap_trace_sort (const void *_t1, const void *_t2)
   cmp = (word) t2->n_bytes - (word) t1->n_bytes;
   if (!cmp)
     cmp = (word) t2->n_allocations - (word) t1->n_allocations;
+  return cmp;
+}
+
+static int
+mheap_trace_sort2 (const void *_t1, const void *_t2)
+{
+  const mheap_trace_t *t1 = _t1;
+  const mheap_trace_t *t2 = _t2;
+  word cmp;
+
+  cmp = (word) t2->n_allocations - (word) t1->n_allocations;
+  if (!cmp)
+	  cmp = (word) t2->n_bytes - (word) t1->n_bytes;
   return cmp;
 }
 

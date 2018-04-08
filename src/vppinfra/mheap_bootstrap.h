@@ -135,8 +135,10 @@ typedef struct
   /* Count of allocations with this traceback. */
 #if CLIB_VEC64 > 0
   u64 n_allocations;
+  u64 n_gets;
 #else
   u32 n_allocations;
+  u32 n_gets;
 #endif
 
   /* Count of bytes allocated with this traceback. */

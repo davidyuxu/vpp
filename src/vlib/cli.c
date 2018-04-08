@@ -699,6 +699,8 @@ vlib_cli_output (vlib_main_t * vm, char *fmt, ...)
   vec_free (s);
 }
 
+extern void *counter_heap;
+
 static clib_error_t *
 show_memory_usage (vlib_main_t * vm,
 		   unformat_input_t * input, vlib_cli_command_t * cmd)
@@ -727,8 +729,14 @@ show_memory_usage (vlib_main_t * vm,
       vlib_cli_output (vm, "Thread %d %v\n", index, vlib_worker_threads[index].name);
       vlib_cli_output (vm, "%U\n", format_mheap, clib_per_cpu_mheaps[index], verbose);
       index++;
+	  // kingwel, don't show worker's heap
+	  break;
   }));
   /* *INDENT-ON* */
+
+  vlib_cli_output (vm, "Counter : \n");
+  vlib_cli_output (vm, "%U\n", format_mheap, counter_heap, verbose);
+
   return 0;
 }
 

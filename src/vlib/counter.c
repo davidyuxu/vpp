@@ -74,15 +74,29 @@ vlib_clear_combined_counters (vlib_combined_counter_main_t * cm)
     }
 }
 
+void *counter_heap = 0;
+
+static void vlib_init_counter_heap()
+{
+  if (!counter_heap)
+	counter_heap = mheap_alloc (0, 64 << 20);
+}
+
 void
 vlib_validate_simple_counter (vlib_simple_counter_main_t * cm, u32 index)
 {
   vlib_thread_main_t *tm = vlib_get_thread_main ();
   int i;
 
+  vlib_init_counter_heap();
+  
+  void *oldheap = clib_mem_set_heap (counter_heap);  
+
   vec_validate (cm->counters, tm->n_vlib_mains - 1);
   for (i = 0; i < tm->n_vlib_mains; i++)
     vec_validate_aligned (cm->counters[i], index, CLIB_CACHE_LINE_BYTES);
+
+  clib_mem_set_heap (oldheap);
 }
 
 void
@@ -91,9 +105,15 @@ vlib_validate_combined_counter (vlib_combined_counter_main_t * cm, u32 index)
   vlib_thread_main_t *tm = vlib_get_thread_main ();
   int i;
 
+  vlib_init_counter_heap();
+  
+  void *oldheap = clib_mem_set_heap (counter_heap);  
+
   vec_validate (cm->counters, tm->n_vlib_mains - 1);
   for (i = 0; i < tm->n_vlib_mains; i++)
     vec_validate_aligned (cm->counters[i], index, CLIB_CACHE_LINE_BYTES);
+
+  clib_mem_set_heap (oldheap);
 }
 
 u32
