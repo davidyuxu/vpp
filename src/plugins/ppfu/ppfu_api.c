@@ -146,7 +146,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   if (callline->call_type == PPF_DRB_CALL)
   {
-	  uword *p = hash_get (im->fib_index_by_table_id, ntohl (nb->encap_vrf_id));
+	  uword *p = hash_get (im->fib_index_by_table_id, nb->encap_vrf_id);
 	  if (!p)
 	  {
 		rv = VNET_API_ERROR_NO_SUCH_FIB;
@@ -154,7 +154,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  }
 
 	  tunnel_type = PPF_GTPU_NB;
-	  nb_in_teid = ntohl(mp->ue_bearer_id);
+	  nb_in_teid = mp->ue_bearer_id;
   
 	  vnet_ppf_gtpu_add_del_tunnel_args_t nb_tunnel = {
 	    .is_ip6 = 0,
@@ -162,7 +162,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	    .decap_next_index = 0,		//to be delete
 	    .encap_fib_index = nb->encap_vrf_id,
 	    .in_teid = nb_in_teid,
-	    .out_teid = ntohl (nb->out_teid),
+	    .out_teid = nb->out_teid,
 	    .dst = to_ip46 (0, nb->dst_ip_address),
 	    .src = to_ip46 (0, nb->src_ip_address),
 	    .call_id = mp->call_id,
@@ -194,14 +194,14 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   }
 
-  for (i = 0; i<= MAX_SB_PER_CALL; i++)
+  for (i = 0; i< MAX_SB_PER_CALL; i++)
   {
   	  sb = &(mp->sb[i]);
 
   	  if (sb->src_ip_address == 0) 
 		continue;
 
-	  uword *p = hash_get (im->fib_index_by_table_id, ntohl (sb->encap_vrf_id));
+	  uword *p = hash_get (im->fib_index_by_table_id, sb->encap_vrf_id);
 	  if (!p)
 	  {
 		rv = VNET_API_ERROR_NO_SUCH_FIB;
@@ -213,7 +213,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  else 
 	  	tunnel_type = PPF_GTPU_SRB;
 	  	
-	  sb_in_teid [i] = ((i + 1) << 30) |ntohl(mp->ue_bearer_id);
+	  sb_in_teid [i] = (((i + 1) << 30) |mp->ue_bearer_id);
 
 	  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
 	    .is_ip6 = 0,
@@ -221,7 +221,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	    .encap_fib_index = sb->encap_vrf_id,
 	    .decap_next_index = 0,
 	    .in_teid = sb_in_teid[i],
-	    .out_teid = ntohl (sb->pri_out_teid),
+	    .out_teid = (sb->pri_out_teid),
 	    .dst = to_ip46 (0, sb->pri_ip_address),
 	    .src = to_ip46 (0, sb->src_ip_address),
 	    .call_id = mp->call_id,
@@ -282,7 +282,7 @@ out:
 
 	nb_in_teid = 0;
 
- 	for (i = 0; i<= MAX_SB_PER_CALL; i++) {
+ 	for (i = 0; i< MAX_SB_PER_CALL; i++) {
  	    if (sb_tunnel_added[i] == 1) {
  	    	vnet_ppf_gtpu_del_tunnel (sb_tunnel_id[i]);
  	      sb_tunnel_added[i] = 0;
@@ -298,7 +298,7 @@ out:
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
   ({  
 
-     for (i = 0; i<=MAX_SB_PER_CALL; i++) {
+     for (i = 0; i< MAX_SB_PER_CALL; i++) {
      	rmp->sb_in_teid[i] = sb_in_teid[i];
      }
       rmp->nb_in_teid = nb_in_teid;
@@ -351,7 +351,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
   }
 
   //first, remove sbs 
-  for (i = 0; i<= MAX_SB_PER_CALL; i++) 
+  for (i = 0; i< MAX_SB_PER_CALL; i++) 
   {
 	if (callline->call_type == PPF_DRB_CALL)
 	    sb_key = &(callline->rb.drb.sb_tunnel[i]);
@@ -374,14 +374,14 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 
   //second, update or add sbs
   //To be done: how to rollback if updated failded in progress??
-  for (i = 0; i<= MAX_SB_PER_CALL; i++)
+  for (i = 0; i< MAX_SB_PER_CALL; i++)
   {
 	  sb = &(mp->sb[i]);
 
 	  if (sb->src_ip_address == 0) 
 		continue;
 
-	  uword *p = hash_get (im->fib_index_by_table_id, ntohl (sb->encap_vrf_id));
+	  uword *p = hash_get (im->fib_index_by_table_id,  (sb->encap_vrf_id));
 	  if (!p)
 	  {
 		rv = VNET_API_ERROR_NO_SUCH_FIB;
@@ -397,7 +397,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 	  
 	  	//update sb_tunnel
 		vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
-		    .out_teid = ntohl (sb->pri_out_teid),
+		    .out_teid = (sb->pri_out_teid),
 		    .dst = to_ip46 (0, sb->pri_ip_address),
 		    .dst_port = sb->pri_port,
 		    .dscp = sb->pri_dscp,
@@ -420,7 +420,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 		  else 
 			tunnel_type = PPF_GTPU_SRB;
 			
-		  sb_in_teid [i] = ((i + 1) << 30) |ntohl(mp->ue_bearer_id);
+		  sb_in_teid [i] = ((i + 1) << 30) |(mp->ue_bearer_id);
 
 		  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
 		    .is_ip6 = 0,
@@ -428,7 +428,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 		    .encap_fib_index = sb->encap_vrf_id,
 		    .decap_next_index = 0,
 		    .in_teid = sb_in_teid[i],
-		    .out_teid = ntohl (sb->pri_out_teid),
+		    .out_teid = (sb->pri_out_teid),
 		    .dst = to_ip46 (0, sb->pri_ip_address),
 		    .src = to_ip46 (0, sb->src_ip_address),
 		    .call_id = mp->call_id,
@@ -465,7 +465,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 out:
   /* *INDENT-OFF* */
   if (rv != 0) {
-	for (i = 0; i<= MAX_SB_PER_CALL; i++) {
+	for (i = 0; i< MAX_SB_PER_CALL; i++) {
 	    if (sb_tunnel_added[i] != 0) {
 	    	vnet_ppf_gtpu_del_tunnel (sb_tunnel_id[i]);
 	    	sb_tunnel_added[i] = 0;
@@ -477,7 +477,7 @@ out:
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
   ({	
 
-     for (i = 0; i<=MAX_SB_PER_CALL; i++) {
+     for (i = 0; i<MAX_SB_PER_CALL; i++) {
 	rmp->sb_in_teid[i] = sb_in_teid[i];
      }
 	rmp->call_id = mp->call_id;
@@ -527,7 +527,7 @@ vl_api_ppfu_plugin_bearer_release_t_handler
 
   }
 
-  for (i = 0; i<= MAX_SB_PER_CALL; i++)
+  for (i = 0; i< MAX_SB_PER_CALL; i++)
   {
 
 	  if (callline->call_type == PPF_DRB_CALL)
