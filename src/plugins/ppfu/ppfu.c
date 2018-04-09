@@ -443,7 +443,7 @@ format_ppf_pdcp_simple (u8 * s, va_list * va)
   ppf_pdcp_session_t * pdcp_session = 0;
   ppf_pdcp_main_t * ppm = &ppf_pdcp_main;
 
-  s = format (s, "sess-id %d", pdcp->session_id);
+  s = format (s, "sess-id %u", pdcp->session_id);
   if (verbose > 0) {
     pdcp_session= pool_elt_at_index (ppm->sessions, pdcp->session_id);
     if (pdcp_session) {
@@ -465,7 +465,10 @@ format_ppf_callline (u8 * s, va_list * va)
     return s;
   }
 
-  s = format (s, "[%d]type %s ", callline->call_index, ppf_callline_type_strings[callline->call_type]);
+  s = format (s, "[%d]type %s ue-bearer-id 0x%x sb-policy 0x%x",
+  	callline->call_index,
+  	ppf_callline_type_strings[callline->call_type],
+  	callline->ue_bearer_id, callline->sb_policy);
 
   if (PPF_SRB_CALL == callline->call_type) {    
     if (verbose > 0) {
