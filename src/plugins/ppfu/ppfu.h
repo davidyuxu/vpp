@@ -158,6 +158,9 @@ typedef struct _ppf_pdcp_config_t_
   //PathContext paths[MAX_PATHS];
 } ppf_pdcp_config_t;
 
+#define PPF_PDCP_COUNT(hfn, sn, len)   (((hfn) << (1 << (len))) | (sn))
+#define PPF_PDCP_SN_INC(sn, len)       (((sn) + 1) & pow2_mask(len))
+
 typedef struct
 {
   u8  integrity_key[MAX_PDCP_KEY_LEN];

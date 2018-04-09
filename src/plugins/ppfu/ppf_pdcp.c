@@ -165,6 +165,25 @@ ppf_pdcp_decap_header_18bsn (u8 * buf, u8 * dc, u32 * sn)
 }
 
 u32
+ppf_pdcp_nop (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+  return 0;
+}
+
+u32
+ppf_pdcp_eia0_protect (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+  memset (out, 0x00, 4);
+  return 0;
+}
+
+u32
+ppf_pdcp_eia0_validate (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+  return 0;
+}
+
+u32
 ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight_limit)
 {
   ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
@@ -192,6 +211,10 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
   clib_warning("ppf_pdcp_create_session: configuring in-flight-limit to 0x%lx, received configuration value 0x%x \n",
 		  pdcp_sess->in_flight_limit, in_flight_limit);
 
+  pdcp_sess->protect = &ppf_pdcp_nop;
+  pdcp_sess->validate = &ppf_pdcp_nop;
+  pdcp_sess->mac_length = 0;
+
   switch (pdcp_sess->sn_length) {
     case 5:
       pdcp_sess->header_length = 1;
@@ -218,6 +241,11 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
       pdcp_sess->encap_header = &ppf_pdcp_encap_header_18bsn;
       pdcp_sess->decap_header = &ppf_pdcp_decap_header_18bsn;
       break;
+
+    case 255: /* Only test use, bypass pdcp */
+      pdcp_sess->header_length = 0;
+      break;
+      
     default:
       clib_warning("ERROR: Unknown sequence number length %u.\n",pdcp_sess->sn_length);
       pool_put (ppm->sessions, pdcp_sess);
@@ -226,25 +254,6 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
   
   session_id = (u32)(pdcp_sess - ppm->sessions);
   return session_id;
-}
-
-u32
-ppf_pdcp_nop (u8 * in, u8 * out, u32 size, void * security_parameters)
-{
-  return 0;
-}
-
-u32
-ppf_pdcp_eia0_protect (u8 * in, u8 * out, u32 size, void * security_parameters)
-{
-  memset (out, 0x00, 4);
-  return 0;
-}
-
-u32
-ppf_pdcp_eia0_validate (u8 * in, u8 * out, u32 size, void * security_parameters)
-{
-  return 0;
 }
 
 u32 
