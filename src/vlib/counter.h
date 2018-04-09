@@ -319,6 +319,45 @@ serialize_function_t serialize_vlib_simple_counter_main,
 serialize_function_t serialize_vlib_combined_counter_main,
   unserialize_vlib_combined_counter_main;
 
+/** A collection of interface counters */
+typedef struct
+{
+  vlib_counter_t rx;
+  vlib_counter_t tx;
+} vlib_if_counter_t;
+
+typedef struct
+{
+    vlib_if_counter_t *counters;//per thread
+    u32 sw_if_index;
+}vlib_if_stats_main_t;
+
+
+/*added by brant for measure throughput per thread*/
+#define SYSTEM_THROUGHPUT_MAX_BINS              60u
+#define SYSTEM_THROUGHPUT_TIMER_INTERVEL        10
+#define ONE_MB (1 << 20)
+
+typedef struct
+{
+    vlib_if_stats_main_t *if_stats;/*last counters per object per thread */
+
+	vlib_if_stats_main_t *if_stats_by_bin[SYSTEM_THROUGHPUT_MAX_BINS];
+
+	u32 throughput_threshold_interval;
+	u32 system_current_throughput_mbps;
+	u32 system_current_throughput_pps;
+	u32 system_interval_throughput_mbps;
+	u32 system_interval_throughput_pps;
+
+    int throughput_debug;
+
+    
+    volatile u32 *if_counter_lock;
+} throughput_stats_main_t;
+
+void throughput_stats_validate(u32 sw_if_index);
+
 #endif /* included_vlib_counter_h */
 
 /*

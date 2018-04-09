@@ -23,6 +23,8 @@
 #define STATS_DEBUG 0
 
 stats_main_t stats_main;
+static throughput_stats_main_t throughput_stats_main;
+
 
 #include <vnet/ip/ip.h>
 
@@ -92,6 +94,395 @@ setup_message_id_table (api_main_t * am)
 /* 5ms */
 #define STATS_RELEASE_DELAY_NS (1000 * 1000 * 5)
 /*                              ns/us  us/ms        */
+
+u32 throughput_slot = 0;
+void throughput_stats_validate(u32 sw_if_index);
+static void throughput_stats_verbose ();
+static void throughput_stats_del(u32 sw_if_index);
+static void throughput_stats_clear ();
+
+static clib_error_t *
+throughput_trace_command_fn (vlib_main_t * vm,
+		      unformat_input_t * input, vlib_cli_command_t * cmd)
+{
+    u32 sw_if_index;
+    int verbose = 0;
+    clib_error_t *error;
+
+    while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT) {
+        if (unformat (input, "on") || unformat (input, "enable")) {
+            throughput_stats_main.throughput_debug = 1;
+            vlib_cli_output(vm, "SYSTEM THROUGHPUT TRACE IS ON \n");
+        } else if (unformat (input, "off")) {
+            throughput_stats_main.throughput_debug = 0;
+            vlib_cli_output(vm, "SYSTEM THROUGHPUT TRACE IS OFF \n");
+        } else if (unformat (input, "add %u", &sw_if_index)) {
+            throughput_stats_validate(sw_if_index);
+        } else if (unformat (input, "del %u", &sw_if_index)) {
+            throughput_stats_del(sw_if_index);
+        } else if (unformat (input, "verbose %d", &verbose)) {
+            throughput_stats_verbose(verbose);
+        } else if (unformat (input, "clear")) {
+            throughput_stats_clear();
+        } else {
+    	  error = clib_error_return (0, "unknown input `%U'",
+    				     format_unformat_error, input);
+    	  return error;
+	    }
+    }  
+    
+    return 0;
+}
+
+/*
+ * Display, replay, or save a binary API trace
+ */
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (throughput_trace_command, static) =
+{
+  .path = "throughput trace",
+  .short_help = "throughput trace [on|off|clear|verbose <level>|add <sw_idx>]|del <sw_idx>",
+  .function = throughput_trace_command_fn,
+};
+/* *INDENT-ON* */
+
+static inline void
+throughput_stats_lock ()
+{
+  if (throughput_stats_main.if_counter_lock)
+    while (__sync_lock_test_and_set (throughput_stats_main.if_counter_lock, 1))
+      /* zzzz */ ;
+}
+
+static inline void
+throughput_stats_unlock ()
+{
+  if (throughput_stats_main.if_counter_lock)
+    *throughput_stats_main.if_counter_lock = 0;
+}
+
+static void
+throughput_stats_init(stats_main_t * sm)
+{
+    memset (&throughput_stats_main, 0, sizeof(throughput_stats_main));
+
+    throughput_stats_main.throughput_threshold_interval = 60;
+
+    throughput_stats_main.if_counter_lock = clib_mem_alloc_aligned (CLIB_CACHE_LINE_BYTES, CLIB_CACHE_LINE_BYTES);
+    throughput_stats_main.if_counter_lock[0] = 0;
+}
+
+static void 
+througput_stats_counter_clear(vlib_if_stats_main_t *sm)
+{
+    vlib_if_counter_t *sc;
+
+    vec_foreach(sc, sm->counters) {
+        memset (sc, 0, sizeof(*sc));
+    }
+}
+
+static void
+throughput_stats_counter_show_(vlib_if_stats_main_t *sm)
+{
+    vlib_if_counter_t *c;
+    int i;
+    vlib_main_t *vm = stats_main.vlib_main;
+    int show_title = 1;
+    
+    vec_foreach_index (i, sm->counters) {
+        c = vec_elt_at_index(sm->counters, i);
+        if (show_title == 1) {
+            vlib_cli_output(vm, "%10d %10d %15llu %15llu %20llu %20llu\n", sm->sw_if_index, i,
+                 c->rx.packets, c->tx.packets, c->rx.bytes, c->tx.bytes);
+            show_title = 0;
+        } else {
+            vlib_cli_output(vm, "           %10d %15llu %15llu %20llu %20llu\n", i,
+                 c->rx.packets, c->tx.packets, c->rx.bytes, c->tx.bytes);
+        }
+    }
+
+}
+
+static void
+throughput_stats_verbose (int verbose)
+{
+    vlib_main_t *vm = stats_main.vlib_main;
+
+    vlib_thread_main_t *tm = vlib_get_thread_main ();
+    int i;
+    vlib_if_stats_main_t *sm;
+
+    if (verbose == 0) {
+        vlib_cli_output(vm, "Past 10 seconds counters:\n");
+        vlib_cli_output(vm, "\n%10s %10s %15s %15s %20s %20s\n", "Interface", "Thread", "RxPkts", "TxPkts", "RxBytes", "TxBytes");
+        vec_foreach (sm, throughput_stats_main.if_stats) {
+            throughput_stats_counter_show_(sm);
+        }
+    }
+
+    if (verbose == 1) {
+        vlib_cli_output(vm, "Slot counters:\n");
+        vlib_cli_output(vm, "\n%10s %10s %15s %15s %20s %20s\n", "Interface", "Thread", "RxPkts", "TxPkts", "RxBytes", "TxBytes");
+        for (i = 0; i < SYSTEM_THROUGHPUT_MAX_BINS; i++) {
+            vlib_cli_output(vm, "Slot number: %d\n", i);
+            vec_foreach(sm, throughput_stats_main.if_stats_by_bin[i]) {
+                throughput_stats_counter_show_(sm);
+            }
+        }
+    }
+}
+
+static void
+throughput_stats_clear ()
+{
+    vlib_if_stats_main_t *sm;
+    int i;
+
+    throughput_stats_lock();
+    vec_foreach (sm, throughput_stats_main.if_stats) {
+        througput_stats_counter_clear(sm);
+    }
+
+    
+    for (i = 0; i < SYSTEM_THROUGHPUT_MAX_BINS; i++) {
+        vec_foreach (sm, throughput_stats_main.if_stats_by_bin[i]) {
+            througput_stats_counter_clear(sm);
+        }
+    }
+
+    throughput_stats_unlock();
+
+}
+
+static void
+throughput_stats_add_ (u32 sw_if_index)
+{
+    vlib_thread_main_t *tm = vlib_get_thread_main ();
+    int i;
+    vlib_if_stats_main_t *sm;
+
+    vec_add2(throughput_stats_main.if_stats, sm, 1);
+    
+    sm->sw_if_index = sw_if_index;
+    
+    vec_validate (sm->counters, tm->n_vlib_mains - 1);
+    througput_stats_counter_clear(sm);
+    
+
+    vec_add2(throughput_stats_main.if_stats_by_bin[i], sm, SYSTEM_THROUGHPUT_MAX_BINS);
+    for (i = 0; i < SYSTEM_THROUGHPUT_MAX_BINS; i++) {
+        sm->sw_if_index = sw_if_index;
+        
+        vec_validate (sm->counters, tm->n_vlib_mains - 1);
+        througput_stats_counter_clear(sm);
+
+        sm++;
+    }
+}
+
+static void 
+throughput_stats_del(u32 sw_if_index)
+{
+    vlib_if_stats_main_t *sm;
+    u32 i, index;
+
+    throughput_stats_lock();
+
+    vec_foreach_index (index, throughput_stats_main.if_stats) {
+        sm = vec_elt_at_index(throughput_stats_main.if_stats, index);
+        if (sm->sw_if_index == sw_if_index) {
+            vec_free(sm->counters);
+            vec_delete(throughput_stats_main.if_stats, 1, index);
+
+            for (i = 0; i < SYSTEM_THROUGHPUT_MAX_BINS; i++) {
+                vec_free(throughput_stats_main.if_stats_by_bin[i]->counters);
+                vec_delete(throughput_stats_main.if_stats_by_bin[i], 1, index);
+            }
+            
+            break;
+        }
+    }
+    
+    throughput_stats_unlock();
+}
+
+void 
+throughput_stats_validate(u32 sw_if_index)
+{
+    vlib_if_stats_main_t *sm;
+
+    throughput_stats_lock();
+
+    vec_foreach (sm, throughput_stats_main.if_stats) {
+        if (sm->sw_if_index == sw_if_index) {
+            throughput_stats_unlock();
+            return;
+        }
+    }
+
+    throughput_stats_add_(sw_if_index);
+    
+    throughput_stats_unlock();
+}
+
+static void
+throughput_over_interval_get (u32 interval, u32 * mbps, u32 * pps)
+{
+	u32 i, j, n_counts;
+	u32 starting_bin;
+	u32 ending_bin;
+	u32 number_of_bins = 0;
+	u64 inbytes = 0;
+	u64 inpkts = 0;
+    vlib_if_stats_main_t *sm;
+    vlib_if_counter_t *c;
+
+	number_of_bins = interval / SYSTEM_THROUGHPUT_TIMER_INTERVEL;
+	number_of_bins %= SYSTEM_THROUGHPUT_MAX_BINS;
+
+	if (throughput_slot > (number_of_bins - 1)) {
+		starting_bin = throughput_slot - number_of_bins;
+		ending_bin = throughput_slot;
+	} else {
+		starting_bin = SYSTEM_THROUGHPUT_MAX_BINS - number_of_bins + throughput_slot;
+		ending_bin = SYSTEM_THROUGHPUT_MAX_BINS + throughput_slot;
+	}
+
+	for (i = starting_bin; i < ending_bin; i++) {
+        vec_foreach(sm, throughput_stats_main.if_stats_by_bin[i % SYSTEM_THROUGHPUT_MAX_BINS]) {
+            vec_foreach (c, sm->counters) {
+                inbytes += c->rx.bytes;
+                inpkts += c->rx.packets;
+            }
+        }
+	}
+
+	*mbps = (inbytes * 8) / interval / ONE_MB;
+	*pps = inpkts / interval;
+}
+
+
+static void
+throughput_show ()
+{
+    vlib_main_t *vm = stats_main.vlib_main;
+    u32 slot = 0;
+    int n_interface, n_thread;
+    vlib_if_stats_main_t *sm;
+    vlib_if_counter_t *c;
+    int show_if_index = 0;
+    
+    slot = (throughput_slot == 0) ? (SYSTEM_THROUGHPUT_MAX_BINS - 1) : (throughput_slot - 1);
+
+	vlib_cli_output(vm, "\n%10s %10s %10s %10s %15s %15s\n", "Interface", "Thread", "Rx", "Tx", "Rx_Mbps", "Tx_Mbps");
+
+    vec_foreach(sm, throughput_stats_main.if_stats_by_bin[slot]) {
+        show_if_index = 1;
+        vec_foreach_index (n_thread, sm->counters) {
+            c = vec_elt_at_index(sm->counters, n_thread);
+            if (show_if_index == 1) {
+                vlib_cli_output(vm, "%10d %10d %10llu %10llu %15llu %15llu\n", sm->sw_if_index, n_thread,
+                             c->rx.packets / SYSTEM_THROUGHPUT_TIMER_INTERVEL,
+                             c->tx.packets / SYSTEM_THROUGHPUT_TIMER_INTERVEL,
+                             c->rx.bytes / SYSTEM_THROUGHPUT_TIMER_INTERVEL / ONE_MB * 8,
+                             c->tx.bytes / SYSTEM_THROUGHPUT_TIMER_INTERVEL / ONE_MB * 8);
+                show_if_index = 0;
+            } else {
+                vlib_cli_output(vm, "           %10d %10llu %10llu %15llu %15llu\n", n_thread,
+                             c->rx.packets / SYSTEM_THROUGHPUT_TIMER_INTERVEL,
+                             c->tx.packets / SYSTEM_THROUGHPUT_TIMER_INTERVEL,
+                             c->rx.bytes / SYSTEM_THROUGHPUT_TIMER_INTERVEL / ONE_MB * 8,
+                             c->tx.bytes / SYSTEM_THROUGHPUT_TIMER_INTERVEL / ONE_MB * 8);            
+            }
+        }
+        
+    }
+}
+
+static void
+do_throughtput_measure(stats_main_t * sm)
+{
+    vnet_interface_main_t *im = sm->interface_main;
+    vlib_if_stats_main_t *last_ism, *bin_ism;
+    vlib_if_counter_t *last_sc, *bin_sc;
+    vlib_counter_t *rx_c, *tx_c;
+    int i, n_interface, n_thread;
+	u32 mbps, pps, pps_ui, n_counts;
+	u32 mbps_interval = 0;
+	u32 pps_interval = 0;
+	counter_t total_bytes = 0;
+	counter_t total_pkts = 0;
+    vlib_main_t *vm = sm->vlib_main;
+    u32 sw_if_index;
+
+    if (vec_len(throughput_stats_main.if_stats) == 0)
+        return ;
+    
+    throughput_stats_lock();
+
+    n_counts = vlib_combined_counter_n_counters (&im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_RX]);
+    vec_foreach_index (i, throughput_stats_main.if_stats) {
+        last_ism = vec_elt_at_index(throughput_stats_main.if_stats, i);
+        bin_ism = vec_elt_at_index(throughput_stats_main.if_stats_by_bin[throughput_slot], i);
+
+        ASSERT (last_ism->sw_if_index == bin_ism->sw_if_index);
+        ASSERT (vec_len(last_ism->counters) == vec_len(bin_ism->counters));
+        
+        sw_if_index = last_ism->sw_if_index;
+        
+        ASSERT (sw_if_index < n_counts);
+        vec_foreach_index(n_thread, last_ism->counters) {
+            last_sc = vec_elt_at_index(last_ism->counters, n_thread);
+            bin_sc = vec_elt_at_index(bin_ism->counters, n_thread);
+
+            rx_c = &im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_RX].counters[n_thread][sw_if_index];
+            tx_c = &im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_TX].counters[n_thread][sw_if_index];
+
+            bin_sc->rx.bytes    = rx_c->bytes - last_sc->rx.bytes;
+            bin_sc->rx.packets  = rx_c->packets - last_sc->rx.packets;
+            bin_sc->tx.bytes    = tx_c->bytes - last_sc->tx.bytes;
+            bin_sc->tx.packets  = tx_c->packets - last_sc->tx.packets;
+
+            last_sc->rx.bytes   = rx_c->bytes;
+            last_sc->rx.packets = rx_c->packets;
+            last_sc->tx.bytes   = tx_c->bytes;
+            last_sc->tx.packets = tx_c->packets;
+            
+            total_bytes += bin_sc->rx.bytes;
+            total_pkts  += bin_sc->rx.packets;
+            
+        } 
+    }
+
+    throughput_slot = (throughput_slot + 1) % SYSTEM_THROUGHPUT_MAX_BINS;
+
+    mbps = ((total_bytes * 8) / SYSTEM_THROUGHPUT_TIMER_INTERVEL) / ONE_MB;
+    pps = total_pkts / SYSTEM_THROUGHPUT_TIMER_INTERVEL;
+
+    /* Get the last 5 minute system throughput */
+    throughput_over_interval_get (300, &mbps_interval, &pps_interval);
+
+    throughput_over_interval_get (throughput_stats_main.throughput_threshold_interval, &mbps_interval, &pps_interval);
+
+    throughput_stats_main.system_current_throughput_mbps = mbps;
+    throughput_stats_main.system_current_throughput_pps = pps;
+    throughput_stats_main.system_interval_throughput_mbps = mbps_interval;
+    throughput_stats_main.system_interval_throughput_pps = pps_interval;
+
+    throughput_stats_unlock();
+
+    /* Display all the throughput info */
+    if (throughput_stats_main.throughput_debug) {
+        vlib_cli_output(vm, "\nThroughput : past %u seconds - %u Mbps and %u pps, past %u seconds - %u Mbps and %u pps.\n",
+         SYSTEM_THROUGHPUT_TIMER_INTERVEL, mbps, pps, throughput_stats_main.throughput_threshold_interval, mbps_interval,
+         pps_interval);
+
+        throughput_show ();
+    }
+
+}
 
 u8 *
 format_vnet_interface_combined_counters (u8 * s, va_list * args)
@@ -2287,6 +2678,8 @@ stats_thread_fn (void *arg)
       ip46_fib_stats_delay (sm, sm->stats_poll_interval_in_seconds,
 			    0 /* nsec */ );
 
+      do_throughtput_measure(sm);
+
       if (!(sm->enable_poller))
 	{
 	  continue;
@@ -2982,6 +3375,8 @@ stats_init (vlib_main_t * vm)
   sm->stats_registration_hash[IDX_##n] = 0;
 #include <vpp/stats/stats.reg>
 #undef stats_reg
+
+  throughput_stats_init(sm);
 
   return 0;
 }
