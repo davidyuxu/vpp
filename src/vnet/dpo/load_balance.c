@@ -847,6 +847,11 @@ load_balance_module_init (void)
 {
     index_t lbi;
 
+    /* Init load balance pool, by Jordy */
+	if (vlib_global_main.max_interfaces) {
+		pool_init_aligned (load_balance_pool, vlib_global_main.max_interfaces * 11 / 10, CLIB_CACHE_LINE_BYTES);
+	}
+
     dpo_register(DPO_LOAD_BALANCE, &lb_vft, load_balance_nodes);
 
     /*

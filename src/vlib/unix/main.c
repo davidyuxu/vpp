@@ -387,6 +387,55 @@ VLIB_REGISTER_NODE (startup_config_node,static) = {
 };
 /* *INDENT-ON* */
 
+
+/* Application global configuration in config-file, by Jordy */
+
+static clib_error_t *
+application_global_config (vlib_main_t * vm, unformat_input_t * input)
+{
+  clib_error_t *error = 0;
+  u32 max_capacity = 0;
+  u32 max_interfaces = 0;
+  uword heap_size = 0;
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "capacity %d", &max_capacity))
+        ;
+      else if (unformat (input, "max-interfaces %d", &max_interfaces))
+        ;
+      else if (unformat (input, "counter-heap-size %U", unformat_memory_size, &heap_size))
+        ;
+      else
+        {
+          return clib_error_return (0, "unknown input `%U'",
+    				format_unformat_error, input);
+        }
+    }
+
+  if (max_capacity != 0) {
+    vm->max_capacity = max_capacity;
+  } else {
+    vm->max_capacity = 1000;
+  }
+
+  if (max_interfaces != 0) {
+    vm->max_interfaces = max_interfaces;
+  } else {
+    vm->max_interfaces = 2000;
+  }
+  
+  if (heap_size != 0)
+    vm->counter_heap_size = heap_size;
+  else
+  	vm->counter_heap_size = 0;
+
+  return error;
+}
+
+VLIB_EARLY_CONFIG_FUNCTION (application_global_config, "app-global");
+
+
 static clib_error_t *
 unix_config (vlib_main_t * vm, unformat_input_t * input)
 {

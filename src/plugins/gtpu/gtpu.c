@@ -1240,6 +1240,10 @@ gtpu_init (vlib_main_t * vm)
 
   gtm->fib_node_type = fib_node_register_new_type (&gtpu_vft);
 
+  if (vm->max_capacity) {
+  	pool_init_aligned (gtm->tunnels, vm->max_capacity, CLIB_CACHE_LINE_BYTES);
+  }
+
   return 0;
 }
 

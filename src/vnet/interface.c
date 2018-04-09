@@ -1229,6 +1229,12 @@ vnet_interface_init (vlib_main_t * vm)
   vnet_buffer_opaque_t *o = 0;
   clib_error_t *error;
 
+  /* Init interface pool, by Jordy */
+  if (vm->max_interfaces) {
+  	pool_alloc (im->hw_interfaces, vm->max_interfaces);
+	pool_init (im->sw_interfaces, vm->max_interfaces);
+  }
+
   /*
    * Keep people from shooting themselves in the foot.
    */

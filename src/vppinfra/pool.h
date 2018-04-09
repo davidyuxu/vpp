@@ -514,6 +514,27 @@ do {									\
   vec_free(_pool_var(dv));                              \
 }
 
+/* Init memory for unfixed pool, by Jordy */
+#define pool_init_aligned(P,N,A)        \
+do {									\
+  u32 i;							    \
+  CLIB_UNUSED(typeof (P[0]) *E);        \
+										\
+  pool_alloc_aligned(P,N,A);            \
+  for (i = 0; i < (N); i++) {           \
+  	pool_get_aligned(P,E,A);            \
+  }                                     \
+                                        \
+  for (i = 0; i < (N-1); i++) {         \
+  	 pool_put_index(P, N-i-2);          \
+  }                                     \
+  if(i>0)pool_put_index(P, i);          \
+                                        \
+} while (0)
+
+#define pool_init(P,N)    pool_init_aligned(P,N,0)
+
+
 #endif /* included_pool_h */
 
 /*
