@@ -266,7 +266,7 @@ public:
 			if (VAPI_EINVAL == rv) {
 				rx_err++;
 				return nullptr;
-			} else if (VAPI_OK != rv) {
+			} else if (VAPI_OK != rv || shm_data == nullptr) {
 				return nullptr;
 			}
 
