@@ -83,17 +83,17 @@ format_ppf_gtpu_tunnel (u8 * s, va_list * args)
   ppf_gtpu_tunnel_t *t = va_arg (*args, ppf_gtpu_tunnel_t *);
   ppf_gtpu_main_t *ngm = &ppf_gtpu_main;
 
-  s = format (s, "[%d] src %U dst %U in_teid %d out_teid %d fib-idx %d sw-if-idx %d ",
+  s = format (s, "[%d] src %U dst %U in_teid %x out_teid %x fib-idx %d sw-if-idx %u ",
 	      t - ngm->tunnels,
 	      format_ip46_address, &t->src, IP46_TYPE_ANY,
 	      format_ip46_address, &t->dst, IP46_TYPE_ANY,
 	      t->in_teid, t->out_teid, t->encap_fib_index, t->sw_if_index);
 
-  s = format (s, "encap-dpo-idx %d ", t->next_dpo.dpoi_index);
+  s = format (s, "encap-dpo-idx %u ", t->next_dpo.dpoi_index);
   s = format (s, "decap-next-%U ", format_decap_next, t->decap_next_index);
 
   if (PREDICT_FALSE (ip46_address_is_multicast (&t->dst)))
-    s = format (s, "mcast-sw-if-idx %d ", t->mcast_sw_if_index);
+    s = format (s, "mcast-sw-if-idx %u ", t->mcast_sw_if_index);
 
   return s;
 }
