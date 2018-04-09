@@ -72,7 +72,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
-  next_index = ppf_pdcp_main.pdcp_encrypt_next_index;
+  next_index = ppm->pdcp_encrypt_next_index;
 
   while (n_left_from > 0)
     {
@@ -162,6 +162,10 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    pdcp1 = pool_elt_at_index(ppm->sessions, c1->pdcp.session_id);
 	    pdcp2 = pool_elt_at_index(ppm->sessions, c2->pdcp.session_id);
 	    pdcp3 = pool_elt_at_index(ppm->sessions, c3->pdcp.session_id);
+
+            // Fix later!!!
+	    //if (PREDICT_FALSE(0 == pdcp0->header_length))
+	    //	goto next0;
 
 	    vlib_buffer_advance (b0, -(word)(pdcp0->header_length));
 	    vlib_buffer_advance (b1, -(word)(pdcp1->header_length));
