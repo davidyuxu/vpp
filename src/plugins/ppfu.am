@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#vppapitestplugins_LTLIBRARIES += ppf_gtpu_test_plugin.la
+vppapitestplugins_LTLIBRARIES += ppf_gtpu_test_plugin.la
 vppplugins_LTLIBRARIES += ppfu_plugin.la
 
 ppfu_plugin_la_SOURCES =		\
@@ -28,7 +28,6 @@ ppfu_plugin_la_SOURCES =		\
 	ppfu/ppf_pdcp.c     \
 	ppfu/ppfu.c		\
 	ppfu/ppfu_api.c		
-#	ppfu/ppf_gtpu_api.c
 
 BUILT_SOURCES +=			\
 	ppfu/ppf_gtpu.api.h		    \
@@ -49,8 +48,8 @@ nobase_apiinclude_HEADERS +=			\
   ppfu/ppfu.api.h	
 
 
-#ppf_gtpu_test_plugin_la_SOURCES = \
-#  ppfu/ppf_gtpu_test.c            \
-#  ppfu/ppf_gtpu_plugin.api.h
+ppf_gtpu_test_plugin_la_SOURCES = \
+  ppfu/ppfu_test.c            \
+  ppfu/ppfu_plugin.api.h
 
 # vi:syntax=automake

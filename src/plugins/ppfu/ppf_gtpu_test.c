@@ -619,8 +619,6 @@ api_ppf_gtpu_tunnel_dump (vat_main_t * vam)
  * and that the data plane plugin processes
  */
 #define foreach_vpe_api_msg                                            \
-_(sw_interface_set_ppf_gtpu_bypass,                                        \
-      "<intfc> | sw_if_index <id> [ip4 | ip6] [enable | disable]")     \
 _(ppf_gtpu_add_del_tunnel,                                                 \
         "src <ip-addr> { dst <ip-addr> | group <mcast-ip-addr>\n"      \
         "{ <intfc> | mcast_sw_if_index <nn> } }\n"                     \
