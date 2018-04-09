@@ -213,6 +213,14 @@ typedef struct vlib_main_t
   /* Vector of pending RPC requests */
   uword *pending_rpc_requests;
 
+  /* Specify the maximum hw/sw interface number */
+  u32 max_interfaces;
+
+  /* Specify the application capacity, e.g.: gtpu tunnels */
+  u32 max_capacity;
+
+  /* Specify dedicated counter heap size */
+  uword counter_heap_size;
 } vlib_main_t;
 
 /* Global main structure. */

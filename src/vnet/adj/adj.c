@@ -512,6 +512,9 @@ adj_module_init (vlib_main_t * vm)
     adj_midchain_module_init();
     adj_mcast_module_init();
 
+	if (vm->max_interfaces)
+		pool_init_aligned (adj_pool, vm->max_interfaces + 1000, CLIB_CACHE_LINE_BYTES);
+
     return (NULL);
 }
 

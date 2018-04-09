@@ -75,12 +75,19 @@ vlib_clear_combined_counters (vlib_combined_counter_main_t * cm)
 }
 
 void *counter_heap = 0;
+#define DEF_COUNTER_HEAP_SIZE  (64 << 20)
 
-static void vlib_init_counter_heap()
+static void vlib_counter_heap_init()
 {
-  if (!counter_heap)
-	counter_heap = mheap_alloc (0, 64 << 20);
+  if (!counter_heap) {
+  	if (vlib_global_main.counter_heap_size == 0)
+		vlib_global_main.counter_heap_size = DEF_COUNTER_HEAP_SIZE;
+	counter_heap = mheap_alloc (0, vlib_global_main.counter_heap_size);
+  }
 }
+
+//VLIB_INIT_FUNCTION (vlib_counter_heap_init);
+
 
 void
 vlib_validate_simple_counter (vlib_simple_counter_main_t * cm, u32 index)
@@ -88,7 +95,7 @@ vlib_validate_simple_counter (vlib_simple_counter_main_t * cm, u32 index)
   vlib_thread_main_t *tm = vlib_get_thread_main ();
   int i;
 
-  vlib_init_counter_heap();
+  vlib_counter_heap_init();
   
   void *oldheap = clib_mem_set_heap (counter_heap);  
 
@@ -105,7 +112,7 @@ vlib_validate_combined_counter (vlib_combined_counter_main_t * cm, u32 index)
   vlib_thread_main_t *tm = vlib_get_thread_main ();
   int i;
 
-  vlib_init_counter_heap();
+  vlib_counter_heap_init();
   
   void *oldheap = clib_mem_set_heap (counter_heap);  
 
