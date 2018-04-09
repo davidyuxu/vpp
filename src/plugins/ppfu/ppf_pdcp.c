@@ -72,17 +72,17 @@ format_ppf_pdcp_session (u8 * s, va_list * va)
 {
   ppf_pdcp_session_t * pdcp_session = va_arg (*va, ppf_pdcp_session_t *);
 
-  s = format (s, "sn-length %d, header-length %d, mac-length %d, in-flight-limit %ld\n", 
+  s = format (s, "sn-length %d, header-length %d, mac-length %d, in-flight-limit %lx\n", 
   	pdcp_session->sn_length, 
   	pdcp_session->header_length,
   	pdcp_session->mac_length,
   	pdcp_session->in_flight_limit);
 
-  s = format (s, "tx-hfn %d, tx-next %d\n", 
+  s = format (s, "tx-hfn %u, tx-next %u\n", 
   	pdcp_session->tx_hfn, 
   	pdcp_session->tx_next_sn);
 
-  s = format (s, "rx-hfn %d, rx-next-expected %d, rx-last-forwarded %d\n", 
+  s = format (s, "rx-hfn %u, rx-next-expected %u, rx-last-forwarded %u\n", 
   	pdcp_session->rx_hfn, 
   	pdcp_session->rx_next_expected_sn, 
   	pdcp_session->rx_last_forwarded_sn);
