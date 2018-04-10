@@ -522,13 +522,14 @@ do {									\
 										\
   pool_alloc_aligned(P,N,A);            \
   for (i = 0; i < (N); i++) {           \
-  	pool_get_aligned(P,E,A);            \
+  	pool_get_aligned(P,E,A);        \
   }                                     \
                                         \
-  for (i = 0; i < (N-1); i++) {         \
-  	 pool_put_index(P, N-i-2);          \
+  for (i = 0; i < (N-2); i++) {         \
+  	 pool_put_index(P, N-i-2);      \
   }                                     \
-  if(i>0)pool_put_index(P, i);          \
+  if(i>0) pool_put_index(P, i+1);       \
+  if(i>0) pool_put_index(P, 0);         \
                                         \
 } while (0)
 
