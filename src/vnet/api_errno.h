@@ -143,8 +143,7 @@ _(EMPTY_CALLINE, -150, "Calline is empty")				\
 _(WRONG_TUNNEL_TYPE, -151, "Tunnel type is wrong")			\
 _(TUNNEL_IN_USE, -152, "tunnel is not empty") 				\
 _(TUNNEL_IS_EMPTY, -153, "tunnel is not existed")			\
-_(UPDATE_TUNNEL_WRONG_IP, -154, "wrong ip type for src and dst")
-
+_(UPDATE_TUNNEL_WRONG_IP, -154, "wrong ip type for src and dst")	\
 
 
 typedef enum
