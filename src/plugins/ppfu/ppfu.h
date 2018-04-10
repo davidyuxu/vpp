@@ -158,8 +158,24 @@ typedef struct _ppf_pdcp_config_t_
   //PathContext paths[MAX_PATHS];
 } ppf_pdcp_config_t;
 
-#define PPF_PDCP_COUNT(hfn, sn, len)   (((hfn) << (1 << (len))) | (sn))
+#define PPF_PDCP_COUNT(hfn, sn, len)  ((255 == len) ? (sn) : (((hfn) << (1 << (len))) | (sn)))
+#define PPF_PDCP_COUNT_INC(hfn, sn, len)   \
+do {                                       \
+	(sn)++;                                \
+	if ((sn) == (1 << (len))) {           \
+		(hfn)++;                           \
+		(sn) = 0;                          \
+	}                                      \
+} while (0)
 #define PPF_PDCP_SN_INC(sn, len)       (((sn) + 1) & pow2_mask(len))
+
+enum {
+  PPF_PDCP_DIR_ENC = 0,
+  PPF_PDCP_DIR_DEC = 1
+};
+
+
+typedef u32 (*pdcp_security_handler)(u8 * /* in */, u8 * /* out */, u32 /* len */, void * /* security parameters */);
 
 typedef struct
 {
@@ -177,11 +193,19 @@ typedef struct
   u64 in_flight_limit;
   void (*encap_header)(u8 *, u8, u32);
   void (*decap_header)(u8 *, u8 *, u32 *);
-  u32  (*protect)(u8 *, u8 *, u32, void *);
-  u32  (*validate)(u8 *, u8 *, u32, void *);
-  u32  (*encrypt)(u8 *, u8 *, u32, void *);
-  u32  (*decrypt)(u8 *, u8 *, u32, void *);
+  pdcp_security_handler protect;
+  pdcp_security_handler validate;
+  pdcp_security_handler encrypt;
+  pdcp_security_handler decrypt;
 } ppf_pdcp_session_t;
+
+typedef struct
+{
+  ppf_pdcp_session_t * pdcp_sess;
+  u32 count;
+  u8  bearer;
+  u8  dir;
+} ppf_pdcp_security_param_t;
 
 typedef struct
 {
@@ -265,7 +289,7 @@ typedef union {
 
 typedef struct
 {
-  uword *nb_out_msg_by_sn;   /* hash <PDCP SN> -> <transaction-id + request-id> */
+  u64 *nb_out_msg_by_sn;   /* hash <PDCP SN> -> <transaction-id + request-id> */
   ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_CALL];
 } ppf_srb_callline_t;
 
@@ -292,6 +316,8 @@ typedef struct
   u32 sb_policy;
   u32 ue_bearer_id;
 } ppf_callline_t;
+
+#define PPF_BEARER(ub)  (((ub) >> 25) & 0x1f)
 
 typedef struct
 {
@@ -385,7 +411,7 @@ int vnet_ppf_del_callline (u32 call_id) ;
 int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c);
 
 
-
+u8 *format_ppf_call_type (u8 * s, va_list * va);
 u8 *format_ppf_pdcp_session (u8 * s, va_list * va);
 u8 *format_ppf_callline (u8 * s, va_list * va);
 

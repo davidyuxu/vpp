@@ -926,7 +926,7 @@ hash_format_pair_default (u8 * s, va_list * args)
   s = format (s, "0x%08x", p->key);
   if (hash_value_bytes (h) > 0)
     s =
-      format (s, " -> 0x%8U", format_hex_bytes, &p->value[0],
+      format (s, " -> 0x%16U", format_hex_bytes, &p->value[0],
 	      hash_value_bytes (h));
   return s;
 }
