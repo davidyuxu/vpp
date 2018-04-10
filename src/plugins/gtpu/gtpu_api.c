@@ -63,9 +63,10 @@ typedef enum
 #include <gtpu/gtpu.api.h>
 #undef vl_msg_name_crc_list
 
+/* move to gtpu.h --- add by anhua
 #define REPLY_MSG_ID_BASE gtm->msg_id_base
 #include <vlibapi/api_helper_macros.h>
-
+*/
 static void
 setup_message_id_table (gtpu_main_t * gtm, api_main_t * am)
 {
@@ -79,7 +80,8 @@ setup_message_id_table (gtpu_main_t * gtm, api_main_t * am)
 _(SW_INTERFACE_SET_GTPU_BYPASS, sw_interface_set_gtpu_bypass)   \
 _(GTPU_ADD_DEL_TUNNEL, gtpu_add_del_tunnel)                     \
 _(GTPU_ADD_DEL_TUNNEL_V2, gtpu_add_del_tunnel_v2)		\
-_(GTPU_TUNNEL_DUMP, gtpu_tunnel_dump)
+_(GTPU_TUNNEL_DUMP, gtpu_tunnel_dump)                   \
+_(GTPU_CLIENT_REGISTRATION, gtpu_client_registration)
 
 static void
   vl_api_sw_interface_set_gtpu_bypass_t_handler
@@ -330,6 +332,121 @@ vl_api_gtpu_tunnel_dump_t_handler (vl_api_gtpu_tunnel_dump_t * mp)
       t = &gtm->tunnels[gtm->tunnel_index_by_sw_if_index[sw_if_index]];
       send_gtpu_tunnel_details (t, reg, mp->context);
     }
+}
+
+
+static vpe_client_registration_t *get_gtpu_client (u32 client_index)
+{
+    gtpu_main_t *gtm = &gtpu_main;
+    gtpu_client_registration_t *registrations;
+    uword *p;
+
+    /* If there is, is our client_index one of them */
+    registrations = &gtm->registrations;
+    p = hash_get (registrations->client_hash, client_index);
+
+    /* get fail */
+    if (!p)
+        return 0;
+
+    return pool_elt_at_index (registrations->clients, p[0]);
+}
+
+static int clear_gtpu_client (u32 client_index)
+{
+    gtpu_main_t *gtm = &gtpu_main;
+    gtpu_client_registration_t *registrations;
+    vpe_client_registration_t *client;
+    uword *p;
+    int elts;
+    
+    /* If there is, is our client_index one of them */
+    registrations = &gtm->registrations;
+    p = hash_get (registrations->client_hash, client_index);
+    
+    if (!p)
+        goto exit;
+
+    client = pool_elt_at_index (registrations->clients, p[0]);
+    hash_unset (registrations->client_hash, client->client_index);
+    pool_put (registrations->clients, client);
+
+exit:
+    elts = 0;
+    /* Now check if that was the last item in any of the listened to gtpu */
+    elts += pool_elts (registrations->clients);
+    return elts;
+}
+
+static int set_gtpu_client (vpe_client_registration_t * client)
+{
+    gtpu_main_t *gtm = &gtpu_main;
+    gtpu_client_registration_t *registrations;
+    vpe_client_registration_t *cr;
+    uword *p;
+
+    registrations = &gtm->registrations;
+
+    /* Is there anything listening */
+    p = hash_get (registrations->client_hash, client->client_index);
+
+    if (!p)
+    {
+        pool_get (registrations->clients, cr);
+        cr->client_index = client->client_index;
+        cr->client_pid = client->client_pid;
+        hash_set (registrations->client_hash, cr->client_index, cr - registrations->clients);
+    }
+
+    return 1;
+}
+
+static void
+vl_api_gtpu_client_registration_t_handler (vl_api_gtpu_client_registration_t *mp)
+{
+    gtpu_main_t *gtm = &gtpu_main;
+    vpe_client_registration_t *rp, _rp;
+    vl_api_registration_t *reg;
+    vl_api_gtpu_client_registration_reply_t *rmp;
+    i32 retval = 0;
+    
+    rp = get_gtpu_client(mp->client_index);
+
+    /* Disable case */
+    if (mp->enable_disable == 0)
+    {
+        if (!rp)			/* No client to disable */
+        {
+            clib_warning ("pid %d: already disabled for stats...", mp->client_pid);
+            return;
+        }
+        gtm->enable_poller = clear_gtpu_client(mp->client_index);
+        return;
+    }
+    
+    /* Enable case */
+    if (!rp)
+    {
+        rp = &_rp;
+        rp->client_index = mp->client_index;
+        rp->client_pid = mp->client_pid;
+        gtm->enable_poller = set_gtpu_client(rp);
+    }
+
+    /*reply */
+    reg = vl_api_client_index_to_registration (mp->client_index);
+    if (!reg)
+    {
+        gtm->enable_poller = clear_gtpu_client(mp->client_index);
+        return;
+    }
+
+    rmp = vl_msg_api_alloc (sizeof (*rmp));
+    rmp->_vl_msg_id = ntohs (VL_API_GTPU_CLIENT_REGISTRATION_REPLY);
+    rmp->context = mp->context;
+    rmp->retval = retval;
+
+    vl_api_send_msg (reg, (u8 *) rmp);
 }
 
 
