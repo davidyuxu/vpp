@@ -87,7 +87,7 @@ ppf_gtpu_input (vlib_main_t * vm,
   u32 stats_sw_if_index, stats_n_packets, stats_n_bytes;
 
   if (is_ip4)
-    last_key4.as_u64 = ~0;
+    last_key4.as_u32 = ~0;
   else
     memset (&last_key6, 0xff, sizeof (last_key6));
 
@@ -196,21 +196,20 @@ ppf_gtpu_input (vlib_main_t * vm,
 
 	  /* Manipulate packet 0 */
           if (is_ip4) {
-            key4_0.src = ip4_0->src_address.as_u32;
-            key4_0.teid = ppf_gtpu0->teid;
+              key4_0.teid = ppf_gtpu0->teid;
 
  	    /* Make sure PPF_GTPU tunnel exist according to packet SIP and teid
  	     * SIP identify a PPF_GTPU path, and teid identify a tunnel in a given PPF_GTPU path */
-           if (PREDICT_FALSE (key4_0.as_u64 != last_key4.as_u64))
+           if (PREDICT_FALSE (key4_0.as_u32 != last_key4.as_u32))
               {
-                p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u64);
+                p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u32);
                 if (PREDICT_FALSE (p0 == NULL))
                   {
                     error0 = PPF_GTPU_ERROR_NO_SUCH_TUNNEL;
                     next0 = PPF_GTPU_INPUT_NEXT_DROP;
                     goto trace0;
                   }
-                last_key4.as_u64 = key4_0.as_u64;
+                last_key4.as_u32 = key4_0.as_u32;
                 tunnel_index0 = last_tunnel_index = p0[0];
               }
             else
@@ -240,10 +239,9 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    	
 	    if (PREDICT_FALSE (ip4_address_is_multicast (&ip4_0->dst_address)))
 	      {
-		key4_0.src = ip4_0->dst_address.as_u32;
 		key4_0.teid = ppf_gtpu0->teid;
 		/* Make sure mcast PPF_GTPU tunnel exist by packet DIP and teid */
-		p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u64);
+		p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u32);
 		if (PREDICT_TRUE (p0 != NULL))
 		  {
 		    mt0 = pool_elt_at_index (gtm->tunnels, p0[0]);
@@ -255,8 +253,6 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    goto trace0;
 
          } else /* !is_ip4 */ {
-            key6_0.src.as_u64[0] = ip6_0->src_address.as_u64[0];
-            key6_0.src.as_u64[1] = ip6_0->src_address.as_u64[1];
             key6_0.teid = ppf_gtpu0->teid;
 
  	    /* Make sure PPF_GTPU tunnel exist according to packet SIP and teid
@@ -291,8 +287,6 @@ ppf_gtpu_input (vlib_main_t * vm,
 		goto next0; /* valid packet */
 	    if (PREDICT_FALSE (ip6_address_is_multicast (&ip6_0->dst_address)))
 	      {
-		key6_0.src.as_u64[0] = ip6_0->dst_address.as_u64[0];
-		key6_0.src.as_u64[1] = ip6_0->dst_address.as_u64[1];
 		key6_0.teid = ppf_gtpu0->teid;
 		p0 = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6_0);
 		if (PREDICT_TRUE (p0 != NULL))
@@ -383,21 +377,20 @@ ppf_gtpu_input (vlib_main_t * vm,
 
           /* Manipulate packet 1 */
           if (is_ip4) {
-            key4_1.src = ip4_1->src_address.as_u32;
             key4_1.teid = ppf_gtpu1->teid;
 
  	    /* Make sure PPF_GTPU tunnel exist according to packet SIP and teid
  	     * SIP identify a PPF_GTPU path, and teid identify a tunnel in a given PPF_GTPU path */
-	    if (PREDICT_FALSE (key4_1.as_u64 != last_key4.as_u64))
+	    if (PREDICT_FALSE (key4_1.as_u32 != last_key4.as_u32))
               {
-                p1 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_1.as_u64);
+                p1 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_1.as_u32);
                 if (PREDICT_FALSE (p1 == NULL))
                   {
                     error1 = PPF_GTPU_ERROR_NO_SUCH_TUNNEL;
                     next1 = PPF_GTPU_INPUT_NEXT_DROP;
                     goto trace1;
                   }
-                last_key4.as_u64 = key4_1.as_u64;
+                last_key4.as_u32 = key4_1.as_u32;
                 tunnel_index1 = last_tunnel_index = p1[0];
               }
             else
@@ -428,10 +421,9 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    
 	    if (PREDICT_FALSE (ip4_address_is_multicast (&ip4_1->dst_address)))
 	      {
-		key4_1.src = ip4_1->dst_address.as_u32;
 		key4_1.teid = ppf_gtpu1->teid;
 		/* Make sure mcast PPF_GTPU tunnel exist by packet DIP and teid */
-		p1 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_1.as_u64);
+		p1 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_1.as_u32);
 		if (PREDICT_TRUE (p1 != NULL))
 		  {
 		    mt1 = pool_elt_at_index (gtm->tunnels, p1[0]);
@@ -443,8 +435,6 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    goto trace1;
 
          } else /* !is_ip4 */ {
-            key6_1.src.as_u64[0] = ip6_1->src_address.as_u64[0];
-            key6_1.src.as_u64[1] = ip6_1->src_address.as_u64[1];
             key6_1.teid = ppf_gtpu1->teid;
 
  	    /* Make sure PPF_GTPU tunnel exist according to packet SIP and teid
@@ -481,8 +471,6 @@ ppf_gtpu_input (vlib_main_t * vm,
 		goto next1; /* valid packet */
 	    if (PREDICT_FALSE (ip6_address_is_multicast (&ip6_1->dst_address)))
 	      {
-		key6_1.src.as_u64[0] = ip6_1->dst_address.as_u64[0];
-		key6_1.src.as_u64[1] = ip6_1->dst_address.as_u64[1];
 		key6_1.teid = ppf_gtpu1->teid;
 		p1 = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6_1);
 		if (PREDICT_TRUE (p1 != NULL))
@@ -628,21 +616,20 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    }
 
           if (is_ip4) {
-            key4_0.src = ip4_0->src_address.as_u32;
             key4_0.teid = ppf_gtpu0->teid;
 
  	    /* Make sure PPF_GTPU tunnel exist according to packet SIP and teid
  	     * SIP identify a PPF_GTPU path, and teid identify a tunnel in a given PPF_GTPU path */
-            if (PREDICT_FALSE (key4_0.as_u64 != last_key4.as_u64))
+            if (PREDICT_FALSE (key4_0.as_u32 != last_key4.as_u32))
               {
-                p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u64);
+                p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u32);
                 if (PREDICT_FALSE (p0 == NULL))
                   {
                     error0 = PPF_GTPU_ERROR_NO_SUCH_TUNNEL;
                     next0 = PPF_GTPU_INPUT_NEXT_DROP;
                     goto trace00;
                   }
-                last_key4.as_u64 = key4_0.as_u64;
+                last_key4.as_u32 = key4_0.as_u32;
                 tunnel_index0 = last_tunnel_index = p0[0];
               }
             else
@@ -680,10 +667,9 @@ ppf_gtpu_input (vlib_main_t * vm,
 	
 	    if (PREDICT_FALSE (ip4_address_is_multicast (&ip4_0->dst_address)))
 	      {
-		key4_0.src = ip4_0->dst_address.as_u32;
 		key4_0.teid = ppf_gtpu0->teid;
 		/* Make sure mcast PPF_GTPU tunnel exist by packet DIP and teid */
-		p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u64);
+		p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u32);
 		if (PREDICT_TRUE (p0 != NULL))
 		  {
 		    mt0 = pool_elt_at_index (gtm->tunnels, p0[0]);
@@ -695,8 +681,6 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    goto trace00;
 
           } else /* !is_ip4 */ {
-            key6_0.src.as_u64[0] = ip6_0->src_address.as_u64[0];
-            key6_0.src.as_u64[1] = ip6_0->src_address.as_u64[1];
             key6_0.teid = ppf_gtpu0->teid;
 
  	    /* Make sure PPF_GTPU tunnel exist according to packet SIP and teid
@@ -731,8 +715,6 @@ ppf_gtpu_input (vlib_main_t * vm,
 		goto next00; /* valid packet */
 	    if (PREDICT_FALSE (ip6_address_is_multicast (&ip6_0->dst_address)))
 	      {
-		key6_0.src.as_u64[0] = ip6_0->dst_address.as_u64[0];
-		key6_0.src.as_u64[1] = ip6_0->dst_address.as_u64[1];
 		key6_0.teid = ppf_gtpu0->teid;
 		p0 = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6_0);
 		if (PREDICT_TRUE (p0 != NULL))

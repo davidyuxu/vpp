@@ -101,15 +101,9 @@ typedef CLIB_PACKED
    */
   union {
     struct {
-      u32 src;
       u32 teid;
     };
-    struct {
-      u32 call_id;
-      u32 tunnel_type;
-    };
-    u64 as_u64;
-    
+    u32 as_u32;
   };
 }) ppf_gtpu4_tunnel_key_t;
 /* *INDENT-ON* */
@@ -121,7 +115,6 @@ typedef CLIB_PACKED
    * Key fields: ip src and ppf_gtpu teid on incoming ppf_gtpu packet
    * all fields in NET byte order
    */
-  ip6_address_t src;
   u32 teid;
 }) ppf_gtpu6_tunnel_key_t;
 /* *INDENT-ON* */
@@ -236,7 +229,7 @@ typedef struct
   ppf_gtpu_tunnel_t *tunnels;
 
   /* lookup tunnel by key */
-  uword *ppf_gtpu4_tunnel_by_key;	/* keyed on ipv4.dst + teid */
+  uword *ppf_gtpu4_tunnel_by_key;	/* keyed on teid */
   uword *ppf_gtpu6_tunnel_by_key;	/* keyed on ipv6.dst + teid */
 
   uword *ppf_gtpu4_tunnel_by_callid_dir;        /*key on callid + dir */		

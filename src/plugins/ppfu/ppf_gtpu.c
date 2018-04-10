@@ -427,13 +427,11 @@ int vnet_ppf_gtpu_add_del_tunnel
 
   if (!is_ip6)
     {
-      key4.src = a->dst.ip4.as_u32;	/* decap src in key is encap dst in config */
       key4.teid = clib_host_to_net_u32 (a->in_teid);
-      p = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64);
+      p = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u32);
     }
   else
     {
-      key6.src = a->dst.ip6;
       key6.teid = clib_host_to_net_u32 (a->in_teid);
       p = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6);
     }
@@ -516,7 +514,7 @@ int vnet_ppf_gtpu_add_del_tunnel
 	hash_set_mem_alloc (&gtm->ppf_gtpu6_tunnel_by_key, &key6,
 			    t - gtm->tunnels);
       else
-	hash_set (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64, t - gtm->tunnels);
+	hash_set (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u32, t - gtm->tunnels);
 
 	if (t->tunnel_type == PPF_GTPU_SB ) {
 		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_PDCP_INPUT;
@@ -728,7 +726,7 @@ int vnet_ppf_gtpu_add_del_tunnel
       gtm->tunnel_index_by_sw_if_index[t->sw_if_index] = ~0;
 
       if (!is_ip6)
-	hash_unset (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64);
+	hash_unset (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u32);
       else
 	hash_unset_mem_free (&gtm->ppf_gtpu6_tunnel_by_key, &key6);
 
@@ -778,13 +776,11 @@ int vnet_ppf_gtpu_add_tunnel
 
   if (!is_ip6)
     {
-      key4.src = a->dst.ip4.as_u32;	/* decap src in key is encap dst in config */
       key4.teid = clib_host_to_net_u32 (a->in_teid);
-      p = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64);
+      p = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u32);
     }
   else
     {
-      key6.src = a->dst.ip6;
       key6.teid = clib_host_to_net_u32 (a->in_teid);
       p = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6);
     }
@@ -860,13 +856,13 @@ int vnet_ppf_gtpu_add_tunnel
       }
       
       ip_udp_ppf_gtpu_rewrite (t, is_ip6);
-
+	
       /* copy the key */
       if (is_ip6)
 	hash_set_mem_alloc (&gtm->ppf_gtpu6_tunnel_by_key, &key6,
 			    t - gtm->tunnels);
       else
-	hash_set (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64, t - gtm->tunnels);
+	hash_set (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u32, t - gtm->tunnels);
 
 	if (t->tunnel_type == PPF_GTPU_SB ) {
 		t->decap_next_index = PPF_GTPU_INPUT_NEXT_PPF_PDCP_INPUT;
@@ -885,159 +881,93 @@ int vnet_ppf_gtpu_add_tunnel
 	if (t->decap_next_index == ~0) {
 		return VNET_API_ERROR_NEXT_HOP_NOT_FOUND_MP;
 	}
+
+	if (!ip_is_zero(&t->dst, is_ip6))
+	{
+	      vnet_hw_interface_t *hi;
+	      if (vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) > 0)
+		{
+		  vnet_interface_main_t *im = &vnm->interface_main;
+		  hw_if_index = gtm->free_ppf_gtpu_tunnel_hw_if_indices
+		    [vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) - 1];
+		  _vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) -= 1;
+
+		  hi = vnet_get_hw_interface (vnm, hw_if_index);
+		  hi->dev_instance = t - gtm->tunnels;
+		  hi->hw_instance = hi->dev_instance;
+
+		  /* clear old stats of freed tunnel before reuse */
+		  sw_if_index = hi->sw_if_index;
+		  vnet_interface_counter_lock (im);
+		  vlib_zero_combined_counter
+		    (&im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_TX],
+		     sw_if_index);
+		  vlib_zero_combined_counter (&im->combined_sw_if_counters
+					      [VNET_INTERFACE_COUNTER_RX],
+					      sw_if_index);
+		  vlib_zero_simple_counter (&im->sw_if_counters
+					    [VNET_INTERFACE_COUNTER_DROP],
+					    sw_if_index);
+		  vnet_interface_counter_unlock (im);
+		}
+	      else
+		{
+		  hw_if_index = vnet_register_interface
+		    (vnm, ppf_gtpu_device_class.index, t - gtm->tunnels,
+		     ppf_gtpu_hw_class.index, t - gtm->tunnels);
+		  hi = vnet_get_hw_interface (vnm, hw_if_index);
+		}
+
+	      /* Set ppf_gtpu tunnel output node */
+	      u32 encap_index = !is_ip6 ?
+		ppf_gtpu4_encap_node.index : ppf_gtpu6_encap_node.index;
+	      vnet_set_interface_output_node (vnm, hw_if_index, encap_index);
+
+	      t->hw_if_index = hw_if_index;
+	      t->sw_if_index = sw_if_index = hi->sw_if_index;
+
+	      vec_validate_init_empty (gtm->tunnel_index_by_sw_if_index, sw_if_index,
+				       ~0);
+	      gtm->tunnel_index_by_sw_if_index[sw_if_index] = t - gtm->tunnels;
+
+	      /* setup l2 input config with l2 feature and bd 0 to drop packet */
+	      vec_validate (l2im->configs, sw_if_index);
+	      l2im->configs[sw_if_index].feature_bitmap = L2INPUT_FEAT_DROP;
+	      l2im->configs[sw_if_index].bd_index = 0;
+
+	      vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, sw_if_index);
+	      si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
+	      vnet_sw_interface_set_flags (vnm, sw_if_index,
+					   VNET_SW_INTERFACE_FLAG_ADMIN_UP);
+
+	      fib_node_init (&t->node, gtm->fib_node_type);
+	      fib_prefix_t tun_dst_pfx;
+	      vnet_flood_class_t flood_class = VNET_FLOOD_CLASS_TUNNEL_NORMAL;
+
+	      fib_prefix_from_ip46_addr (&t->dst, &tun_dst_pfx);
+	      if (!ip46_address_is_multicast (&t->dst))
+		{
+		  /* Unicast tunnel -
+		   * source the FIB entry for the tunnel's destination
+		   * and become a child thereof. The tunnel will then get poked
+		   * when the forwarding for the entry updates, and the tunnel can
+		   * re-stack accordingly
+		   */
+		  vtep_addr_ref (&t->src);
+		  t->fib_entry_index = fib_table_entry_special_add
+		    (t->encap_fib_index, &tun_dst_pfx, FIB_SOURCE_RR,
+		     FIB_ENTRY_FLAG_NONE);
+		  #if 0
+		  t->sibling_index = fib_entry_child_add
+		    (t->fib_entry_index, gtm->fib_node_type, t - gtm->tunnels);
+		  #endif
+		  ppf_gtpu_tunnel_restack_dpo (t);
+		}
 		
-      vnet_hw_interface_t *hi;
-      if (vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) > 0)
-	{
-	  vnet_interface_main_t *im = &vnm->interface_main;
-	  hw_if_index = gtm->free_ppf_gtpu_tunnel_hw_if_indices
-	    [vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) - 1];
-	  _vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) -= 1;
+	      vnet_get_sw_interface (vnet_get_main (), sw_if_index)->flood_class =
+		flood_class;
 
-	  hi = vnet_get_hw_interface (vnm, hw_if_index);
-	  hi->dev_instance = t - gtm->tunnels;
-	  hi->hw_instance = hi->dev_instance;
-
-	  /* clear old stats of freed tunnel before reuse */
-	  sw_if_index = hi->sw_if_index;
-	  vnet_interface_counter_lock (im);
-	  vlib_zero_combined_counter
-	    (&im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_TX],
-	     sw_if_index);
-	  vlib_zero_combined_counter (&im->combined_sw_if_counters
-				      [VNET_INTERFACE_COUNTER_RX],
-				      sw_if_index);
-	  vlib_zero_simple_counter (&im->sw_if_counters
-				    [VNET_INTERFACE_COUNTER_DROP],
-				    sw_if_index);
-	  vnet_interface_counter_unlock (im);
 	}
-      else
-	{
-	  hw_if_index = vnet_register_interface
-	    (vnm, ppf_gtpu_device_class.index, t - gtm->tunnels,
-	     ppf_gtpu_hw_class.index, t - gtm->tunnels);
-	  hi = vnet_get_hw_interface (vnm, hw_if_index);
-	}
-
-      /* Set ppf_gtpu tunnel output node */
-      u32 encap_index = !is_ip6 ?
-	ppf_gtpu4_encap_node.index : ppf_gtpu6_encap_node.index;
-      vnet_set_interface_output_node (vnm, hw_if_index, encap_index);
-
-      t->hw_if_index = hw_if_index;
-      t->sw_if_index = sw_if_index = hi->sw_if_index;
-
-      vec_validate_init_empty (gtm->tunnel_index_by_sw_if_index, sw_if_index,
-			       ~0);
-      gtm->tunnel_index_by_sw_if_index[sw_if_index] = t - gtm->tunnels;
-
-      /* setup l2 input config with l2 feature and bd 0 to drop packet */
-      vec_validate (l2im->configs, sw_if_index);
-      l2im->configs[sw_if_index].feature_bitmap = L2INPUT_FEAT_DROP;
-      l2im->configs[sw_if_index].bd_index = 0;
-
-      vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, sw_if_index);
-      si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
-      vnet_sw_interface_set_flags (vnm, sw_if_index,
-				   VNET_SW_INTERFACE_FLAG_ADMIN_UP);
-
-      fib_node_init (&t->node, gtm->fib_node_type);
-      fib_prefix_t tun_dst_pfx;
-      vnet_flood_class_t flood_class = VNET_FLOOD_CLASS_TUNNEL_NORMAL;
-
-      fib_prefix_from_ip46_addr (&t->dst, &tun_dst_pfx);
-      if (!ip46_address_is_multicast (&t->dst))
-	{
-	  /* Unicast tunnel -
-	   * source the FIB entry for the tunnel's destination
-	   * and become a child thereof. The tunnel will then get poked
-	   * when the forwarding for the entry updates, and the tunnel can
-	   * re-stack accordingly
-	   */
-	  vtep_addr_ref (&t->src);
-	  t->fib_entry_index = fib_table_entry_special_add
-	    (t->encap_fib_index, &tun_dst_pfx, FIB_SOURCE_RR,
-	     FIB_ENTRY_FLAG_NONE);
-	  #if 0
-	  t->sibling_index = fib_entry_child_add
-	    (t->fib_entry_index, gtm->fib_node_type, t - gtm->tunnels);
-	  #endif
-	  ppf_gtpu_tunnel_restack_dpo (t);
-	}
-      else
-	{
-	  /* Multicast tunnel -
-	   * as the same mcast group can be used for mutiple mcast tunnels
-	   * with different VNIs, create the output fib adjecency only if
-	   * it does not already exist
-	   */
-	  fib_protocol_t fp = fib_ip_proto (is_ip6);
-
-	  if (vtep_addr_ref (&t->dst) == 1)
-	    {
-	      fib_node_index_t mfei;
-	      adj_index_t ai;
-	      fib_route_path_t path = {
-		.frp_proto = fib_proto_to_dpo (fp),
-		.frp_addr = zero_addr,
-		.frp_sw_if_index = 0xffffffff,
-		.frp_fib_index = ~0,
-		.frp_weight = 0,
-		.frp_flags = FIB_ROUTE_PATH_LOCAL,
-	      };
-	      const mfib_prefix_t mpfx = {
-		.fp_proto = fp,
-		.fp_len = (is_ip6 ? 128 : 32),
-		.fp_grp_addr = tun_dst_pfx.fp_addr,
-	      };
-
-	      /*
-	       * Setup the (*,G) to receive traffic on the mcast group
-	       *  - the forwarding interface is for-us
-	       *  - the accepting interface is that from the API
-	       */
-	      mfib_table_entry_path_update (t->encap_fib_index,
-					    &mpfx,
-					    MFIB_SOURCE_GTPU,
-					    &path, MFIB_ITF_FLAG_FORWARD);
-
-	      path.frp_sw_if_index = a->mcast_sw_if_index;
-	      path.frp_flags = FIB_ROUTE_PATH_FLAG_NONE;
-	      mfei = mfib_table_entry_path_update (t->encap_fib_index,
-						   &mpfx,
-						   MFIB_SOURCE_GTPU,
-						   &path,
-						   MFIB_ITF_FLAG_ACCEPT);
-
-	      /*
-	       * Create the mcast adjacency to send traffic to the group
-	       */
-	      ai = adj_mcast_add_or_lock (fp,
-					  fib_proto_to_link (fp),
-					  a->mcast_sw_if_index);
-
-	      /*
-	       * create a new end-point
-	       */
-	      mcast_shared_add (&t->dst, mfei, ai);
-	    }
-
-	  dpo_id_t dpo = DPO_INVALID;
-	  mcast_shared_t ep = mcast_shared_get (&t->dst);
-
-	  /* Stack shared mcast dst mac addr rewrite on encap */
-	  dpo_set (&dpo, DPO_ADJACENCY_MCAST,
-		   fib_proto_to_dpo (fp), ep.mcast_adj_index);
-
-	  dpo_stack_from_node (encap_index, &t->next_dpo, &dpo);
-
-	  dpo_reset (&dpo);
-	  flood_class = VNET_FLOOD_CLASS_TUNNEL_MASTER;
-	}
-
-      vnet_get_sw_interface (vnet_get_main (), sw_if_index)->flood_class =
-	flood_class;
     }
     
   if (sw_if_indexp)
@@ -1058,13 +988,6 @@ int vnet_ppf_gtpu_update_tunnel
   t = &(gtm->tunnels[tunnel_id]);
    
   {
-
-#if 0
-/* copy from arg structure */
-#define _(x) t->x = a->x;
-	update_tunnel_copy;
-#undef _
-#endif
 
       if (a->dscp != ~0) 
       	t->dscp = a->dscp;
@@ -1088,7 +1011,7 @@ int vnet_ppf_gtpu_update_tunnel
 		t->type = a->type;
 
 	if (!ip_is_zero(&a->dst, t->is_ip6))
-		ip_copy (&(t->dst), &(a->src), t->is_ip6);
+		ip_copy (&(t->dst), &(a->dst), t->is_ip6);
 		
 	ip_udp_ppf_gtpu_rewrite (t, t->is_ip6);	
 
@@ -1132,44 +1055,43 @@ int vnet_ppf_gtpu_del_tunnel
 
       }
 
-      vnet_sw_interface_set_flags (vnm, t->sw_if_index, 0 /* down */ );
-      vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, t->sw_if_index);
-      si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
+	if (!ip_is_zero(&t->dst, t->is_ip6)){
+	      vnet_sw_interface_set_flags (vnm, t->sw_if_index, 0 /* down */ );
+	      vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, t->sw_if_index);
+	      si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
 
-      /* make sure tunnel is removed from l2 bd or xconnect */
-      set_int_l2_mode (gtm->vlib_main, vnm, MODE_L3, t->sw_if_index, 0, 0, 0,
-		       0);
-      vec_add1 (gtm->free_ppf_gtpu_tunnel_hw_if_indices, t->hw_if_index);
+	      /* make sure tunnel is removed from l2 bd or xconnect */
+	      set_int_l2_mode (gtm->vlib_main, vnm, MODE_L3, t->sw_if_index, 0, 0, 0,
+			       0);
+	      vec_add1 (gtm->free_ppf_gtpu_tunnel_hw_if_indices, t->hw_if_index);
 
-      gtm->tunnel_index_by_sw_if_index[t->sw_if_index] = ~0;
+	      gtm->tunnel_index_by_sw_if_index[t->sw_if_index] = ~0;
+      }
 
       if (!t->is_ip6)
       {
-          key4.src = t->dst.ip4.as_u32;	/* decap src in key is encap dst in config */
           key4.teid = clib_host_to_net_u32 (t->in_teid);
-          hash_unset (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u64);
+          hash_unset (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u32);
       }
       else
       {
-          key6.src = t->dst.ip6;
           key6.teid = clib_host_to_net_u32 (t->in_teid);
           hash_unset_mem_free (&gtm->ppf_gtpu6_tunnel_by_key, &key6);
       }
 
-      if (!ip46_address_is_multicast (&t->dst))
-	{
-	  vtep_addr_unref (&t->src);
-	  #if 0
-	  fib_entry_child_remove (t->fib_entry_index, t->sibling_index);
-	  #endif
-	  fib_table_entry_delete_index (t->fib_entry_index, FIB_SOURCE_RR);
-	}
-      else if (vtep_addr_unref (&t->dst) == 0)
-	{
-	  mcast_shared_remove (&t->dst);
-	}
+	if (!ip_is_zero(&t->dst, t->is_ip6)){
+	      if (!ip46_address_is_multicast (&t->dst))
+		{
+		  vtep_addr_unref (&t->src);
+		  #if 0
+		  fib_entry_child_remove (t->fib_entry_index, t->sibling_index);
+		  #endif
+		  fib_table_entry_delete_index (t->fib_entry_index, FIB_SOURCE_RR);
+		}
 
-      fib_node_deinit (&t->node);
+
+     		fib_node_deinit (&t->node);
+      }
       vec_free (t->rewrite);
      
       pool_put (gtm->tunnels, t);

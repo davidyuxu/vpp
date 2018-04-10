@@ -143,13 +143,6 @@ _(BIER_BSL_UNSUP, -146, "BIER bit-string-length unsupported")		\
 _(INSTANCE_IN_USE, -147, "Instance in use")				\
 _(INVALID_SESSION_ID, -148, "session ID out of range")			\
 _(ACL_IN_USE_BY_LOOKUP_CONTEXT, -149, "ACL in use by a lookup context")	\ 
-_(WRONG_MAX_SESSION_NUM, -200, "Wrong max session number")		\
-_(CALLLNE_IN_USE, -201, "Calline is not empty")				\
-_(EMPTY_CALLINE, -202, "Calline is empty")				\
-_(WRONG_TUNNEL_TYPE, -203, "Tunnel type is wrong")			\
-_(TUNNEL_IN_USE, -204, "tunnel is not empty") 				\
-_(TUNNEL_IS_EMPTY, -205, "tunnel is not existed")			\
-_(UPDATE_TUNNEL_WRONG_IP, -206, "wrong ip type for src and dst")	\
 
 typedef enum
 {
