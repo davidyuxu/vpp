@@ -18,6 +18,8 @@
 #include <vlib/vlib.h>
 #include <vnet/pg/pg.h>
 #include <gtpu/gtpu.h>
+#include <vnet/lisp-cp/packets.h>
+#include <vnet/ip/ip4.h>
 
 vlib_node_registration_t gtpu4_input_node;
 vlib_node_registration_t gtpu6_input_node;
@@ -66,6 +68,211 @@ validate_gtpu_fib (vlib_buffer_t *b, gtpu_tunnel_t *t, u32 is_ip4)
 
   return (fib_index == t->encap_fib_index);
 }
+
+/* send echo respond, by xftony*/
+static void
+gtpu_send_echo_respond(vlib_main_t * vm, vlib_node_runtime_t * node, vlib_buffer_t * b0, u32 is_ip4)
+{
+	u32  bi0_copy;
+	void* b0_copy;
+	gtpu_header_t * gtpu;
+	vlib_frame_t *frame;    
+	u32 *to_next;
+    
+	if (vlib_buffer_alloc (vm, &bi0_copy, 1) == 1){
+		b0_copy = vlib_buffer_get_current (vlib_get_buffer (vm, bi0_copy));
+		clib_memcpy (b0_copy, vlib_buffer_get_current (b0), b0->current_length);
+        VLIB_BUFFER_TRACE_TRAJECTORY_INIT (vlib_get_buffer (vm, bi0_copy));
+        vlib_get_buffer (vm, bi0_copy)->current_length = b0->current_length;
+	}
+    
+	/* create the echo respond message*/
+	if(is_ip4){
+		ip4_header_t * ip4; 
+		ip4_address_t tmp;
+		udp_header_t * udp;  
+	    ip4 = (ip4_header_t *)b0_copy;
+	    udp = (udp_header_t *)(ip4 +1);
+	    gtpu = (gtpu_header_t *)(udp + 1);
+
+        clib_memcpy(&tmp, &ip4->src_address, sizeof(ip4_address_t));
+        clib_memcpy(&ip4->src_address, &ip4->dst_address, sizeof(ip4_address_t));
+    	clib_memcpy(&ip4->dst_address, &tmp, sizeof(ip4_address_t));
+
+		gtpu->length = clib_host_to_net_u16((sizeof(*gtpu) - 4)/* Now only support 8-byte gtpu header. TBD */);
+		/* teid may changed if we get bi-teid*/
+		gtpu->type	 = GTPU_TYPE_ECHO_RESPONSE; 
+
+        udp->dst_port = udp->src_port;
+        udp->src_port = clib_host_to_net_u16(UDP_DST_PORT_GTPU);
+        udp->length = clib_host_to_net_u16(sizeof(*udp) + (sizeof(*gtpu) - 4)/* Now only support 8-byte gtpu header. TBD */);
+    	udp->checksum = 0;
+		
+		ip4->length = clib_host_to_net_u16(sizeof(*ip4) + sizeof(*udp) + (sizeof(*gtpu) - 4)/* Now only support 8-byte gtpu header. TBD */);
+        ip4->checksum = 0;
+		ip4->checksum = ip4_header_checksum (ip4);
+
+        /* Enqueue the packet right now */    
+        frame = vlib_get_frame_to_node (vm, ip4_lookup_node.index);    
+    	to_next = vlib_frame_vector_args (frame);    
+    	to_next[0] = bi0_copy;    
+    	frame->n_vectors = 1;    
+    	/*just create one package*/    
+    	vlib_put_frame_to_node (vm, ip4_lookup_node.index, frame);
+        
+	} else {
+		ip6_header_t * ip6; 
+		ip6_address_t tmp;
+		udp_header_t * udp;  
+		
+		ip6 = (ip6_header_t *)b0_copy;
+		udp = (udp_header_t *)(ip6 +1);
+	    gtpu = (gtpu_header_t *)(udp + 1);
+
+        clib_memcpy(&tmp, &ip6->src_address, sizeof(ip6_address_t));
+        clib_memcpy(&ip6->src_address, &ip6->dst_address, sizeof(ip6_address_t));
+    	clib_memcpy(&ip6->dst_address, &tmp, sizeof(ip6_address_t));
+		gtpu->length = clib_host_to_net_u16((sizeof(*gtpu) - 4)/* Now only support 8-byte gtpu header. TBD */);
+		/* teid may changed if we get bi-teid*/
+		gtpu->type   = GTPU_TYPE_ECHO_RESPONSE; 
+		
+    	udp->dst_port = udp->src_port;
+        udp->src_port = clib_host_to_net_u16(UDP_DST_PORT_GTPU);
+    	udp->checksum = 0;
+
+        /* Enqueue the packet right now */    
+        frame = vlib_get_frame_to_node (vm, ip6_lookup_node.index);    
+    	to_next = vlib_frame_vector_args (frame);    
+    	to_next[0] = bi0_copy;    
+    	frame->n_vectors = 1;    
+    	/*just create one package*/    
+    	vlib_put_frame_to_node (vm, ip6_lookup_node.index, frame);
+	}
+};
+
+/* send error indication msg, by xftony*/
+static void
+gtpu_send_error_indication(vlib_main_t * vm, vlib_buffer_t * b0, u32 is_ip4)
+{
+	u32  bi0_copy;
+	void* b0_copy;
+	gtpu_header_t * gtpu;
+	vlib_frame_t *frame;    
+	u32 *to_next;
+
+	if (is_ip4) {
+       vlib_buffer_advance(b0, -(word)(sizeof(udp_header_t)+sizeof(ip4_header_t)));
+    } else {
+       vlib_buffer_advance(b0, -(word)(sizeof(udp_header_t)+sizeof(ip6_header_t)));
+    }
+
+	if (vlib_buffer_alloc (vm, &bi0_copy, 1) == 1){
+		b0_copy = vlib_buffer_get_current (vlib_get_buffer (vm, bi0_copy));
+		clib_memcpy (b0_copy, vlib_buffer_get_current (b0), b0->current_length);
+        vlib_get_buffer (vm, bi0_copy)->current_length = b0->current_length;
+	}
+    
+    /* pop (ip, udp) */
+    if (is_ip4) {
+        vlib_buffer_advance(b0, sizeof(ip4_header_t)+sizeof(udp_header_t));
+    } else {
+        vlib_buffer_advance(b0, sizeof(ip6_header_t)+sizeof(udp_header_t));
+    }
+    
+	/* create the error_indication message*/
+	/* swap src and dst*/
+	if(is_ip4){
+		ip4_header_t * ip4; 
+		ip4_address_t tmp;
+		udp_header_t * udp;
+            
+        ip4 = (ip4_header_t *)b0_copy;
+	    udp = (udp_header_t *)(ip4 + 1);
+	    gtpu = (gtpu_header_t *)(udp + 1);
+
+		clib_memcpy(&tmp, &ip4->src_address, sizeof(ip4_address_t));
+        clib_memcpy(&ip4->src_address, &ip4->dst_address, sizeof(ip4_address_t));
+    	clib_memcpy(&ip4->dst_address, &tmp, sizeof(ip4_address_t));
+		
+		gtpu->type = GTPU_TYPE_ERROR_INDICATION; 
+		
+	    udp->dst_port = udp->src_port;
+        udp->src_port = clib_host_to_net_u16(UDP_DST_PORT_GTPU);  
+		udp->checksum = 0;//udp_checksum (udp, clib_net_to_host_u16 (udp->length), (void *)ip4, IP4);;
+
+		ip4->length = clib_host_to_net_u16(sizeof(*ip4) + sizeof(*udp) + (sizeof(*gtpu) - 4)/* Now only support 8-byte gtpu header. TBD */);
+		ip4->checksum = 0;
+		ip4->checksum = ip4_header_checksum (ip4);
+        
+	} else {
+	    ip6_header_t * ip6, * orig_ip6; 
+	    udp_header_t * udp;  
+		
+	    orig_ip6 = (ip6_header_t *)b0_copy;
+		vlib_buffer_advance(b0_copy, -(word)(sizeof(gtpu_header_t)+sizeof(udp_header_t)+sizeof(ip6_header_t)));
+	    
+        ip6 = vlib_buffer_get_current(b0_copy);
+	    udp = (udp_header_t *)(ip6 + 1);
+	    gtpu = (gtpu_header_t *)(udp + 1);
+
+	    clib_memcpy(ip6, orig_ip6, sizeof(ip6_header_t)+sizeof(udp_header_t)+sizeof(gtpu_header_t)-4);
+	    clib_memcpy(&ip6->src_address, &orig_ip6->dst_address, sizeof(ip6_address_t));
+	    clib_memcpy(&ip6->dst_address, &orig_ip6->src_address, sizeof(ip6_address_t));	
+
+		gtpu->type	 = GTPU_TYPE_ERROR_INDICATION; 
+
+		udp->dst_port = udp->src_port;
+	    udp->src_port = clib_host_to_net_u16(UDP_DST_PORT_GTPU);  
+	    udp->checksum = 0;//udp_checksum (udp, clib_net_to_host_u16 (udp->length), (void *)ip6, IP6);
+	}
+
+	/* teid may changed if we get bi-teid*/
+	
+	/* Enqueue the packet right now */    
+    frame = vlib_get_frame_to_node (vm, ip4_lookup_node.index);    
+	to_next = vlib_frame_vector_args (frame);    
+	to_next[0] = bi0_copy;    
+	frame->n_vectors = 1;    
+	/*just create one package*/    
+	vlib_put_frame_to_node (vm, ip4_lookup_node.index, frame);
+    //clib_warning("xftony: send a GTPU_TYPE_ERROR_INDICATION msg");
+};
+
+
+/* process GTPU messages, sending event to the gtpu_process_node, by xftony */
+void gtpu_msg_handle(vlib_main_t * vm, vlib_node_runtime_t * node, vlib_buffer_t * b0, u8 gtpu_type, u32 is_ip4){
+	u32 bi0_copy;
+             
+    if (GTPU_TYPE_ECHO_REQUEST == gtpu_type)
+    {
+		gtpu_send_echo_respond(vm, node, b0, is_ip4);
+	    //clib_warning("xftony: send a GTPU_TYPE_ECHO_RESPONSE msg");
+    }   
+    else
+    {
+        if (vlib_buffer_alloc (vm, &bi0_copy, 1) == 1){
+            void *dst = vlib_buffer_get_current (vlib_get_buffer (vm, bi0_copy));
+            clib_memcpy (dst, vlib_buffer_get_current (b0), b0->current_length);
+			vlib_get_buffer (vm, bi0_copy)->current_length = b0->current_length;
+        }
+        
+	    if (GTPU_TYPE_ECHO_RESPONSE == gtpu_type){
+		//	clib_warning("xftony: get a GTPU_TYPE_ECHO_RESPONSE msg");
+	        if (is_ip4)
+           	 	vlib_process_signal_event_mt (vm, gtpu_process_node.index, GTPU_EVENT_TYPE_ECHO_RESPONSE_IP4, bi0_copy);
+		    else
+			    vlib_process_signal_event_mt (vm, gtpu_process_node.index, GTPU_EVENT_TYPE_ECHO_RESPONSE_IP6, bi0_copy);
+	    }
+	    else if (GTPU_TYPE_ERROR_INDICATION == gtpu_type){	
+		//	clib_warning("xftony: get a GTPU_TYPE_ERROR_INDICATION msg");
+	        if (is_ip4)
+	            vlib_process_signal_event_mt (vm, gtpu_process_node.index, GTPU_EVENT_TYPE_ERROR_INDICATE_IP4, bi0_copy);	
+    		else 
+	            vlib_process_signal_event_mt (vm, gtpu_process_node.index, GTPU_EVENT_TYPE_ERROR_INDICATE_IP6, bi0_copy);	
+	    }
+    }
+}
+
 
 always_inline uword
 gtpu_input (vlib_main_t * vm,
@@ -163,18 +370,21 @@ gtpu_input (vlib_main_t * vm,
             ip6_0 = vlib_buffer_get_current (b0);
             ip6_1 = vlib_buffer_get_current (b1);
 	  }
+      /*handle the gtpu msg, by xftony*/
+	  if (PREDICT_FALSE(GTPU_TYPE_GTPU != gtpu0->type)){
+				gtpu_msg_handle(vm, node, b0, gtpu0->type, is_ip4);
+			}
+	  if (PREDICT_FALSE(GTPU_TYPE_GTPU != gtpu1->type)){
+				gtpu_msg_handle(vm, node, b1, gtpu1->type, is_ip4);
+			}
 
           /* pop (ip, udp, gtpu) */
           if (is_ip4) {
-            vlib_buffer_advance
-              (b0, sizeof(*ip4_0)+sizeof(udp_header_t));
-	    vlib_buffer_advance
-              (b1, sizeof(*ip4_1)+sizeof(udp_header_t));
+            vlib_buffer_advance(b0, sizeof(*ip4_0)+sizeof(udp_header_t));
+	        vlib_buffer_advance(b1, sizeof(*ip4_1)+sizeof(udp_header_t));
           } else {
-	    vlib_buffer_advance
-              (b0, sizeof(*ip6_0)+sizeof(udp_header_t));
-            vlib_buffer_advance
-              (b1, sizeof(*ip6_1)+sizeof(udp_header_t));
+	        vlib_buffer_advance(b0, sizeof(*ip6_0)+sizeof(udp_header_t));
+            vlib_buffer_advance(b1, sizeof(*ip6_1)+sizeof(udp_header_t));
           }
 
           tunnel_index0 = ~0;
@@ -187,6 +397,7 @@ gtpu_input (vlib_main_t * vm,
 	    {
 	      error0 = GTPU_ERROR_BAD_VER;
 	      next0 = GTPU_INPUT_NEXT_DROP;
+		  gtpu_send_error_indication(vm, b0, is_ip4);
 	      goto trace0;
 	    }
 
@@ -204,6 +415,9 @@ gtpu_input (vlib_main_t * vm,
                   {
                     error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
                     next0 = GTPU_INPUT_NEXT_DROP;
+					if(gtpu0->type==GTPU_TYPE_GTPU){
+						gtpu_send_error_indication(vm, b0, is_ip4);
+			        }
                     goto trace0;
                   }
                 last_key4.as_u64 = key4_0.as_u64;
@@ -218,6 +432,7 @@ gtpu_input (vlib_main_t * vm,
 	      {
 		error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
 		next0 = GTPU_INPUT_NEXT_DROP;
+		gtpu_send_error_indication(vm, b0, is_ip4);
 		goto trace0;
 	      }
 
@@ -238,6 +453,9 @@ gtpu_input (vlib_main_t * vm,
 	      }
 	    error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next0 = GTPU_INPUT_NEXT_DROP;
+		if(gtpu0->type==GTPU_TYPE_GTPU){
+			gtpu_send_error_indication(vm, b0, is_ip4);
+        }
 	    goto trace0;
 
          } else /* !is_ip4 */ {
@@ -254,6 +472,9 @@ gtpu_input (vlib_main_t * vm,
                   {
                     error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
                     next0 = GTPU_INPUT_NEXT_DROP;
+					if(gtpu0->type==GTPU_TYPE_GTPU){
+						gtpu_send_error_indication(vm, b0, is_ip4);
+			        }
                     goto trace0;
                   }
                 clib_memcpy (&last_key6, &key6_0, sizeof(key6_0));
@@ -268,6 +489,7 @@ gtpu_input (vlib_main_t * vm,
 	      {
 		error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
 		next0 = GTPU_INPUT_NEXT_DROP;
+		gtpu_send_error_indication(vm, b0, is_ip4);
 		goto trace0;
 	      }
 
@@ -289,6 +511,9 @@ gtpu_input (vlib_main_t * vm,
 	      }
 	    error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next0 = GTPU_INPUT_NEXT_DROP;
+		if(gtpu0->type==GTPU_TYPE_GTPU){
+			gtpu_send_error_indication(vm, b0, is_ip4);
+        }
 	    goto trace0;
           }
 
@@ -361,6 +586,7 @@ gtpu_input (vlib_main_t * vm,
 	    {
 	      error1 = GTPU_ERROR_BAD_VER;
 	      next1 = GTPU_INPUT_NEXT_DROP;
+		  gtpu_send_error_indication(vm, b1, is_ip4);
 	      goto trace1;
 	    }
 
@@ -378,6 +604,9 @@ gtpu_input (vlib_main_t * vm,
                   {
                     error1 = GTPU_ERROR_NO_SUCH_TUNNEL;
                     next1 = GTPU_INPUT_NEXT_DROP;
+					if(gtpu0->type==GTPU_TYPE_GTPU){
+						gtpu_send_error_indication(vm, b0, is_ip4);
+				    }
                     goto trace1;
                   }
                 last_key4.as_u64 = key4_1.as_u64;
@@ -386,7 +615,7 @@ gtpu_input (vlib_main_t * vm,
             else
               tunnel_index1 = last_tunnel_index;
  	    t1 = pool_elt_at_index (gtm->tunnels, tunnel_index1);
-
+        
 	    /* Validate GTPU tunnel encap-fib index agaist packet */
 	    if (PREDICT_FALSE (validate_gtpu_fib (b1, t1, is_ip4) == 0))
 	      {
@@ -412,6 +641,9 @@ gtpu_input (vlib_main_t * vm,
 	      }
 	    error1 = GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next1 = GTPU_INPUT_NEXT_DROP;
+		if(gtpu0->type==GTPU_TYPE_GTPU){
+			gtpu_send_error_indication(vm, b1, is_ip4);
+        }
 	    goto trace1;
 
          } else /* !is_ip4 */ {
@@ -429,6 +661,9 @@ gtpu_input (vlib_main_t * vm,
                   {
                     error1 = GTPU_ERROR_NO_SUCH_TUNNEL;
                     next1 = GTPU_INPUT_NEXT_DROP;
+					if(gtpu0->type==GTPU_TYPE_GTPU){
+						gtpu_send_error_indication(vm, b1, is_ip4);
+			        }
                     goto trace1;
                   }
 
@@ -444,6 +679,7 @@ gtpu_input (vlib_main_t * vm,
 	      {
 		error1 = GTPU_ERROR_NO_SUCH_TUNNEL;
 		next1 = GTPU_INPUT_NEXT_DROP;
+		gtpu_send_error_indication(vm, b1, is_ip4);
 		goto trace1;
 	      }
 
@@ -465,6 +701,9 @@ gtpu_input (vlib_main_t * vm,
 	      }
 	    error1 = GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next1 = GTPU_INPUT_NEXT_DROP;
+		if(gtpu0->type==GTPU_TYPE_GTPU){
+			gtpu_send_error_indication(vm, b1, is_ip4);
+        }
 	    goto trace1;
 	  }
 
@@ -575,6 +814,10 @@ gtpu_input (vlib_main_t * vm,
               (b0, -(word)(sizeof(udp_header_t)+sizeof(ip6_header_t)));
             ip6_0 = vlib_buffer_get_current (b0);
           }
+	  /* handle gtpu msg, add by xftony*/	  
+	  if (PREDICT_FALSE(GTPU_TYPE_GTPU != gtpu0->type)){
+		  gtpu_msg_handle(vm, node, b0, gtpu0->type, is_ip4);
+      }
 
           /* pop (ip, udp) */
           if (is_ip4) {
@@ -591,6 +834,8 @@ gtpu_input (vlib_main_t * vm,
 	    {
 	      error0 = GTPU_ERROR_BAD_VER;
 	      next0 = GTPU_INPUT_NEXT_DROP;
+		  clib_warning("xftony");
+		  gtpu_send_error_indication(vm, b0, is_ip4);
 	      goto trace00;
 	    }
 
@@ -607,6 +852,9 @@ gtpu_input (vlib_main_t * vm,
                   {
                     error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
                     next0 = GTPU_INPUT_NEXT_DROP;
+					if(gtpu0->type==GTPU_TYPE_GTPU){
+					    gtpu_send_error_indication(vm, b0, is_ip4);	
+					}
                     goto trace00;
                   }
                 last_key4.as_u64 = key4_0.as_u64;
@@ -621,6 +869,7 @@ gtpu_input (vlib_main_t * vm,
 	      {
 		error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
 		next0 = GTPU_INPUT_NEXT_DROP;
+		gtpu_send_error_indication(vm, b0, is_ip4);
 		goto trace00;
 	      }
 
@@ -641,6 +890,9 @@ gtpu_input (vlib_main_t * vm,
 	      }
 	    error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next0 = GTPU_INPUT_NEXT_DROP;
+		if(gtpu0->type==GTPU_TYPE_GTPU){
+			gtpu_send_error_indication(vm, b0, is_ip4);
+        }
 	    goto trace00;
 
           } else /* !is_ip4 */ {
@@ -657,6 +909,9 @@ gtpu_input (vlib_main_t * vm,
                   {
                     error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
                     next0 = GTPU_INPUT_NEXT_DROP;
+                    if(gtpu0->type==GTPU_TYPE_GTPU){
+    					gtpu_send_error_indication(vm, b0, is_ip4);
+                    }
                     goto trace00;
                   }
                 clib_memcpy (&last_key6, &key6_0, sizeof(key6_0));
@@ -671,6 +926,7 @@ gtpu_input (vlib_main_t * vm,
 	      {
 		error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
 		next0 = GTPU_INPUT_NEXT_DROP;
+    	gtpu_send_error_indication(vm, b0, is_ip4);
 		goto trace00;
 	      }
 
@@ -692,6 +948,9 @@ gtpu_input (vlib_main_t * vm,
 	      }
 	    error0 = GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next0 = GTPU_INPUT_NEXT_DROP;
+		if(gtpu0->type==GTPU_TYPE_GTPU){
+			gtpu_send_error_indication(vm, b0, is_ip4);
+        }
 	    goto trace00;
           }
 
