@@ -24,7 +24,9 @@
 /* Statistics (not all errors) */
 
 #define foreach_ppf_pdcp_encrypt_error    \
-_(ENCAPSULATED, "good packets encapsulated")
+_(ENCRYPTED, "good packets encrypted")    \
+_(NO_SUCH_CALL, "no such call packets")   \
+_(BYPASSED, "bypassed packets")
 
 static char * ppf_pdcp_encrypt_error_strings[] = {
 #define _(sym,string) string,
@@ -40,7 +42,13 @@ typedef enum {
 } ppf_pdcp_encrypt_error_t;
 
 typedef struct {
-  u32 sw_if_index;
+  u32 tunnel_index;
+  u32 call_id;
+  u32 call_type;
+  u32 ue_bearer_id;
+  u32 sn;
+  u32 count;
+  u32 error;
   u32 next_index;
 } ppf_pdcp_encrypt_trace_t;
 
@@ -51,8 +59,11 @@ u8 * format_ppf_pdcp_encrypt_trace  (u8 * s, va_list * args)
 
   ppf_pdcp_encrypt_trace_t * t = va_arg (*args, ppf_pdcp_encrypt_trace_t *);
   
-  s = format (s, "PDCP_ENCRYPT: sw_if_index %d, next index %d",
-		  t->sw_if_index, t->next_index);
+  s = format (s, "PDCP_ENCRYPT: tunnel_index %d, call_id %d (type %U, ue_bearer %x)\nsn %u, count %u, error %s, next_index %d",
+		  t->tunnel_index, t->call_id,
+		  format_ppf_call_type, t->call_type, t->ue_bearer_id,
+		  t->sn, t->count, ppf_pdcp_encrypt_error_strings[t->error], t->next_index);
+
   return s;
 }
 
@@ -87,45 +98,33 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    ppf_pdcp_encrypt_next_t next1 = next_index;
 	    ppf_pdcp_encrypt_next_t next2 = next_index;
 	    ppf_pdcp_encrypt_next_t next3 = next_index;
-	    u32 sw_if_index0 = 0;
-	    u32 sw_if_index1 = 0;
-	    u32 sw_if_index2 = 0;
-	    u32 sw_if_index3 = 0;
 	    u32 bi0, bi1, bi2, bi3;
 	    vlib_buffer_t * b0, * b1, *b2, *b3;
-	    u32 tunnel_index0;
-	    u32 tunnel_index1;
-	    u32 tunnel_index2;
-	    u32 tunnel_index3;
+	    u32 error0 = 0, error1 = 0, error2 = 0, error3 = 0;
+	    u32 tunnel_index0, tunnel_index1, tunnel_index2, tunnel_index3;
 	    ppf_gtpu_tunnel_t * t0, * t1, * t2, * t3;
 	    ppf_callline_t * c0, * c1, * c2, * c3;
 	    ppf_pdcp_session_t * pdcp0, * pdcp1, * pdcp2, *pdcp3;
 	    u8 * buf0, * buf1, * buf2, * buf3;
+	    u32 count0, count1, count2, count3;
+	    u32 sn0, sn1, sn2, sn3;
 	    u32 len0, len1, len2, len3;
+	    ppf_pdcp_security_param_t sp0, sp1, sp2, sp3;
 	    
 	    
 	    /* Prefetch next iteration. */
 	    {
-		vlib_buffer_t * p4, * p5, *p6, *p7;
-		
-		p4 = vlib_get_buffer (vm, from[4]);
-		p5 = vlib_get_buffer (vm, from[5]);
-		p6 = vlib_get_buffer (vm, from[6]);
-		p7 = vlib_get_buffer (vm, from[7]);
-		
-		vlib_prefetch_buffer_header (p4, LOAD);
-		vlib_prefetch_buffer_header (p5, LOAD);
-		vlib_prefetch_buffer_header (p6, LOAD);
-		vlib_prefetch_buffer_header (p7, LOAD);
-
-		#if 0 
-		//dont know what to prefetch
-		// what is the difference between STORE & LOAD
-		CLIB_PREFETCH (p4->data, sizeof (ip4_header_t), STORE);
-		CLIB_PREFETCH (p5->data, sizeof (ip4_header_t), STORE);
-		CLIB_PREFETCH (p6->data, sizeof (ip4_header_t), STORE);
-		CLIB_PREFETCH (p7->data, sizeof (ip4_header_t), STORE);
-		#endif
+          vlib_buffer_t * p4, * p5, *p6, *p7;
+          
+          p4 = vlib_get_buffer (vm, from[4]);
+          p5 = vlib_get_buffer (vm, from[5]);
+          p6 = vlib_get_buffer (vm, from[6]);
+          p7 = vlib_get_buffer (vm, from[7]);
+          
+          vlib_prefetch_buffer_header (p4, LOAD);
+          vlib_prefetch_buffer_header (p5, LOAD);
+          vlib_prefetch_buffer_header (p6, LOAD);
+          vlib_prefetch_buffer_header (p7, LOAD);
 	    }
 
 	    /* speculatively enqueue b0 and b1 to the current next frame */
@@ -143,6 +142,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    b2 = vlib_get_buffer (vm, bi2);
 	    b3 = vlib_get_buffer (vm, bi3);
 
+        /* Find context */	    
 	    tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
 	    tunnel_index1 = vnet_buffer(b1)->sw_if_index[VLIB_TX];
 	    tunnel_index2 = vnet_buffer(b2)->sw_if_index[VLIB_TX];
@@ -163,113 +163,231 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    pdcp2 = pool_elt_at_index(ppm->sessions, c2->pdcp.session_id);
 	    pdcp3 = pool_elt_at_index(ppm->sessions, c3->pdcp.session_id);
 
-            // Fix later!!!
-	    //if (PREDICT_FALSE(0 == pdcp0->header_length))
-	    //	goto next0;
+        if (PREDICT_TRUE(PPF_DRB_CALL == c0->call_type)) {
+			sn0 = pdcp0->tx_next_sn;
+			count0 = PPF_PDCP_COUNT (pdcp0->tx_hfn, pdcp0->tx_next_sn, pdcp0->sn_length);
+			PPF_PDCP_COUNT_INC (pdcp0->tx_hfn, pdcp0->tx_next_sn, pdcp0->sn_length);
+        } else {
+			sn0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn;
+			count0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.count;
+        }
 
+        if (PREDICT_TRUE(PPF_DRB_CALL == c1->call_type)) {
+			sn1 = pdcp1->tx_next_sn;
+			count1 = PPF_PDCP_COUNT (pdcp1->tx_hfn, pdcp1->tx_next_sn, pdcp1->sn_length);
+			PPF_PDCP_COUNT_INC (pdcp1->tx_hfn, pdcp1->tx_next_sn, pdcp1->sn_length);
+        } else {
+			sn1 = vnet_buffer2(b1)->ppf_du_metadata.pdcp.sn;
+			count1 = vnet_buffer2(b1)->ppf_du_metadata.pdcp.count;
+        }
+
+        if (PREDICT_TRUE(PPF_DRB_CALL == c2->call_type)) {
+			sn2 = pdcp2->tx_next_sn;
+			count2 = PPF_PDCP_COUNT (pdcp2->tx_hfn, pdcp2->tx_next_sn, pdcp2->sn_length);
+			PPF_PDCP_COUNT_INC (pdcp2->tx_hfn, pdcp2->tx_next_sn, pdcp2->sn_length);
+        } else {
+			sn2 = vnet_buffer2(b2)->ppf_du_metadata.pdcp.sn;
+			count2 = vnet_buffer2(b2)->ppf_du_metadata.pdcp.count;
+        }
+		
+        if (PREDICT_TRUE(PPF_DRB_CALL == c3->call_type)) {
+			sn3 = pdcp3->tx_next_sn;
+			count3 = PPF_PDCP_COUNT (pdcp3->tx_hfn, pdcp3->tx_next_sn, pdcp3->sn_length);
+			PPF_PDCP_COUNT_INC (pdcp3->tx_hfn, pdcp3->tx_next_sn, pdcp3->sn_length);
+        } else {
+			sn3 = vnet_buffer2(b3)->ppf_du_metadata.pdcp.sn;
+			count3 = vnet_buffer2(b3)->ppf_du_metadata.pdcp.count;
+        }
+		
+        /* Handle packet 0 */
+	    
+	    if (PREDICT_FALSE(0 == pdcp0->header_length)) {
+	      error0 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
+	      goto next0;
+	    }
+
+	    /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b0, -(word)(pdcp0->header_length));
-	    vlib_buffer_advance (b1, -(word)(pdcp1->header_length));
-	    vlib_buffer_advance (b2, -(word)(pdcp2->header_length));
-	    vlib_buffer_advance (b3, -(word)(pdcp3->header_length));
-
 	    buf0 = vlib_buffer_get_current (b0);
-	    buf1 = vlib_buffer_get_current (b1);
-	    buf2 = vlib_buffer_get_current (b2);
-	    buf3 = vlib_buffer_get_current (b3);
+	    pdcp0->encap_header (buf0, 0, sn0);
 
-	    pdcp0->encap_header (buf0, 0, vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn);
-	    pdcp1->encap_header (buf1, 0, vnet_buffer2(b1)->ppf_du_metadata.pdcp.sn);
-	    pdcp2->encap_header (buf2, 0, vnet_buffer2(b2)->ppf_du_metadata.pdcp.sn);
-	    pdcp3->encap_header (buf3, 0, vnet_buffer2(b3)->ppf_du_metadata.pdcp.sn);
+		sp0.pdcp_sess = pdcp0;
+		sp0.count = count0;
+		sp0.bearer = PPF_BEARER(c0->ue_bearer_id);
+		sp0.dir = PPF_PDCP_DIR_ENC;
 
-            /* Integrity */
+        /* Integrity */
 	    len0 = vlib_buffer_length_in_chain(vm, b0);
-	    len1 = vlib_buffer_length_in_chain(vm, b1);
-	    len2 = vlib_buffer_length_in_chain(vm, b2);
-	    len3 = vlib_buffer_length_in_chain(vm, b3);
 	    vlib_buffer_put_uninit (b0, pdcp0->mac_length);
-	    vlib_buffer_put_uninit (b0, pdcp1->mac_length);
-	    vlib_buffer_put_uninit (b0, pdcp2->mac_length);
-	    vlib_buffer_put_uninit (b0, pdcp3->mac_length);
-	    pdcp0->protect (buf0, buf0 + len0, len0, NULL);
-	    pdcp1->protect (buf1, buf1 + len1, len1, NULL);
-	    pdcp2->protect (buf2, buf2 + len2, len2, NULL);
-	    pdcp3->protect (buf3, buf3 + len3, len3, NULL);
+	    pdcp0->protect (buf0, buf0 + len0, len0, &sp0);
 
-            /* Encrypt */
+        /* Encrypt */
 	    len0 = vlib_buffer_length_in_chain(vm, b0);
-	    len1 = vlib_buffer_length_in_chain(vm, b1);
-	    len2 = vlib_buffer_length_in_chain(vm, b2);
-	    len3 = vlib_buffer_length_in_chain(vm, b3);
 	    pdcp0->encrypt (buf0 + pdcp0->header_length,
 	    	            buf0 + pdcp0->header_length,
 	    	            len0 - pdcp0->header_length,
-	    	            NULL);
+	    	            &sp0);
+
+        next0:
+          if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
+          {
+            if (b0->flags & VLIB_BUFFER_IS_TRACED) 
+            {
+              ppf_pdcp_encrypt_trace_t *t = 
+                vlib_add_trace (vm, node, b0, sizeof (*t));
+              t->tunnel_index = tunnel_index0;
+              t->call_id = t0->call_id;
+              t->call_type = c0->call_type;
+              t->ue_bearer_id = c0->ue_bearer_id;
+              t->sn = sn0;
+              t->count = count0;
+              t->error = error0;
+              t->next_index = next0;			  
+            }
+          }
+
+        /* Handle packet 1 */
+
+	    if (PREDICT_FALSE(0 == pdcp1->header_length)) {
+	      error1 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
+	      goto next1;
+	    }
+
+	    /* Prepend and encap pdcp header */
+	    vlib_buffer_advance (b1, -(word)(pdcp1->header_length));
+	    buf1 = vlib_buffer_get_current (b1);
+	    pdcp1->encap_header (buf1, 0, sn1);
+
+		sp1.pdcp_sess = pdcp1;
+		sp1.count = count1;
+		sp1.bearer = PPF_BEARER(c1->ue_bearer_id);
+		sp1.dir = PPF_PDCP_DIR_ENC;
+
+        /* Integrity */
+	    len1 = vlib_buffer_length_in_chain(vm, b1);
+	    vlib_buffer_put_uninit (b1, pdcp1->mac_length);
+	    pdcp1->protect (buf1, buf1 + len1, len1, &sp1);
+
+        /* Encrypt */
+	    len1 = vlib_buffer_length_in_chain(vm, b1);
 	    pdcp1->encrypt (buf1 + pdcp1->header_length,
 	    	            buf1 + pdcp1->header_length,
 	    	            len1 - pdcp1->header_length,
-	    	            NULL);
+	    	            &sp1);
+	  
+        next1:
+          if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
+          {
+            if (b1->flags & VLIB_BUFFER_IS_TRACED) 
+            {
+              ppf_pdcp_encrypt_trace_t *t = 
+                vlib_add_trace (vm, node, b1, sizeof (*t));
+              t->tunnel_index = tunnel_index1;
+              t->call_id = t1->call_id;
+              t->call_type = c1->call_type;
+              t->ue_bearer_id = c1->ue_bearer_id;
+              t->sn = sn1;
+              t->count = count1;
+              t->error = error1;
+              t->next_index = next1;			  
+            }
+          }
+
+        /* Handle packet 2 */
+
+	    if (PREDICT_FALSE(0 == pdcp2->header_length)) {
+	      error2 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
+	      goto next2;
+	    }
+
+	    /* Prepend and encap pdcp header */
+	    vlib_buffer_advance (b2, -(word)(pdcp2->header_length));
+	    buf2 = vlib_buffer_get_current (b2);
+	    pdcp2->encap_header (buf2, 0, sn2);
+
+		sp2.pdcp_sess = pdcp2;
+		sp2.count = count2;
+		sp2.bearer = PPF_BEARER(c2->ue_bearer_id);
+		sp2.dir = PPF_PDCP_DIR_ENC;
+
+        /* Integrity */
+	    len2 = vlib_buffer_length_in_chain(vm, b2);
+	    vlib_buffer_put_uninit (b2, pdcp2->mac_length);
+	    pdcp2->protect (buf2, buf2 + len2, len2, &sp2);
+
+        /* Encrypt */
+	    len2 = vlib_buffer_length_in_chain(vm, b2);
 	    pdcp2->encrypt (buf2 + pdcp2->header_length,
 	    	            buf2 + pdcp2->header_length,
 	    	            len2 - pdcp2->header_length,
-	    	            NULL);
+	    	            &sp2);
+
+        next2:
+          if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
+          {
+            if (b2->flags & VLIB_BUFFER_IS_TRACED) 
+            {
+              ppf_pdcp_encrypt_trace_t *t = 
+                vlib_add_trace (vm, node, b2, sizeof (*t));
+              t->tunnel_index = tunnel_index2;
+              t->call_id = t2->call_id;
+              t->call_type = c2->call_type;
+              t->ue_bearer_id = c2->ue_bearer_id;
+              t->sn = sn2;
+              t->count = count2;
+              t->error = error2;
+              t->next_index = next2;			  
+            }
+          }
+
+        /* Handle packet 3 */
+
+	    if (PREDICT_FALSE(0 == pdcp3->header_length)) {
+	      error3 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
+	      goto next3;
+	    }
+
+	    /* Prepend and encap pdcp header */
+	    vlib_buffer_advance (b3, -(word)(pdcp3->header_length));
+	    buf3 = vlib_buffer_get_current (b3);
+	    pdcp3->encap_header (buf3, 0, sn3);
+
+		sp3.pdcp_sess = pdcp3;
+		sp3.count = count3;
+		sp3.bearer = PPF_BEARER(c3->ue_bearer_id);
+		sp3.dir = PPF_PDCP_DIR_ENC;
+
+        /* Integrity */
+	    len3 = vlib_buffer_length_in_chain(vm, b3);
+	    vlib_buffer_put_uninit (b3, pdcp3->mac_length);
+	    pdcp3->protect (buf3, buf3 + len3, len3, &sp3);
+
+        /* Encrypt */
+	    len3 = vlib_buffer_length_in_chain(vm, b3);
 	    pdcp3->encrypt (buf3 + pdcp3->header_length,
 	    	            buf3 + pdcp3->header_length,
 	    	            len3 - pdcp3->header_length,
-	    	            NULL);
+	    	            &sp3);
 
-
-	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
-	    sw_if_index1 = vnet_buffer(b1)->sw_if_index[VLIB_RX];
-	    sw_if_index2 = vnet_buffer(b2)->sw_if_index[VLIB_RX];
-	    sw_if_index3 = vnet_buffer(b3)->sw_if_index[VLIB_RX];
-
-	    if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
-	    {
-		if (b0->flags & VLIB_BUFFER_IS_TRACED) 
-		{
-			ppf_pdcp_encrypt_trace_t *t = 
-				vlib_add_trace (vm, node, b0, sizeof (*t));
-			t->sw_if_index = sw_if_index0;
-			t->next_index = next0;			  
-		}
-	    }
-	  
-            if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
+        next3:
+          if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
+          {
+            if (b3->flags & VLIB_BUFFER_IS_TRACED) 
             {
-		if (b1->flags & VLIB_BUFFER_IS_TRACED) 
-		{
-	 		ppf_pdcp_encrypt_trace_t *t = 
-	 			vlib_add_trace (vm, node, b1, sizeof (*t));
-	 		t->sw_if_index = sw_if_index1;
-	 		t->next_index = next1;			
-		}
+              ppf_pdcp_encrypt_trace_t *t = 
+                vlib_add_trace (vm, node, b3, sizeof (*t));
+              t->tunnel_index = tunnel_index3;
+              t->call_id = t3->call_id;
+              t->call_type = c3->call_type;
+              t->ue_bearer_id = c3->ue_bearer_id;
+              t->sn = sn3;
+              t->count = count3;
+              t->error = error3;
+              t->next_index = next3;			  
             }
-
-            if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
-            {
-		if (b2->flags & VLIB_BUFFER_IS_TRACED) 
-		{
-			ppf_pdcp_encrypt_trace_t *t = 
-				vlib_add_trace (vm, node, b2, sizeof (*t));
-			t->sw_if_index = sw_if_index2;
-			t->next_index = next2;	    
-		}
-            }
-
-            if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
-            {
-		if (b3->flags & VLIB_BUFFER_IS_TRACED) 
-		{
-			ppf_pdcp_encrypt_trace_t *t = 
-				vlib_add_trace (vm, node, b3, sizeof (*t));
-			t->sw_if_index = sw_if_index3;
-			t->next_index = next3;	 
-
-		}
-            }
+          }
   
-	    pkts_processed += 4;
+            pkts_processed += 4;
 		 
             /* verify speculative enqueues, maybe switch current next frame */
             vlib_validate_buffer_enqueue_x4 (vm, node, next_index,
@@ -280,15 +398,18 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	while (n_left_from > 0 && n_left_to_next > 0)
 	  {
 	    ppf_pdcp_encrypt_next_t next0 = next_index;
-	    u32 sw_if_index0 = 0;
 	    u32 bi0;
 	    vlib_buffer_t * b0; 
+	    u32 error0 = 0;
 	    u32 tunnel_index0;
 	    ppf_gtpu_tunnel_t * t0;
 	    ppf_callline_t * c0;
 	    ppf_pdcp_session_t * pdcp0;
 	    u8 * buf0;
+	    u32 count0;
+	    u32 sn0;
 	    u32 len0;
+	    ppf_pdcp_security_param_t sp0;
 
 	    /* speculatively enqueue b0 to the current next frame */
 	    bi0 = from[0];
@@ -300,50 +421,73 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 
 	    b0 = vlib_get_buffer (vm, bi0);
 
+        /* Find context */
 	    tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
-
 	    t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
-
 	    c0 = &(pm->ppf_calline_table[t0->call_id]);
-
 	    pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
 
+        if (PREDICT_TRUE(PPF_DRB_CALL == c0->call_type)) {
+			sn0 = pdcp0->tx_next_sn;
+			count0 = PPF_PDCP_COUNT (pdcp0->tx_hfn, pdcp0->tx_next_sn, pdcp0->sn_length);
+			PPF_PDCP_COUNT_INC (pdcp0->tx_hfn, pdcp0->tx_next_sn, pdcp0->sn_length);
+        } else {
+			sn0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn;
+			count0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.count;
+        }
+
+	    if (PREDICT_FALSE(0 == pdcp0->header_length)) {
+	      error0 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
+	      goto next00;
+	    }
+
+        /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b0, -(word)(pdcp0->header_length));
-
 	    buf0 = vlib_buffer_get_current (b0);
+	    pdcp0->encap_header (buf0, 0, sn0);
 
-	    pdcp0->encap_header (buf0, 0, vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn);
+		sp0.pdcp_sess = pdcp0;
+		sp0.count = count0;
+		sp0.bearer = PPF_BEARER(c0->ue_bearer_id);
+		sp0.dir = PPF_PDCP_DIR_ENC;
 
-            /* Integrity */
+        /* Integrity */
 	    len0 = vlib_buffer_length_in_chain(vm, b0);
 	    vlib_buffer_put_uninit (b0, pdcp0->mac_length);
-	    pdcp0->protect (buf0, buf0 + len0, len0, NULL);
+	    pdcp0->protect (buf0, buf0 + len0, len0, &sp0);
 
-            /* Encrypt */
+        /* Encrypt */
 	    len0 = vlib_buffer_length_in_chain(vm, b0);
 	    pdcp0->encrypt (buf0 + pdcp0->header_length,
 	    	            buf0 + pdcp0->header_length,
 	    	            len0 - pdcp0->header_length,
-	    	            NULL);
+	    	            &sp0);
 
-	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
+        next00:
+			
+          if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
+          {
+            if (b0->flags & VLIB_BUFFER_IS_TRACED) 
+            {
+              ppf_pdcp_encrypt_trace_t *t = 
+                vlib_add_trace (vm, node, b0, sizeof (*t));
+              t->tunnel_index = tunnel_index0;
+              t->call_id = t0->call_id;
+              t->call_type = c0->call_type;
+              t->ue_bearer_id = c0->ue_bearer_id;
+              t->sn = sn0;
+              t->count = count0;
+              t->error = error0;
+              t->next_index = next0;			  
+            }
+          }
+ 		
+        pkts_processed += 1;
 
-	    if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
-	    {
-		  if (b0->flags & VLIB_BUFFER_IS_TRACED) 
-		  {
-			  ppf_pdcp_encrypt_trace_t *t = 
-			    vlib_add_trace (vm, node, b0, sizeof (*t));
-			  t->sw_if_index = sw_if_index0;
-			  t->next_index = next0;			  
-		   }
-	    }
- 
-		
 	    /* verify speculative enqueue, maybe switch current next frame */
 	    vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
-							 to_next, n_left_to_next,
-							 bi0, next0);
+					 to_next, n_left_to_next,
+					 bi0, next0);
 	  }
 
 	vlib_put_next_frame (vm, node, next_index, n_left_to_next);

@@ -196,7 +196,7 @@ int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c)
 	vnet_ppf_init_calline (c->call_id, c->call_type);
 	
 	/* Create pdcp session */
-	call_line->pdcp.session_id = ppf_pdcp_create_session (12, 1, 1, 0);
+	call_line->pdcp.session_id = ppf_pdcp_create_session (255, 1, 1, 0);
 	if (~0 != call_line->pdcp.session_id) {
 		ppf_pdcp_config_t pdcp_config;
 
@@ -455,6 +455,17 @@ format_ppf_pdcp_simple (u8 * s, va_list * va)
 }
 
 u8 *
+format_ppf_call_type (u8 * s, va_list * va)
+{
+  int type = va_arg (*va, int);
+  if ((type < 0) || (type > PPF_DRB_CALL))
+    s = format (s, "invalid");
+  else
+    s = format (s, "%s", ppf_callline_type_strings[type]);
+  return s;
+}
+
+u8 *
 format_ppf_callline (u8 * s, va_list * va)
 {
   ppf_callline_t * callline = va_arg (*va, ppf_callline_t *);
@@ -465,9 +476,9 @@ format_ppf_callline (u8 * s, va_list * va)
     return s;
   }
 
-  s = format (s, "[%d]type %s ue-bearer-id 0x%x sb-policy 0x%x",
+  s = format (s, "[%d]type %U ub 0x%x sb-policy 0x%x ",
   	callline->call_index,
-  	ppf_callline_type_strings[callline->call_type],
+  	format_ppf_call_type, callline->call_type,
   	callline->ue_bearer_id, callline->sb_policy);
 
   if (PPF_SRB_CALL == callline->call_type) {    

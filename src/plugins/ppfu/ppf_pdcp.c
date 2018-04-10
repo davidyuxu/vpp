@@ -164,23 +164,184 @@ ppf_pdcp_decap_header_18bsn (u8 * buf, u8 * dc, u32 * sn)
   *sn = (((*buf) << 16) | ((*(buf + 1)) << 8) | (*(buf + 2))) & 0x3ffff;
 }
 
+always_inline void
+ppf_pdcp_gen_iv (u8 alg, u32 count, u8 bearer, u8 dir, u8 * iv)
+{
+	switch (alg) {
+		case PDCP_SNOW3G_CIPHERING:
+			{
+				iv[0]  = ((count >> 24) & 0xFF);
+				iv[1]  = ((count >> 16) & 0xFF);
+				iv[2]  = ((count >> 8)  & 0xFF);
+				iv[3]  = ((count)       & 0xFF);
+				iv[8]  = ((count >> 24) & 0xFF);
+				iv[9]  = ((count >> 16) & 0xFF);
+				iv[10] = ((count >> 8)  & 0xFF);
+				iv[11] = ((count)       & 0xFF);
+				iv[4]  = ((((bearer & 0x1F) << 1) | (dir & 0x1)) << 2);
+				iv[12] = ((((bearer & 0x1F) << 1) | (dir & 0x1)) << 2);
+			}
+			break;
+
+		case PDCP_AES_CIPHERING:
+			{
+				iv[0] = ((count >> 24) & 0xFF);
+				iv[1] = ((count >> 16) & 0xFF);
+				iv[2] = ((count >> 8)  & 0xFF);
+				iv[3] = ((count)       & 0xFF);
+				iv[4] = ((((bearer & 0x1F) << 1) | (dir & 0x1)) << 2);
+			}
+			break;
+
+		case PDCP_SNOW3G_INTEGRITY:
+			{
+				iv[0]  = ((count>>24) & 0xFF);
+				iv[1]  = ((count>>16) & 0xFF);
+				iv[2]  = ((count>>8)  & 0xFF);
+				iv[3]  = ((count)     & 0xFF);
+				iv[4]  = (bearer & 0x1F) << 3;
+
+				iv[8]  = ((count >> 24) & 0xFF) ^ (dir << 7);
+				iv[9]  = ((count >> 16) & 0xFF);
+				iv[10] = ((count >> 8)  & 0xFF);
+				iv[11] = ((count >> 0)  & 0xFF);
+				iv[12] = (bearer & 0x1F) << 3;
+				iv[14] = (iv[14] ^ (dir << 7));
+			}
+			break;
+
+		case PDCP_AES_INTEGRITY:
+			{
+				iv[0] = ((count >> 24) & 0xFF);
+				iv[1] = ((count >> 16) & 0xFF);
+				iv[2] = ((count >> 8)  & 0xFF);
+				iv[3] = ((count >> 0)  & 0xFF);
+				iv[4] = ((((bearer & 0x1F) << 1) | (dir & 0x1)) << 2);
+				iv[5] = 0;
+				iv[6] = 0;
+				iv[7] = 0;
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
 u32
 ppf_pdcp_nop (u8 * in, u8 * out, u32 size, void * security_parameters)
 {
-  return 0;
+	return 0;
 }
 
 u32
 ppf_pdcp_eia0_protect (u8 * in, u8 * out, u32 size, void * security_parameters)
 {
-  memset (out, 0x00, 4);
-  return 0;
+	memset (out, 0x00, 4);
+	return 0;
 }
 
 u32
 ppf_pdcp_eia0_validate (u8 * in, u8 * out, u32 size, void * security_parameters)
 {
-  return 0;
+	memset (out, 0x00, 4);
+	return 0;
+}
+
+u32
+ppf_pdcp_eia1 (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
+	CLIB_UNUSED(u8 iv[16]) = {0};
+
+	ppf_pdcp_gen_iv (PDCP_SNOW3G_INTEGRITY,
+				sec_para->count, sec_para->bearer, sec_para->dir, iv);
+
+	// TODO:
+	out[0] = 'S';
+	out[1] = '3';
+	out[2] = 'G';
+	out[3] = '^';
+
+	return 0;
+}
+
+u32
+ppf_pdcp_eea1 (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
+	CLIB_UNUSED(u8 iv[16]) = {0};
+
+	ppf_pdcp_gen_iv (PDCP_SNOW3G_CIPHERING,
+				sec_para->count, sec_para->bearer, sec_para->dir, iv);
+
+	// TODO:
+	
+	return 0;
+}
+
+u32
+ppf_pdcp_eia2 (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
+	CLIB_UNUSED(u8 iv[16]) = {0};
+
+	ppf_pdcp_gen_iv (PDCP_AES_INTEGRITY,
+				sec_para->count, sec_para->bearer, sec_para->dir, iv);
+
+	// TODO:
+	out[0] = 'A';
+	out[1] = 'E';
+	out[2] = 'S';
+	out[3] = '^';
+	
+	return 0;
+}
+
+u32
+ppf_pdcp_eea2 (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
+	CLIB_UNUSED(u8 iv[16]) = {0};
+
+	ppf_pdcp_gen_iv (PDCP_AES_CIPHERING,
+				sec_para->count, sec_para->bearer, sec_para->dir, iv);
+
+	// TODO:
+	
+	return 0;
+}
+
+u32
+ppf_pdcp_eia3 (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
+	CLIB_UNUSED(u8 iv[16]) = {0};
+
+	ppf_pdcp_gen_iv (PDCP_ZUC_INTEGRITY,
+				sec_para->count, sec_para->bearer, sec_para->dir, iv);
+
+	// TODO:
+	out[0] = 'Z';
+	out[1] = 'U';
+	out[2] = 'C';
+	out[3] = '^';
+	
+	return 0;
+}
+
+u32
+ppf_pdcp_eea3 (u8 * in, u8 * out, u32 size, void * security_parameters)
+{
+	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
+	CLIB_UNUSED(u8 iv[16]) = {0};
+
+	ppf_pdcp_gen_iv (PDCP_ZUC_CIPHERING,
+				sec_para->count, sec_para->bearer, sec_para->dir, iv);
+
+	// TODO:
+
+	return 0;
 }
 
 u32
@@ -271,36 +432,36 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
     {
       case PDCP_EIA_NONE:
       	pdcp_sess->protect = &ppf_pdcp_nop;
-	pdcp_sess->validate = &ppf_pdcp_nop;
-	pdcp_sess->mac_length = 0;
+        pdcp_sess->validate = &ppf_pdcp_nop;
+        pdcp_sess->mac_length = 0;
         break;
 	
       case PDCP_EIA0:
         pdcp_sess->security_algorithms |= PDCP_NULL_INTEGRITY;
       	pdcp_sess->protect = &ppf_pdcp_eia0_protect;
-	pdcp_sess->validate = &ppf_pdcp_eia0_validate;
-	pdcp_sess->mac_length = 4;
+        pdcp_sess->validate = &ppf_pdcp_eia0_validate;
+        pdcp_sess->mac_length = 4;
         break;
 	
       case PDCP_EIA1:
         pdcp_sess->security_algorithms |= PDCP_SNOW3G_INTEGRITY;
-      	pdcp_sess->protect = &ppf_pdcp_nop;
-	pdcp_sess->validate = &ppf_pdcp_nop;
-	pdcp_sess->mac_length = 4;
+      	pdcp_sess->protect = &ppf_pdcp_eia1;
+        pdcp_sess->validate = &ppf_pdcp_eia1;
+        pdcp_sess->mac_length = 4;
         break;
 
       case PDCP_EIA2:
         pdcp_sess->security_algorithms |= PDCP_AES_INTEGRITY;
-      	pdcp_sess->protect = &ppf_pdcp_nop;
-	pdcp_sess->validate = &ppf_pdcp_nop;
-	pdcp_sess->mac_length = 4;
+      	pdcp_sess->protect = &ppf_pdcp_eia2;
+        pdcp_sess->validate = &ppf_pdcp_eia2;
+        pdcp_sess->mac_length = 4;
         break;
 
       case PDCP_EIA3:
-	pdcp_sess->security_algorithms |= PDCP_ZUC_INTEGRITY;
-      	pdcp_sess->protect = &ppf_pdcp_nop;
-	pdcp_sess->validate = &ppf_pdcp_nop;
-	pdcp_sess->mac_length = 4;
+        pdcp_sess->security_algorithms |= PDCP_ZUC_INTEGRITY;
+      	pdcp_sess->protect = &ppf_pdcp_eia3;
+        pdcp_sess->validate = &ppf_pdcp_eia3;
+        pdcp_sess->mac_length = 4;
         break;
 
       default:
@@ -320,20 +481,20 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
         break;
 	
       case PDCP_EEA1:
-        pdcp_sess->encrypt = &ppf_pdcp_nop;
-        pdcp_sess->decrypt = &ppf_pdcp_nop;
-	pdcp_sess->security_algorithms |= PDCP_SNOW3G_CIPHERING;
+        pdcp_sess->encrypt = &ppf_pdcp_eea1;
+        pdcp_sess->decrypt = &ppf_pdcp_eea1;
+        pdcp_sess->security_algorithms |= PDCP_SNOW3G_CIPHERING;
         break;
 
       case PDCP_EEA2:
-        pdcp_sess->encrypt = &ppf_pdcp_nop;
-        pdcp_sess->decrypt = &ppf_pdcp_nop;
-	pdcp_sess->security_algorithms |= PDCP_AES_CIPHERING;
+        pdcp_sess->encrypt = &ppf_pdcp_eea2;
+        pdcp_sess->decrypt = &ppf_pdcp_eea2;
+        pdcp_sess->security_algorithms |= PDCP_AES_CIPHERING;
         break;
 
       case PDCP_EEA3:
-        pdcp_sess->encrypt = &ppf_pdcp_nop;
-        pdcp_sess->decrypt = &ppf_pdcp_nop;
+        pdcp_sess->encrypt = &ppf_pdcp_eea3;
+        pdcp_sess->decrypt = &ppf_pdcp_eea3;
       	pdcp_sess->security_algorithms |= PDCP_ZUC_CIPHERING;
         break;
 

@@ -256,7 +256,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   }
 
   /* Create pdcp session */
-  callline->pdcp.session_id = ppf_pdcp_create_session (12, 0, 0, 0);
+  callline->pdcp.session_id = ppf_pdcp_create_session (255, 0, 0, 0);
   if (~0 != callline->pdcp.session_id) {
 	  ppf_pdcp_config_t pdcp_config;
   
