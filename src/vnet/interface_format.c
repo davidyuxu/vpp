@@ -284,10 +284,10 @@ format_vnet_sw_interface (u8 * s, va_list * args)
   vnet_interface_main_t *im = &vnm->interface_main;
 
   if (!si)
-    return format (s, "%=32s%=5s%=16s%=16s%=16s",
+    return format (s, "%=32s%=8s%=16s%=16s%=16s",
 		   "Name", "Idx", "State", "Counter", "Count");
 
-  s = format (s, "%-32U%=5d%=16U",
+  s = format (s, "%-32U%=8d%=16U",
 	      format_vnet_sw_interface_name, vnm, si, si->sw_if_index,
 	      format_vnet_sw_interface_flags, si->flags);
 

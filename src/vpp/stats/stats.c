@@ -115,8 +115,12 @@ throughput_trace_command_fn (vlib_main_t * vm,
             vlib_cli_output(vm, "SYSTEM THROUGHPUT TRACE IS OFF \n");
         } else if (unformat (input, "add %u", &sw_if_index)) {
             throughput_stats_validate(sw_if_index);
-        } else if (unformat (input, "del %u", &sw_if_index)) {
-            throughput_stats_del(sw_if_index);
+	} else if (unformat (input, "del %u", &sw_if_index)) {
+            if (throughput_stats_main.throughput_debug == 1) {
+                vlib_cli_output(vm, "Please disable throughput trace before delete a interface trace.\n");
+            } else {
+                throughput_stats_del(sw_if_index);
+            }
         } else if (unformat (input, "verbose %d", &verbose)) {
             throughput_stats_verbose(verbose);
         } else if (unformat (input, "clear")) {
@@ -171,7 +175,7 @@ throughput_stats_init(stats_main_t * sm)
 }
 
 static void 
-througput_stats_counter_clear(vlib_if_stats_main_t *sm)
+throughput_stats_counter_clear(vlib_if_stats_main_t *sm)
 {
     vlib_if_counter_t *sc;
 
@@ -239,13 +243,13 @@ throughput_stats_clear ()
 
     throughput_stats_lock();
     vec_foreach (sm, throughput_stats_main.if_stats) {
-        througput_stats_counter_clear(sm);
+        throughput_stats_counter_clear(sm);
     }
 
     
     for (i = 0; i < SYSTEM_THROUGHPUT_MAX_BINS; i++) {
         vec_foreach (sm, throughput_stats_main.if_stats_by_bin[i]) {
-            througput_stats_counter_clear(sm);
+            throughput_stats_counter_clear(sm);
         }
     }
 
@@ -265,15 +269,16 @@ throughput_stats_add_ (u32 sw_if_index)
     sm->sw_if_index = sw_if_index;
     
     vec_validate (sm->counters, tm->n_vlib_mains - 1);
-    througput_stats_counter_clear(sm);
+    throughput_stats_counter_clear(sm);
     
 
-    vec_add2(throughput_stats_main.if_stats_by_bin[i], sm, SYSTEM_THROUGHPUT_MAX_BINS);
     for (i = 0; i < SYSTEM_THROUGHPUT_MAX_BINS; i++) {
-        sm->sw_if_index = sw_if_index;
+        vec_add2(throughput_stats_main.if_stats_by_bin[i], sm, 1);
+
+	sm->sw_if_index = sw_if_index;
         
         vec_validate (sm->counters, tm->n_vlib_mains - 1);
-        througput_stats_counter_clear(sm);
+        throughput_stats_counter_clear(sm);
 
         sm++;
     }
@@ -368,7 +373,7 @@ throughput_show ()
     u32 slot = 0;
     int n_interface, n_thread;
     vlib_if_stats_main_t *sm;
-    vlib_if_counter_t *c;
+    vlib_if_counter_t *c, ct;
     int show_if_index = 0;
     
     slot = (throughput_slot == 0) ? (SYSTEM_THROUGHPUT_MAX_BINS - 1) : (throughput_slot - 1);
@@ -377,6 +382,8 @@ throughput_show ()
 
     vec_foreach(sm, throughput_stats_main.if_stats_by_bin[slot]) {
         show_if_index = 1;
+        memset (&ct, 0, sizeof (ct));
+
         vec_foreach_index (n_thread, sm->counters) {
             c = vec_elt_at_index(sm->counters, n_thread);
             if (show_if_index == 1) {
@@ -393,7 +400,20 @@ throughput_show ()
                              c->rx.bytes / SYSTEM_THROUGHPUT_TIMER_INTERVEL / ONE_MB * 8,
                              c->tx.bytes / SYSTEM_THROUGHPUT_TIMER_INTERVEL / ONE_MB * 8);            
             }
+
+            ct.rx.packets += c->rx.packets;
+            ct.tx.packets += c->tx.packets;
+            ct.rx.bytes += c->rx.bytes;
+            ct.tx.bytes += c->tx.bytes;
+
         }
+
+        vlib_cli_output(vm, "           %10s %10llu %10llu %15llu %15llu\n", "Total",
+                     ct.rx.packets / SYSTEM_THROUGHPUT_TIMER_INTERVEL,
+                     ct.tx.packets / SYSTEM_THROUGHPUT_TIMER_INTERVEL,
+                     ct.rx.bytes / SYSTEM_THROUGHPUT_TIMER_INTERVEL / ONE_MB * 8,
+                     ct.tx.bytes / SYSTEM_THROUGHPUT_TIMER_INTERVEL / ONE_MB * 8);            
+
         
     }
 }
@@ -429,7 +449,6 @@ do_throughtput_measure(stats_main_t * sm)
         
         sw_if_index = last_ism->sw_if_index;
         
-        ASSERT (sw_if_index < n_counts);
         vec_foreach_index(n_thread, last_ism->counters) {
             last_sc = vec_elt_at_index(last_ism->counters, n_thread);
             bin_sc = vec_elt_at_index(bin_ism->counters, n_thread);
