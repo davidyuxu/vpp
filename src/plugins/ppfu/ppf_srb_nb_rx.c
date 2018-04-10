@@ -147,54 +147,50 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
 	  
           /* Manipulate packet 0 */
 
-	  /* Find callline */
-	  c0 = &(pm->ppf_calline_table[clib_net_to_host_u32(srb0->call_id)]);
+          /* Find callline */
+          c0 = &(pm->ppf_calline_table[clib_net_to_host_u32(srb0->call_id)]);
 
           /* Save transaction-id and request-id in callline */
-	  /* Generate PDCP SN, map <PDCP SN> to <transaction-id + request-id> */
+          /* Generate PDCP SN, map <PDCP SN> to <transaction-id + request-id> */
           pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
-	  key0 = (uword)((pdcp0->tx_hfn << pdcp0->sn_length) | pdcp0->tx_next_sn);
+          key0 = (uword)PPF_PDCP_COUNT (pdcp0->tx_hfn, pdcp0->tx_next_sn, pdcp0->sn_length);
 
           /* Set pdcp-info in buffer */
-	  vnet_buffer2(b0)->ppf_du_metadata.pdcp.count = (u32)key0;	  
-	  vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn = pdcp0->tx_next_sn;
+          vnet_buffer2(b0)->ppf_du_metadata.pdcp.count = (u32)key0;	  
+          vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn = pdcp0->tx_next_sn;
 
-          /* sequence advance */
-	  pdcp0->tx_next_sn++;
-	  if (pdcp0->tx_next_sn == (1 << pdcp0->sn_length)) {
-	    pdcp0->tx_next_sn = 0;
-	    pdcp0->tx_hfn++;
-	  }
+          /* Sequence advance */
+		  PPF_PDCP_COUNT_INC (pdcp0->tx_hfn, pdcp0->tx_next_sn, pdcp0->sn_length);
 	  
-	  msg0.transaction_id = clib_net_to_host_u32(srb0->transaction_id);
-	  msg0.request_id = clib_net_to_host_u32(srb0->msg.out.request_id);
-	  hash_set (c0->rb.srb.nb_out_msg_by_sn, key0, msg0.as_u64);
+          msg0.transaction_id = clib_net_to_host_u32(srb0->transaction_id);
+          msg0.request_id = clib_net_to_host_u32(srb0->msg.out.request_id);
+          hash_set (c0->rb.srb.nb_out_msg_by_sn, key0, msg0.as_u64);
           
-	  /* Determine downlink tunnel */
+          /* Determine downlink tunnel */
                     
           /* Pop gtpu header */
           vlib_buffer_advance (b0, sizeof(ppf_srb_header_t));
           
           /* Determine next node */
-	  if (PREDICT_TRUE(1 == srb0->msg.out.sb_num)) {
-	    tunnel_index0 = c0->rb.srb.sb_tunnel[srb0->msg.out.sb_id[0]].tunnel_id;	    
-
-	    /* Set tunnel-id in buffer */
-	    vnet_buffer(b0)->sw_if_index[VLIB_TX] = tunnel_index0;	    
-
-	    next0 = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
-	  } else {
-	    /* Set call-id in buffer */
-	    vnet_buffer(b0)->sw_if_index[VLIB_TX] = srb0->call_id;
-
-	    /* Set path-info in buffer */
-	    vnet_buffer2(b0)->ppf_du_metadata.path.sb_num = srb0->msg.out.sb_num;
-	    clib_memcpy (vnet_buffer2(b0)->ppf_du_metadata.path.sb_id, srb0->msg.out.sb_id, 3);
-
-	    next0 = PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB;
-	  }
+          if (PREDICT_TRUE(1 == srb0->msg.out.sb_num)) {
+            tunnel_index0 = c0->rb.srb.sb_tunnel[srb0->msg.out.sb_id[0]].tunnel_id;	    
+            
+            /* Set tunnel-id in buffer */
+            vnet_buffer(b0)->sw_if_index[VLIB_TX] = tunnel_index0;	    
+            
+            next0 = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
+          } else {
+            /* Set call-id in buffer */
+            vnet_buffer(b0)->sw_if_index[VLIB_TX] = srb0->call_id;
+            
+            /* Set path-info in buffer */
+            vnet_buffer2(b0)->ppf_du_metadata.path.sb_num = srb0->msg.out.sb_num;
+            clib_memcpy (vnet_buffer2(b0)->ppf_du_metadata.path.sb_id, srb0->msg.out.sb_id, 3);
+            
+            next0 = PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB;
+          }
 	  
-	  /* Counter here */
+          /* Counter here */
           len0 = vlib_buffer_length_in_chain (vm, b0);
           stats_n_packets += 1;
           stats_n_bytes += len0;
@@ -206,8 +202,8 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           {
             ppf_srb_nb_rx_trace_t *tr
               = vlib_add_trace (vm, node, b0, sizeof (*tr));
-	    tr->tunnel_index = tunnel_index0;
-	    clib_memcpy (&tr->srb, srb0, sizeof (*srb0));
+            tr->tunnel_index = tunnel_index0;
+            clib_memcpy (&tr->srb, srb0, sizeof (*srb0));
           }
                     
           vlib_validate_buffer_enqueue_x1 (vm, node, next_index,

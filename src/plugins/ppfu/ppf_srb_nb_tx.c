@@ -98,7 +98,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
         {
           u32 bi0;
           vlib_buffer_t * b0;
-	  u32 len0;
+          u32 len0;
           ip4_header_t * ip4_0;
           udp_header_t * udp0;
           ppf_srb_header_t * srb0;
@@ -106,8 +106,10 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           u32 * copy_src_last0, * copy_dst_last0;
           u16 new_l0;
           ip_csum_t sum0;
-	  u32 tunnel_index0;
-	  ppf_gtpu_tunnel_t * t0;
+          u32 tunnel_index0;
+          ppf_gtpu_tunnel_t * t0;
+		  uword * p0;
+          ppf_srb_msg_id_t msg0;
           
           bi0 = from[0];
           to_next[0] = bi0;
@@ -152,17 +154,25 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           			     - sizeof (*ip4_0));
           udp0->length = new_l0;
 
-	  /* Fix srb data length */
-	  srb0 = (ppf_srb_header_t *)(udp0+1);
-	  len0 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b0)
-					 - sizeof (*ip4_0) - sizeof(*udp0) - sizeof(*srb0));
-	  srb0->msg.in.data_l = len0;
-	  tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
-	  t0 = pool_elt_at_index (pgm->tunnels, tunnel_index0);
-	  srb0->call_id = clib_host_to_net_u32(t0->call_id);
-	  srb0->transaction_id = clib_host_to_net_u32(0);
-	  srb0->msg.in.request_id = clib_host_to_net_u32(0);
-	  srb0->msg.in.integrity_status = clib_host_to_net_u32(1);
+          /* Fix srb data length */
+          srb0 = (ppf_srb_header_t *)(udp0+1);
+          len0 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b0)
+                               - sizeof (*ip4_0) - sizeof(*udp0) - sizeof(*srb0));
+          srb0->msg.in.data_l = len0;
+          tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
+          t0 = pool_elt_at_index (pgm->tunnels, tunnel_index0);
+          srb0->call_id = clib_host_to_net_u32(t0->call_id);
+
+		  p0 = hash_get(ppf_main.ppf_calline_table[t0->call_id].rb.srb.nb_out_msg_by_sn, vnet_buffer2(b0)->ppf_du_metadata.pdcp.count);
+		  if (PREDICT_TRUE (p0 != NULL)) {
+		    msg0.as_u64 = p0[0];
+		  } else {
+		    msg0.as_u64 = 0;
+		  }
+
+          srb0->transaction_id = clib_host_to_net_u32(msg0.transaction_id);
+          srb0->msg.in.request_id = clib_host_to_net_u32(msg0.request_id);
+          srb0->msg.in.integrity_status = clib_host_to_net_u32(vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status);
 
           /* counter here */
           len0 = vlib_buffer_length_in_chain (vm, b0);
@@ -173,8 +183,8 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           {
             ppf_srb_nb_tx_trace_t *tr
               = vlib_add_trace (vm, node, b0, sizeof (*tr));
-	    tr->tunnel_index = tunnel_index0;
-	    clib_memcpy (&tr->srb, srb0, sizeof (*srb0));
+            tr->tunnel_index = tunnel_index0;
+            clib_memcpy (&tr->srb, srb0, sizeof (*srb0));
           }
                       
           vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
