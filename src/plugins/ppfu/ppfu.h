@@ -33,6 +33,7 @@
 #include <vnet/dpo/dpo.h>
 #include <vnet/adj/adj_types.h>
 #include <vnet/fib/fib_table.h>
+#include <openssl/evp.h>
 
 
 #define foreach_ppf_pdcp_input_next        \
@@ -108,7 +109,25 @@ _(IP4_LOOKUP, "ip4-lookup")
     PPF_SRB_NB_TX_N_NEXT,
 } ppf_srb_nb_tx_next_t;
 
-#define MAX_PDCP_KEY_LEN   16
+
+
+
+#define MAX_PDCP_KEY_LEN          16    /* 128 bits */
+#define MAX_REORDER_WINDOW_SIZE   64
+#define INVALID_BUFFER_INDEX      ~0
+
+#define PPF_PDCP_COUNT(hfn, sn, len)  ((255 == len) ? (sn) : (((hfn) << (1 << (len))) | (sn)))
+#define PPF_PDCP_COUNT_INC(hfn, sn, len)   \
+do {                                       \
+	(sn)++;                                \
+	if ((sn) == (1 << (len))) {           \
+		(hfn)++;                           \
+		(sn) = 0;                          \
+	}                                      \
+} while (0)
+#define PPF_PDCP_SN_INC(sn, len)       (((sn) + 1) & pow2_mask(len))
+
+
 
 enum pdcp_security_alg_t 
 { 
@@ -158,27 +177,28 @@ typedef struct _ppf_pdcp_config_t_
   //PathContext paths[MAX_PATHS];
 } ppf_pdcp_config_t;
 
-#define PPF_PDCP_COUNT(hfn, sn, len)  ((255 == len) ? (sn) : (((hfn) << (1 << (len))) | (sn)))
-#define PPF_PDCP_COUNT_INC(hfn, sn, len)   \
-do {                                       \
-	(sn)++;                                \
-	if ((sn) == (1 << (len))) {           \
-		(hfn)++;                           \
-		(sn) = 0;                          \
-	}                                      \
-} while (0)
-#define PPF_PDCP_SN_INC(sn, len)       (((sn) + 1) & pow2_mask(len))
 
 enum {
   PPF_PDCP_DIR_ENC = 0,
   PPF_PDCP_DIR_DEC = 1
 };
 
-
 typedef u32 (*pdcp_security_handler)(u8 * /* in */, u8 * /* out */, u32 /* len */, void * /* security parameters */);
 
 typedef struct
 {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  EVP_CIPHER_CTX *crypto_ctx;
+#else
+  EVP_CIPHER_CTX crypto_ctx;
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  EVP_CIPHER_CTX *integrity_ctx;
+#else
+  EVP_CIPHER_CTX integrity_ctx;
+#endif
+
   u8  integrity_key[MAX_PDCP_KEY_LEN];
   u8  crypto_key[MAX_PDCP_KEY_LEN];
   u8  security_algorithms;
@@ -191,6 +211,8 @@ typedef struct
   u32 rx_next_expected_sn;
   u32 rx_last_forwarded_sn;
   u64 in_flight_limit;
+  uword * rx_replay_bitmap;  /* bitmap of rx sn */
+  u32 * rx_reorder_buffers;  /* rx reordering vector*/
   void (*encap_header)(u8 *, u8, u32);
   void (*decap_header)(u8 *, u8 *, u32 *);
   pdcp_security_handler protect;

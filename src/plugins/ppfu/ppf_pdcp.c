@@ -167,6 +167,8 @@ ppf_pdcp_decap_header_18bsn (u8 * buf, u8 * dc, u32 * sn)
 always_inline void
 ppf_pdcp_gen_iv (u8 alg, u32 count, u8 bearer, u8 dir, u8 * iv)
 {
+	memset (iv, 0, MAX_PDCP_KEY_LEN);
+	
 	switch (alg) {
 		case PDCP_SNOW3G_CIPHERING:
 			{
@@ -302,12 +304,29 @@ u32
 ppf_pdcp_eea2 (u8 * in, u8 * out, u32 size, void * security_parameters)
 {
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
-	CLIB_UNUSED(u8 iv[16]) = {0};
+	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	EVP_CIPHER_CTX *ctx = pdcp_sess->crypto_ctx;
+#else
+	EVP_CIPHER_CTX *ctx = &(pdcp_sess->crypto_ctx);
+#endif
+	u8 iv[MAX_PDCP_KEY_LEN] = {0};
+	int out_len;
 
 	ppf_pdcp_gen_iv (PDCP_AES_CIPHERING,
 				sec_para->count, sec_para->bearer, sec_para->dir, iv);
 
-	// TODO:
+	if (PPF_PDCP_DIR_ENC == sec_para->dir) {
+		EVP_EncryptInit_ex (ctx, EVP_aes_128_ctr(), NULL, pdcp_sess->crypto_key, iv);
+		
+		EVP_EncryptUpdate (ctx, out, &out_len, in, size);
+		EVP_EncryptFinal_ex (ctx, out + out_len, &out_len);
+	} else {
+		EVP_DecryptInit_ex (ctx, EVP_aes_128_ctr(), NULL, pdcp_sess->crypto_key, iv);
+		
+		EVP_DecryptUpdate (ctx, out, &out_len, in, size);
+		EVP_DecryptFinal_ex (ctx, out + out_len, &out_len);
+	}
 	
 	return 0;
 }
@@ -354,6 +373,9 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
 
   pool_get (ppm->sessions, pdcp_sess);
   memset (pdcp_sess, 0, sizeof (*pdcp_sess));
+
+  clib_bitmap_alloc (pdcp_sess->rx_replay_bitmap, MAX_REORDER_WINDOW_SIZE);
+  vec_validate_init_empty (pdcp_sess->rx_reorder_buffers, MAX_REORDER_WINDOW_SIZE, INVALID_BUFFER_INDEX);
 
   pdcp_sess->sn_length = sn_length;
   pdcp_sess->tx_next_sn = tx_count; //(~(0xFFFFFFFF<<sn_length))&tx_count;
@@ -490,6 +512,13 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
         pdcp_sess->encrypt = &ppf_pdcp_eea2;
         pdcp_sess->decrypt = &ppf_pdcp_eea2;
         pdcp_sess->security_algorithms |= PDCP_AES_CIPHERING;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+		pdcp_sess->crypto_ctx    = EVP_CIPHER_CTX_new ();		
+		pdcp_sess->integrity_ctx = EVP_CIPHER_CTX_new ();
+#else
+		EVP_CIPHER_CTX_init (&(pdcp_sess->crypto_ctx));
+		EVP_CIPHER_CTX_init (&(pdcp_sess->integrity_ctx));
+#endif
         break;
 
       case PDCP_EEA3:
@@ -511,6 +540,16 @@ u32
 ppf_pdcp_clear_session (ppf_pdcp_session_t * pdcp_sess)
 {
   if (pdcp_sess) {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	EVP_CIPHER_CTX_free (pdcp_sess->crypto_ctx);
+	EVP_CIPHER_CTX_free (pdcp_sess->integrity_ctx);
+#else
+	EVP_CIPHER_CTX_cleanup (&(pdcp_sess->crypto_ctx));
+	EVP_CIPHER_CTX_cleanup (&(pdcp_sess->integrity_ctx));
+#endif
+
+  	clib_bitmap_free (pdcp_sess->rx_replay_bitmap);
+  	vec_free (pdcp_sess->rx_reorder_buffers);
     pool_put (ppf_pdcp_main.sessions, pdcp_sess);
   }
 
