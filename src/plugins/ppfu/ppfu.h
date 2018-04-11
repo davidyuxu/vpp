@@ -331,7 +331,7 @@ typedef struct
 {
   u32 max_capacity;
   ppf_callline_t * ppf_calline_table;
-  
+  u32 ue_mode;
   
   u16 msg_id_base;
 } ppf_main_t;
