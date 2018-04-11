@@ -343,10 +343,10 @@ api_ppfu_plugin_bearer_install (vat_main_t * vam)
 
   M (PPFU_PLUGIN_BEARER_INSTALL, mp);
 
-  mp->call_id = call_id;
-  mp->ue_bearer_id = ue_bearer_id;
-  mp->sb_policy = sb_policy;
-  mp->transaction_id = transaction_id;
+  mp->call_id = clib_host_to_net_u32(call_id);
+  mp->ue_bearer_id = clib_host_to_net_u32(ue_bearer_id);
+  mp->sb_policy = clib_host_to_net_u32(sb_policy);
+  mp->transaction_id = clib_host_to_net_u32(transaction_id);
 
   if (nb_set != 0)
   {
@@ -354,12 +354,12 @@ api_ppfu_plugin_bearer_install (vat_main_t * vam)
 
     	clib_memcpy (nb->src_ip_address, &nb_src.ip4, sizeof (nb_src.ip4));
     	clib_memcpy (nb->dst_ip_address, &nb_dst.ip4, sizeof (nb_dst.ip4));
-   	nb->encap_vrf_id = (nb_encap_vrf_id);
-    	nb->out_teid = (nb_out_teid);
-    	nb->port = (nb_port);
-    	nb->dscp = (nb_dscp);
-    	nb->type = (nb_type);
-    	nb->protocol_configuration = (nb_protocol_configuration);
+   	nb->encap_vrf_id = clib_host_to_net_u32(nb_encap_vrf_id);
+    	nb->out_teid = clib_host_to_net_u32(nb_out_teid);
+    	nb->port = clib_host_to_net_u32(nb_port);
+    	nb->dscp = clib_host_to_net_u32(nb_dscp);
+    	nb->type = clib_host_to_net_u32(nb_type);
+    	nb->protocol_configuration = clib_host_to_net_u32(nb_protocol_configuration);
 
     } else {
     
@@ -373,16 +373,16 @@ api_ppfu_plugin_bearer_install (vat_main_t * vam)
       clib_memcpy (sb->src_ip_address, &sb0_src.ip4, sizeof (sb0_src.ip4));
     	clib_memcpy (sb->pri_ip_address, &sb0_pri_dst.ip4, sizeof (sb0_pri_dst.ip4));
     	clib_memcpy (sb->sec_ip_address, &sb0_sec_dst.ip4, sizeof (sb0_sec_dst.ip4));
-    	sb->encap_vrf_id = (sb0_encap_vrf_id);
-    	sb->pri_out_teid = (sb0_pri_out_teid);
-    	sb->pri_port = (sb0_pri_port);
-    	sb->pri_dscp = (sb0_pri_dscp);
-    	sb->sec_out_teid = (sb0_sec_out_teid);
-    	sb->sec_port = (sb0_sec_port);
-    	sb->sec_dscp = (sb0_sec_dscp);
-    	sb->protocol_configuration = (sb0_protocol_configuration);
-    	sb->ep_weight = (sb0_ep_weight);
-    	sb->traffic_state = (sb0_traffic_state); 	
+    	sb->encap_vrf_id = clib_host_to_net_u32(sb0_encap_vrf_id);
+    	sb->pri_out_teid = clib_host_to_net_u32(sb0_pri_out_teid);
+    	sb->pri_port = clib_host_to_net_u32(sb0_pri_port);
+    	sb->pri_dscp = clib_host_to_net_u32(sb0_pri_dscp);
+    	sb->sec_out_teid = clib_host_to_net_u32(sb0_sec_out_teid);
+    	sb->sec_port = clib_host_to_net_u32(sb0_sec_port);
+    	sb->sec_dscp = clib_host_to_net_u32(sb0_sec_dscp);
+    	sb->protocol_configuration = clib_host_to_net_u32 (sb0_protocol_configuration);
+    	sb->ep_weight = clib_host_to_net_u32(sb0_ep_weight);
+    	sb->traffic_state = clib_host_to_net_u32(sb0_traffic_state); 	
 	
     } else {
     
@@ -396,15 +396,15 @@ api_ppfu_plugin_bearer_install (vat_main_t * vam)
       clib_memcpy (sb->src_ip_address, &sb1_src.ip4, sizeof (sb1_src.ip4));
     	clib_memcpy (sb->pri_ip_address, &sb1_pri_dst.ip4, sizeof (sb1_pri_dst.ip4));
     	clib_memcpy (sb->sec_ip_address, &sb1_sec_dst.ip4, sizeof (sb1_sec_dst.ip4));
-    	sb->encap_vrf_id = (sb1_encap_vrf_id);
-    	sb->pri_out_teid = (sb1_pri_out_teid);
-    	sb->pri_port = (sb1_pri_port);
-    	sb->pri_dscp = (sb1_pri_dscp);
-    	sb->sec_out_teid = (sb1_sec_out_teid);
-    	sb->sec_port = (sb1_sec_port);
-    	sb->sec_dscp = (sb1_sec_dscp);
-    	sb->protocol_configuration = (sb1_protocol_configuration);
-    	sb->ep_weight = (sb1_ep_weight);
+    	sb->encap_vrf_id = clib_host_to_net_u32(sb1_encap_vrf_id);
+    	sb->pri_out_teid = clib_host_to_net_u32(sb1_pri_out_teid);
+    	sb->pri_port = clib_host_to_net_u32(sb1_pri_port);
+    	sb->pri_dscp = clib_host_to_net_u32(sb1_pri_dscp);
+    	sb->sec_out_teid = clib_host_to_net_u32(sb1_sec_out_teid);
+    	sb->sec_port = clib_host_to_net_u32(sb1_sec_port);
+    	sb->sec_dscp = clib_host_to_net_u32(sb1_sec_dscp);
+    	sb->protocol_configuration = clib_host_to_net_u32(sb1_protocol_configuration);
+    	sb->ep_weight = clib_host_to_net_u32(sb1_ep_weight);
     	sb->traffic_state = (sb1_traffic_state); 	
 	
     } else {
@@ -419,16 +419,16 @@ api_ppfu_plugin_bearer_install (vat_main_t * vam)
       clib_memcpy (sb->src_ip_address, &sb2_src.ip4, sizeof (sb2_src.ip4));
     	clib_memcpy (sb->pri_ip_address, &sb2_pri_dst.ip4, sizeof (sb2_pri_dst.ip4));
     	clib_memcpy (sb->sec_ip_address, &sb2_sec_dst.ip4, sizeof (sb2_sec_dst.ip4));
-    	sb->encap_vrf_id = (sb2_encap_vrf_id);
-    	sb->pri_out_teid = (sb2_pri_out_teid);
-    	sb->pri_port = (sb2_pri_port);
-    	sb->pri_dscp = (sb2_pri_dscp);
-    	sb->sec_out_teid = (sb2_sec_out_teid);
-    	sb->sec_port = (sb2_sec_port);
-    	sb->sec_dscp = (sb2_sec_dscp);
-    	sb->protocol_configuration = (sb2_protocol_configuration);
-    	sb->ep_weight = (sb2_ep_weight);
-    	sb->traffic_state = (sb2_traffic_state); 	
+    	sb->encap_vrf_id = clib_host_to_net_u32(sb2_encap_vrf_id);
+    	sb->pri_out_teid = clib_host_to_net_u32(sb2_pri_out_teid);
+    	sb->pri_port = clib_host_to_net_u32(sb2_pri_port);
+    	sb->pri_dscp = clib_host_to_net_u32(sb2_pri_dscp);
+    	sb->sec_out_teid = clib_host_to_net_u32(sb2_sec_out_teid);
+    	sb->sec_port =clib_host_to_net_u32 (sb2_sec_port);
+    	sb->sec_dscp = clib_host_to_net_u32(sb2_sec_dscp);
+    	sb->protocol_configuration =clib_host_to_net_u32 (sb2_protocol_configuration);
+    	sb->ep_weight = clib_host_to_net_u32(sb2_ep_weight);
+    	sb->traffic_state = clib_host_to_net_u32(sb2_traffic_state); 	
 	
     } else {
     
@@ -596,15 +596,15 @@ api_ppfu_plugin_bearer_update (vat_main_t * vam)
 
   M (PPFU_PLUGIN_BEARER_UPDATE, mp);
 
-  mp->call_id = call_id;
-  mp->ue_bearer_id = ue_bearer_id;
-  mp->transaction_id = transaction_id;
+  mp->call_id = clib_host_to_net_u32(call_id);
+  mp->ue_bearer_id = clib_host_to_net_u32(ue_bearer_id);
+  mp->transaction_id = clib_host_to_net_u32(transaction_id);
 
   for (i = 0; i < MAX_SB_PER_CALL; i ++) {
 
 	memset (&(mp->sb[i]), 0, sizeof (vl_api_sb_path_context_t));
 	if (sb_del[i] == 1) 
-		mp->removal_sb_id[i] = 1;
+		mp->removal_sb_id[i] = clib_host_to_net_u32(1);
 	else 	
 		mp->removal_sb_id[i] = 0;
   }
@@ -617,16 +617,16 @@ api_ppfu_plugin_bearer_update (vat_main_t * vam)
 	clib_memcpy (sb->src_ip_address, &sb0_src.ip4, sizeof (sb0_src.ip4));
 	clib_memcpy (sb->pri_ip_address, &sb0_pri_dst.ip4, sizeof (sb0_pri_dst.ip4));
 	clib_memcpy (sb->sec_ip_address, &sb0_sec_dst.ip4, sizeof (sb0_sec_dst.ip4));
-	sb->encap_vrf_id = (sb0_encap_vrf_id);
-	sb->pri_out_teid = (sb0_pri_out_teid);
-	sb->pri_port = (sb0_pri_port);
-	sb->pri_dscp = (sb0_pri_dscp);
-	sb->sec_out_teid = (sb0_sec_out_teid);
-	sb->sec_port = (sb0_sec_port);
-	sb->sec_dscp = (sb0_sec_dscp);
-	sb->protocol_configuration = (sb0_protocol_configuration);
-	sb->ep_weight = (sb0_ep_weight);
-	sb->traffic_state = (sb0_traffic_state);	
+	sb->encap_vrf_id = clib_host_to_net_u32(sb0_encap_vrf_id);
+	sb->pri_out_teid = clib_host_to_net_u32(sb0_pri_out_teid);
+	sb->pri_port = clib_host_to_net_u32(sb0_pri_port);
+	sb->pri_dscp = clib_host_to_net_u32(sb0_pri_dscp);
+	sb->sec_out_teid = clib_host_to_net_u32(sb0_sec_out_teid);
+	sb->sec_port = clib_host_to_net_u32(sb0_sec_port);
+	sb->sec_dscp = clib_host_to_net_u32(sb0_sec_dscp);
+	sb->protocol_configuration =clib_host_to_net_u32 (sb0_protocol_configuration);
+	sb->ep_weight = clib_host_to_net_u32(sb0_ep_weight);
+	sb->traffic_state = clib_host_to_net_u32(sb0_traffic_state);	
 	
     }
 
@@ -637,16 +637,16 @@ api_ppfu_plugin_bearer_update (vat_main_t * vam)
 	clib_memcpy (sb->src_ip_address, &sb1_src.ip4, sizeof (sb1_src.ip4));
 	clib_memcpy (sb->pri_ip_address, &sb1_pri_dst.ip4, sizeof (sb1_pri_dst.ip4));
 	clib_memcpy (sb->sec_ip_address, &sb1_sec_dst.ip4, sizeof (sb1_sec_dst.ip4));
-	sb->encap_vrf_id = (sb1_encap_vrf_id);
-	sb->pri_out_teid = (sb1_pri_out_teid);
-	sb->pri_port = (sb1_pri_port);
-	sb->pri_dscp = (sb1_pri_dscp);
-	sb->sec_out_teid = (sb1_sec_out_teid);
-	sb->sec_port = (sb1_sec_port);
-	sb->sec_dscp = (sb1_sec_dscp);
-	sb->protocol_configuration = (sb1_protocol_configuration);
-	sb->ep_weight = (sb1_ep_weight);
-	sb->traffic_state = (sb1_traffic_state);	
+	sb->encap_vrf_id = clib_host_to_net_u32 (sb1_encap_vrf_id);
+	sb->pri_out_teid =clib_host_to_net_u32 (sb1_pri_out_teid);
+	sb->pri_port = clib_host_to_net_u32(sb1_pri_port);
+	sb->pri_dscp = clib_host_to_net_u32(sb1_pri_dscp);
+	sb->sec_out_teid = clib_host_to_net_u32(sb1_sec_out_teid);
+	sb->sec_port = clib_host_to_net_u32(sb1_sec_port);
+	sb->sec_dscp =clib_host_to_net_u32(sb1_sec_dscp);
+	sb->protocol_configuration = clib_host_to_net_u32(sb1_protocol_configuration);
+	sb->ep_weight = clib_host_to_net_u32(sb1_ep_weight);
+	sb->traffic_state = clib_host_to_net_u32(sb1_traffic_state);	
 	
     } 
 
@@ -657,16 +657,16 @@ api_ppfu_plugin_bearer_update (vat_main_t * vam)
 	clib_memcpy (sb->src_ip_address, &sb2_src.ip4, sizeof (sb2_src.ip4));
 	clib_memcpy (sb->pri_ip_address, &sb2_pri_dst.ip4, sizeof (sb2_pri_dst.ip4));
 	clib_memcpy (sb->sec_ip_address, &sb2_sec_dst.ip4, sizeof (sb2_sec_dst.ip4));
-	sb->encap_vrf_id = (sb2_encap_vrf_id);
-	sb->pri_out_teid = (sb2_pri_out_teid);
-	sb->pri_port = (sb2_pri_port);
-	sb->pri_dscp = (sb2_pri_dscp);
-	sb->sec_out_teid = (sb2_sec_out_teid);
-	sb->sec_port = (sb2_sec_port);
-	sb->sec_dscp = (sb2_sec_dscp);
-	sb->protocol_configuration = (sb2_protocol_configuration);
-	sb->ep_weight = (sb2_ep_weight);
-	sb->traffic_state = (sb2_traffic_state);	
+	sb->encap_vrf_id = clib_host_to_net_u32(sb2_encap_vrf_id);
+	sb->pri_out_teid = clib_host_to_net_u32(sb2_pri_out_teid);
+	sb->pri_port = clib_host_to_net_u32(sb2_pri_port);
+	sb->pri_dscp = clib_host_to_net_u32(sb2_pri_dscp);
+	sb->sec_out_teid =clib_host_to_net_u32 (sb2_sec_out_teid);
+	sb->sec_port = clib_host_to_net_u32(sb2_sec_port);
+	sb->sec_dscp =clib_host_to_net_u32 (sb2_sec_dscp);
+	sb->protocol_configuration = clib_host_to_net_u32(sb2_protocol_configuration);
+	sb->ep_weight =clib_host_to_net_u32 (sb2_ep_weight);
+	sb->traffic_state = clib_host_to_net_u32(sb2_traffic_state);	
 	
     } 
     
@@ -705,9 +705,9 @@ api_ppfu_plugin_bearer_release (vat_main_t * vam)
 
   M (PPFU_PLUGIN_BEARER_RELEASE, mp);
 
-  mp->call_id = call_id;
-  mp->ue_bearer_id = ue_bearer_id;
-  mp->transaction_id = transaction_id;
+  mp->call_id = clib_host_to_net_u32(call_id);
+  mp->ue_bearer_id = clib_host_to_net_u32(ue_bearer_id);
+  mp->transaction_id = clib_host_to_net_u32(transaction_id);
 
   S (mp);
   W (ret);
