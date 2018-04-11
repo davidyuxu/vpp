@@ -343,6 +343,8 @@ ppf_init (vlib_main_t * vm)
     callline->call_index = ~0;
 
   }
+
+  pm->ue_mode = 0;
   
   return 0;
 }
