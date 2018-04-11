@@ -120,7 +120,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   int i = 0;
 
-  call_id = ntohs(mp->call_id);
+  call_id = clib_net_to_host_u32(mp->call_id);
 
   if (call_id >= ppfm->max_capacity)
   {
@@ -149,7 +149,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   if (callline->call_type == PPF_DRB_CALL)
   {
-	  uword *p = hash_get (im->fib_index_by_table_id, ntohs(nb->encap_vrf_id));
+	  uword *p = hash_get (im->fib_index_by_table_id, clib_net_to_host_u32(nb->encap_vrf_id));
 	  if (!p)
 	  {
 		rv = VNET_API_ERROR_NO_SUCH_FIB;
@@ -157,24 +157,24 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  }
 
 	  tunnel_type = PPF_GTPU_NB;
-	  nb_in_teid = ntohs(mp->ue_bearer_id);
+	  nb_in_teid = clib_net_to_host_u32(mp->ue_bearer_id);
   
 	  vnet_ppf_gtpu_add_del_tunnel_args_t nb_tunnel = {
 	    .is_ip6 = 0,
 	    .mcast_sw_if_index = 0,		//to be delete	    
 	    .decap_next_index = 0,		//to be delete
-	    .encap_fib_index = ntohs(nb->encap_vrf_id),
+	    .encap_fib_index = clib_net_to_host_u32(nb->encap_vrf_id),
 	    .in_teid = nb_in_teid,
-	    .out_teid = ntohs(nb->out_teid),
+	    .out_teid = clib_net_to_host_u32(nb->out_teid),
 	    .dst = to_ip46 (0, nb->dst_ip_address),
 	    .src = to_ip46 (0, nb->src_ip_address),
 	    .call_id = call_id,
 	    .tunnel_type = tunnel_type,
 	    .sb_id = 0,				//only valid for sb
-	    .dst_port = ntohs(nb->port),
-	    .dscp = ntohs(nb->dscp),
-	    .protocol_config = ntohs(nb->protocol_configuration),
-	    .type = ntohs(nb->type),
+	    .dst_port = clib_net_to_host_u32(nb->port),
+	    .dscp = clib_net_to_host_u32(nb->dscp),
+	    .protocol_config = clib_net_to_host_u32(nb->protocol_configuration),
+	    .type = clib_net_to_host_u32(nb->type),
 	  };
 
 	  /* Check src & dst are different */
@@ -204,7 +204,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   	  if (sb->src_ip_address == 0) 
 		continue;
 
-	  uword *p = hash_get (im->fib_index_by_table_id, ntohs(sb->encap_vrf_id));
+	  uword *p = hash_get (im->fib_index_by_table_id, clib_net_to_host_u32(sb->encap_vrf_id));
 	  if (!p)
 	  {
 		rv = VNET_API_ERROR_NO_SUCH_FIB;
@@ -216,25 +216,25 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  else 
 	  	tunnel_type = PPF_GTPU_SRB;
 	  	
-	  sb_in_teid [i] = (((i + 1) << 30) |ntohs(mp->ue_bearer_id));
+	  sb_in_teid [i] = (((i + 1) << 30) |clib_net_to_host_u32(mp->ue_bearer_id));
 
 	  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
 	    .is_ip6 = 0,
 	    .mcast_sw_if_index = 0,
-	    .encap_fib_index = ntohs(sb->encap_vrf_id),
+	    .encap_fib_index = clib_net_to_host_u32(sb->encap_vrf_id),
 	    .decap_next_index = 0,
 	    .in_teid = sb_in_teid[i],
-	    .out_teid = ntohs(sb->pri_out_teid),
+	    .out_teid = clib_net_to_host_u32(sb->pri_out_teid),
 	    .dst = to_ip46 (0, sb->pri_ip_address),
 	    .src = to_ip46 (0, sb->src_ip_address),
 	    .call_id =call_id,
 	    .tunnel_type = tunnel_type,
 	    .sb_id = i,
-	    .dst_port = ntohs(sb->pri_port),
-	    .dscp = ntohs(sb->pri_dscp),
-	    .protocol_config = ntohs(sb->protocol_configuration),
-	    .ep_weight = ntohs(sb->ep_weight),
-	    .traffic_state = ntohs(sb->traffic_state),
+	    .dst_port = clib_net_to_host_u32(sb->pri_port),
+	    .dscp = clib_net_to_host_u32(sb->pri_dscp),
+	    .protocol_config = clib_net_to_host_u32(sb->protocol_configuration),
+	    .ep_weight = clib_net_to_host_u32(sb->ep_weight),
+	    .traffic_state = clib_net_to_host_u32(sb->traffic_state),
 	  };
 
 	  /* Check src & dst are different */
@@ -272,8 +272,8 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  ppf_pdcp_session_update_as_security (pool_elt_at_index(ppf_pdcp_main.sessions, callline->pdcp.session_id), &pdcp_config);
   }
 
-  callline->sb_policy = ntohs(mp->sb_policy);
-  callline->ue_bearer_id = ntohs(mp->ue_bearer_id);
+  callline->sb_policy = clib_net_to_host_u32(mp->sb_policy);
+  callline->ue_bearer_id = clib_net_to_host_u32(mp->ue_bearer_id);
   
 out:
   /* *INDENT-OFF* */
@@ -302,10 +302,10 @@ out:
   ({  
 
      for (i = 0; i< MAX_SB_PER_CALL; i++) {
-     	rmp->sb_in_teid[i] = htons(sb_in_teid[i]);
+     	rmp->sb_in_teid[i] = clib_host_to_net_u32(sb_in_teid[i]);
      }
-      rmp->nb_in_teid = htons(nb_in_teid);
-      rmp->call_id = htons(call_id);
+      rmp->nb_in_teid = clib_host_to_net_u32(nb_in_teid);
+      rmp->call_id = clib_host_to_net_u32(call_id);
       rmp->ue_bearer_id = (mp->ue_bearer_id);
       rmp->transaction_id = (mp->transaction_id);
   
@@ -336,7 +336,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
   u32 sb_tunnel_added[MAX_SB_PER_CALL]={0};
   u32 sb_tunnel_id[MAX_SB_PER_CALL] = {0};
   ppf_gtpu_tunnel_t *t = NULL;
-  u32 call_id = ntohs(mp->call_id);
+  u32 call_id = clib_net_to_host_u32(mp->call_id);
 
   int i = 0;
 
@@ -364,7 +364,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 
 	if (sb_key->tunnel_id != INVALID_TUNNEL_ID)  {
 
-		if (ntohs(mp->removal_sb_id[i]) != 0) {
+		if (clib_net_to_host_u32(mp->removal_sb_id[i]) != 0) {
 
 		  rv = vnet_ppf_gtpu_del_tunnel (sb_key->tunnel_id);
 		  
@@ -385,7 +385,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 	  if (sb->src_ip_address == 0) 
 		continue;
 
-	  uword *p = hash_get (im->fib_index_by_table_id, ntohs (sb->encap_vrf_id));
+	  uword *p = hash_get (im->fib_index_by_table_id, clib_net_to_host_u32 (sb->encap_vrf_id));
 	  if (!p)
 	  {
 		rv = VNET_API_ERROR_NO_SUCH_FIB;
@@ -401,13 +401,13 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 	  
 	  	//update sb_tunnel
 		vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
-		    .out_teid = ntohs(sb->pri_out_teid),
+		    .out_teid = clib_net_to_host_u32(sb->pri_out_teid),
 		    .dst = to_ip46 (0, sb->pri_ip_address),
-		    .dst_port = ntohs(sb->pri_port),
-		    .dscp = ntohs(sb->pri_dscp),
-		    .protocol_config = ntohs(sb->protocol_configuration),
-		    .ep_weight = ntohs(sb->ep_weight),
-		    .traffic_state = ntohs(sb->traffic_state),
+		    .dst_port = clib_net_to_host_u32(sb->pri_port),
+		    .dscp = clib_net_to_host_u32(sb->pri_dscp),
+		    .protocol_config = clib_net_to_host_u32(sb->protocol_configuration),
+		    .ep_weight = clib_net_to_host_u32(sb->ep_weight),
+		    .traffic_state = clib_net_to_host_u32(sb->traffic_state),
 		    .type = ~0,
 		  };
 
@@ -424,25 +424,25 @@ vl_api_ppfu_plugin_bearer_update_t_handler
 		  else 
 			tunnel_type = PPF_GTPU_SRB;
 			
-		  sb_in_teid [i] = (((i + 1) << 30) |ntohs(mp->ue_bearer_id));
+		  sb_in_teid [i] = (((i + 1) << 30) |clib_net_to_host_u32(mp->ue_bearer_id));
 
 		  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
 		    .is_ip6 = 0,
 		    .mcast_sw_if_index = 0,
-		    .encap_fib_index = ntohs(sb->encap_vrf_id),
+		    .encap_fib_index = clib_net_to_host_u32(sb->encap_vrf_id),
 		    .decap_next_index = 0,
 		    .in_teid = sb_in_teid[i],
-		    .out_teid = ntohs(sb->pri_out_teid),
+		    .out_teid = clib_net_to_host_u32(sb->pri_out_teid),
 		    .dst = to_ip46 (0, sb->pri_ip_address),
 		    .src = to_ip46 (0, sb->src_ip_address),
 		    .call_id =call_id,
 		    .tunnel_type = tunnel_type,
 		    .sb_id = i,
-		    .dst_port = ntohs(sb->pri_port),
-		    .dscp = ntohs(sb->pri_dscp),
-		    .protocol_config = ntohs(sb->protocol_configuration),
-		    .ep_weight = ntohs(sb->ep_weight),
-		    .traffic_state = ntohs(sb->traffic_state),
+		    .dst_port = clib_net_to_host_u32(sb->pri_port),
+		    .dscp = clib_net_to_host_u32(sb->pri_dscp),
+		    .protocol_config = clib_net_to_host_u32(sb->protocol_configuration),
+		    .ep_weight = clib_net_to_host_u32(sb->ep_weight),
+		    .traffic_state = clib_net_to_host_u32(sb->traffic_state),
 		  };
 
 		  /* Check src & dst are different */
@@ -482,9 +482,9 @@ out:
   ({	
 
      for (i = 0; i<MAX_SB_PER_CALL; i++) {
-	rmp->sb_in_teid[i] = htons(sb_in_teid[i]);
+	rmp->sb_in_teid[i] = clib_host_to_net_u32(sb_in_teid[i]);
      }
-	rmp->call_id = htons(call_id);
+	rmp->call_id = clib_host_to_net_u32(call_id);
 	rmp->ue_bearer_id = (mp->ue_bearer_id);
 	rmp->transaction_id = (mp->transaction_id);
   
@@ -505,7 +505,7 @@ vl_api_ppfu_plugin_bearer_release_t_handler
   ppf_pdcp_session_t *pdcp_sess = NULL;
   int i = 0;
   ppf_gtpu_tunnel_id_type_t *nb_tunnel, *sb_tunnel[MAX_SB_PER_CALL];
-  u32 call_id = ntohs(mp->call_id);
+  u32 call_id = clib_net_to_host_u32(mp->call_id);
 
   if (call_id >= ppfm->max_capacity)
   {
@@ -568,7 +568,7 @@ out:
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_RELEASE_REPLY,
   ({	
 
-	rmp->call_id = htons(call_id);
+	rmp->call_id = clib_host_to_net_u32(call_id);
 	rmp->ue_bearer_id = (mp->ue_bearer_id);
 	rmp->transaction_id = (mp->transaction_id);
   
