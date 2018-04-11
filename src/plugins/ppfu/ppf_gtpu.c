@@ -776,12 +776,12 @@ int vnet_ppf_gtpu_add_tunnel
 
   if (!is_ip6)
     {
-      key4.teid = clib_host_to_net_u32 (a->in_teid);
+      key4.teid = a->in_teid;
       p = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4.as_u32);
     }
   else
     {
-      key6.teid = clib_host_to_net_u32 (a->in_teid);
+      key6.teid = a->in_teid;
       p = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6);
     }
     
