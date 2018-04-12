@@ -681,10 +681,13 @@ vlib_cli_output (vlib_main_t * vm, char *fmt, ...)
 {
   vlib_process_t *cp = vlib_get_current_process (vm);
   va_list va;
-  u8 *s;
+  u8 *s = 0;
+
+  /* kingwel, make a big enough buffer for cli tx, to avoid vec_resize */
+  vec_alloc (s, 160000);
 
   va_start (va, fmt);
-  s = va_format (0, fmt, &va);
+  s = va_format (s, fmt, &va);
   va_end (va);
 
   /* Terminate with \n if not present. */
