@@ -16,10 +16,9 @@ vppplugins_LTLIBRARIES += gtpu_plugin.la
 
 gtpu_plugin_la_SOURCES =		\
 	gtpu/gtpu_decap.c		    \
-	gtpu/gtpu_encap.c		    \
+    gtpu/gtpu_encap.c		    \
 	gtpu/gtpu.c				    \
-	gtpu/gtpu_api.c                \
-	gtpu/gtpu_process.c
+	gtpu/gtpu_api.c
 
 BUILT_SOURCES +=			\
 	gtpu/gtpu.api.h		    \

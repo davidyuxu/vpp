@@ -65,52 +65,6 @@ define gtpu_tunnel_dump
   u32 sw_if_index;
 };
 
-/** \brief Want gtpu path management info, register a client
-    @param client_index - opaque cookie to identify the sender
-    @param context - sender context, to match reply w/ request
-    @param enable_disable - 1 = enable stats, 0 = disable
-    @param client_pid - pid of process requesting stats updates
-	--- add by anhua
-*/
-define gtpu_client_registration
-{
-  u32 client_index;
-  u32 context;
-  u32 enable_disable;
-  u32 client_pid;
-};
-
-/** \brief reply for set or delete an GTPU tunnel
-    @param context - sender context, to match reply w/ request
-    @param retval - return code
-	--- add by anhua
-*/
-define gtpu_client_registration_reply
-{
-  u32 context;
-  i32 retval;
-};
-
-/** \brief GTPU path info data type for vl_api_gtpu_path_error_t
-    @param dst_address - GTPU tunnel's destination address.
-	--- add by anhua
-*/
-manual_print manual_endian define gtpu_path_error
-{
-  u8 dst_address[16];
-};
-
-/** \brief GTPU path info data type for vl_api_gtpu_tunnel_error_t
-    @param dst_address - GTPU tunnel's destination address.
-    @param teid - Local Tunnel Endpoint Identifier
-	--- add by anhua
-*/
-manual_print manual_endian define gtpu_tunnel_error
-{
-  u8 dst_address[16];
-  u32 teid;
-};
-
 /** \brief dump details of an GTPU tunnel
     @param context - sender context, to match reply w/ request
     @param sw_if_index - software index of the interface

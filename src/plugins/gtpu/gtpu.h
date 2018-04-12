@@ -72,11 +72,6 @@ typedef struct
 #define GTPU_V1_VER   (1<<5)
 
 #define GTPU_PT_GTP    (1<<4)
-
-#define	GTPU_TYPE_ECHO_REQUEST			        1
-#define	GTPU_TYPE_ECHO_RESPONSE				    2
-#define	GTPU_TYPE_ERROR_INDICATION				26
-#define	GTPU_TYPE_EXTENSION_HEADERS_NOTIFICATION 31
 #define GTPU_TYPE_GTPU  255
 
 /* *INDENT-OFF* */
@@ -198,46 +193,6 @@ typedef enum
   GTPU_N_ERROR,
 } gtpu_input_error_t;
 
-#define REPLY_MSG_ID_BASE gtm->msg_id_base
-#include <vlibapi/api_helper_macros.h> /* add by anhua */
-
-typedef struct
-{
-  uword *client_hash;
-  vpe_client_registration_t *clients;
-  u32 item;
-}gtpu_client_registration_t;
-
-
-extern vlib_node_registration_t gtpu_process_node;
-
-enum
-{
-    GTPU_EVENT_TYPE_ECHO_RESPONSE_IP4,
-    GTPU_EVENT_TYPE_ECHO_RESPONSE_IP6,
-    GTPU_EVENT_TYPE_ERROR_INDICATE_IP4,
-    GTPU_EVENT_TYPE_ERROR_INDICATE_IP6
-};
-
-/* gtpu tunnel path_t --- add by anhua */
-typedef struct
-{
-  ip46_address_t src;
-  ip46_address_t dst;
-  u32 tunnel_count;  /* how many tunnel on this path */
-  f64 last_request_time;     /* the last time of send echo request packet */
-  f64 last_response_time;    /* the last time of receive echo response packet */
-  u8 retransmit;             /* retransmit flag and retransmit count when timeout */
-}gtpu_path_t;
-
-/* gtpu path management_t --- add by anhua */
-typedef struct
-{
-  uword *gtpu4_path_by_key;	/* keyed on ipv4.dst + 0 */
-  uword *gtpu6_path_by_key;	/* keyed on ipv6.dst + 0 */
-  gtpu_path_t *paths;
-}gtpu_path_manage_t;
-
 typedef struct
 {
   /* vector of encap tunnel instances */
@@ -278,15 +233,6 @@ typedef struct
   ip46_address_t dst;
   u32 prealloc_tunnels;
   u32 start_teid;
-
-  /* if has no one client , disable polling? --- add by anhua */
-  u32 enable_poller;
-    
-  /* gtpu api client registrations --- add by anhua */
-  gtpu_client_registration_t registrations;
-
-  /* path management --- add by anhua */
-  gtpu_path_manage_t path_manage;
 } gtpu_main_t;
 
 extern gtpu_main_t gtpu_main;
