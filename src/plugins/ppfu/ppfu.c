@@ -195,20 +195,6 @@ int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c)
 
 	vnet_ppf_init_calline (c->call_id, c->call_type);
 	
-	/* Create pdcp session */
-	call_line->pdcp.session_id = ppf_pdcp_create_session (255, 1, 1, 0);
-	if (~0 != call_line->pdcp.session_id) {
-		ppf_pdcp_config_t pdcp_config;
-
-		/* Fix later!!! should be from command parameters */
-		pdcp_config.flags = INTEGRITY_KEY_VALID | CRYPTO_KEY_VALID | INTEGRITY_ALG_VALID | CRYPTO_ALG_VALID;
-		pdcp_config.integrity_algorithm = PDCP_EIA0;
-		pdcp_config.crypto_algorithm = PDCP_EEA0;
-		memset (pdcp_config.integrity_key, 0x55, sizeof(pdcp_config.integrity_key));
-		memset (pdcp_config.crypto_key, 0xaa, sizeof(pdcp_config.crypto_key));
-		ppf_pdcp_session_update_as_security (pool_elt_at_index(ppf_pdcp_main.sessions, call_line->pdcp.session_id), &pdcp_config);
-	}
-
 	call_line->sb_policy = c->sb_policy;
 	call_line->ue_bearer_id = c->ue_bearer_id;
 
@@ -446,8 +432,8 @@ format_ppf_pdcp_simple (u8 * s, va_list * va)
   ppf_pdcp_main_t * ppm = &ppf_pdcp_main;
 
   s = format (s, "sess-id %u", pdcp->session_id);
-  if (verbose > 0) {
-    pdcp_session= pool_elt_at_index (ppm->sessions, pdcp->session_id);
+  if ((verbose > 0) && (~0 != pdcp->session_id)) {
+    pdcp_session = pool_elt_at_index (ppm->sessions, pdcp->session_id);
     if (pdcp_session) {
       s = format (s, "\ndetails %U\n", format_ppf_pdcp_session, pdcp_session);
     }
