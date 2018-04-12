@@ -110,13 +110,13 @@ _(IP4_LOOKUP, "ip4-lookup")
 } ppf_srb_nb_tx_next_t;
 
 
-
-
 #define MAX_PDCP_KEY_LEN          16    /* 128 bits */
 #define MAX_REORDER_WINDOW_SIZE   64
 #define INVALID_BUFFER_INDEX      ~0
 
-#define PPF_PDCP_COUNT(hfn, sn, len)  ((255 == len) ? (sn) : (((hfn) << (1 << (len))) | (sn)))
+#define PPF_PDCP_COUNT(hfn, sn, len)   ((255 == (len)) ? (sn) : (((hfn) << (1 << (len))) | (sn)))
+#define PPF_PDCP_HFN(count, len)       ((255 == (len)) ? 0 : ((count) >> (len)))
+#define PPF_PDCP_SN(count, len)        ((255 == (len)) ? (count) : (count & pow2_mask((len))))
 #define PPF_PDCP_COUNT_INC(hfn, sn, len)   \
 do {                                       \
 	(sn)++;                                \
@@ -125,12 +125,14 @@ do {                                       \
 		(sn) = 0;                          \
 	}                                      \
 } while (0)
-#define PPF_PDCP_SN_INC(sn, len)       (((sn) + 1) & pow2_mask(len))
-
+#define PPF_PDCP_SN_INC(sn, len)           (((sn) + 1) & pow2_mask((len)))
+#define PPF_PDCP_SN_DEC(sn, len)           (((sn) - 1) & pow2_mask((len)))
+#define PPF_PDCP_COUNT_HFN_DEC(count, len) ((255 == (len)) ? (((count) >> (len)) - 1) : ((((count) >> (len)) - 1) & pow2_mask(32 - (len))))
 
 
 enum pdcp_security_alg_t 
 { 
+  PDCP_NONE_SECURITY    = 0x00,
   PDCP_NULL_CIPHERING   = 0x01,
   PDCP_SNOW3G_CIPHERING = 0x02,
   PDCP_AES_CIPHERING    = 0x04,
