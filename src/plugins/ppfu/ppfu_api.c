@@ -141,7 +141,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   nb = &(mp->nb);
 
   // the source ip of nb is 0, means the nb is invalid, the call is SRB
-  if (nb->src_ip_address != 0)
+  if (nb->src_ip_address[0] != 0)
   	call_type = PPF_DRB_CALL;
   else 
   	call_type = PPF_SRB_CALL;
@@ -203,7 +203,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   {
   	  sb = &(mp->sb[i]);
 
-  	  if (sb->src_ip_address == 0) 
+  	  if (sb->src_ip_address[0] == 0) 
 		continue;
 
 	  uword *p = hash_get (im->fib_index_by_table_id, clib_net_to_host_u32(sb->encap_vrf_id));
@@ -390,7 +390,7 @@ vl_api_ppfu_plugin_bearer_update_t_handler
   {
 	  sb = &(mp->sb[i]);
 
-	  if (sb->src_ip_address == 0) 
+	  if (sb->src_ip_address[0] == 0) 
 		continue;
 
 	  uword *p = hash_get (im->fib_index_by_table_id, clib_net_to_host_u32 (sb->encap_vrf_id));
@@ -486,7 +486,7 @@ out:
 	}
   }
   
-  REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
+  REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_UPDATE_REPLY,
   ({	
 
      for (i = 0; i<MAX_SB_PER_CALL; i++) {
