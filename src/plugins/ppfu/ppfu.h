@@ -110,9 +110,10 @@ _(IP4_LOOKUP, "ip4-lookup")
 } ppf_srb_nb_tx_next_t;
 
 
-#define MAX_PDCP_KEY_LEN          16    /* 128 bits */
-#define MAX_REORDER_WINDOW_SIZE   64
-#define INVALID_BUFFER_INDEX      ~0
+#define MAX_PDCP_KEY_LEN              16    /* 128 bits */
+#define PDCP_REPLAY_WINDOW_SIZE(l)    (1 << ((l) - 1))
+#define PDCP_REORDER_WINDOW_SIZE      64
+#define INVALID_BUFFER_INDEX          ~0
 
 #define PPF_PDCP_COUNT(hfn, sn, len)   ((255 == (len)) ? (sn) : (((hfn) << (1 << (len))) | (sn)))
 #define PPF_PDCP_HFN(count, len)       ((255 == (len)) ? 0 : ((count) >> (len)))

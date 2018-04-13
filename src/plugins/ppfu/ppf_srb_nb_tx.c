@@ -163,9 +163,10 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           t0 = pool_elt_at_index (pgm->tunnels, tunnel_index0);
           srb0->call_id = clib_host_to_net_u32(t0->call_id);
 
-		  p0 = hash_get(ppf_main.ppf_calline_table[t0->call_id].rb.srb.nb_out_msg_by_sn, vnet_buffer2(b0)->ppf_du_metadata.pdcp.count);
+		  p0 = hash_get (ppf_main.ppf_calline_table[t0->call_id].rb.srb.nb_out_msg_by_sn, vnet_buffer2(b0)->ppf_du_metadata.pdcp.count);
 		  if (PREDICT_TRUE (p0 != NULL)) {
 		    msg0.as_u64 = p0[0];
+			hash_unset (ppf_main.ppf_calline_table[t0->call_id].rb.srb.nb_out_msg_by_sn, vnet_buffer2(b0)->ppf_du_metadata.pdcp.count);
 		  } else {
 		    msg0.as_u64 = 0;
 		  }
