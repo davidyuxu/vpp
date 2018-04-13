@@ -1560,7 +1560,7 @@ mheap_validate (void *v)
   h->validate_serial += 1;
 }
 
-static void
+static never_inline void
 mheap_get_trace (void *v, uword offset, uword size)
 {
   mheap_t *h;
@@ -1573,7 +1573,7 @@ mheap_get_trace (void *v, uword offset, uword size)
   memset (&trace, 0, sizeof (trace));
 
   n_callers = clib_backtrace (trace.callers, ARRAY_LEN (trace.callers),
-			      /* Skip mheap_get_aligned's frame */ 1);
+			      /* Skip mheap_get_aligned's frame */ 2);
   if (n_callers == 0)
     return;
 
