@@ -209,7 +209,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b0, -(word)(pdcp0->header_length));
 	    buf0 = vlib_buffer_get_current (b0);
-	    pdcp0->encap_header (buf0, 0, sn0);
+	    pdcp0->encap_header (buf0, 1, sn0);
 
 		sp0.pdcp_sess = pdcp0;
 		sp0.count = count0;
@@ -256,7 +256,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b1, -(word)(pdcp1->header_length));
 	    buf1 = vlib_buffer_get_current (b1);
-	    pdcp1->encap_header (buf1, 0, sn1);
+	    pdcp1->encap_header (buf1, 1, sn1);
 
 		sp1.pdcp_sess = pdcp1;
 		sp1.count = count1;
@@ -303,7 +303,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b2, -(word)(pdcp2->header_length));
 	    buf2 = vlib_buffer_get_current (b2);
-	    pdcp2->encap_header (buf2, 0, sn2);
+	    pdcp2->encap_header (buf2, 1, sn2);
 
 		sp2.pdcp_sess = pdcp2;
 		sp2.count = count2;
@@ -350,7 +350,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b3, -(word)(pdcp3->header_length));
 	    buf3 = vlib_buffer_get_current (b3);
-	    pdcp3->encap_header (buf3, 0, sn3);
+	    pdcp3->encap_header (buf3, 1, sn3);
 
 		sp3.pdcp_sess = pdcp3;
 		sp3.count = count3;
@@ -444,7 +444,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
         /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b0, -(word)(pdcp0->header_length));
 	    buf0 = vlib_buffer_get_current (b0);
-	    pdcp0->encap_header (buf0, 0, sn0);
+	    pdcp0->encap_header (buf0, 1, sn0);
 
 		sp0.pdcp_sess = pdcp0;
 		sp0.count = count0;

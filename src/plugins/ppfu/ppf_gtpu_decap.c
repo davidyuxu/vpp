@@ -311,6 +311,8 @@ ppf_gtpu_input (vlib_main_t * vm,
 
 	      /* Manipulate Next Extension Header */
 	      /* TBD */
+	      if (ppf_gtpu0->next_ext_type != 0)
+	        ppf_gtpu_hdr_len0 += 4;
 	    }
 	  else
 	    {
@@ -495,6 +497,8 @@ ppf_gtpu_input (vlib_main_t * vm,
 
 	      /* Manipulate Next Extension Header */
 	      /* TBD */
+	      if (ppf_gtpu1->next_ext_type != 0)
+	        ppf_gtpu_hdr_len1 += 4;
 	    }
 	  else
 	    {
@@ -739,6 +743,8 @@ ppf_gtpu_input (vlib_main_t * vm,
 
 	      /* Manipulate Next Extension Header */
 	      /* TBD */
+	      if (ppf_gtpu0->next_ext_type != 0)
+	        ppf_gtpu_hdr_len0 += 4;
 	    }
 	  else
 	    {
