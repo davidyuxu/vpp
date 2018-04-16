@@ -359,6 +359,8 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
 
   pdcp_sess->protect = &ppf_pdcp_nop;
   pdcp_sess->validate = &ppf_pdcp_nop;
+  pdcp_sess->encrypt = &ppf_pdcp_nop;
+  pdcp_sess->decrypt = &ppf_pdcp_nop;
   pdcp_sess->mac_length = 0;
 
   switch (pdcp_sess->sn_length) {
