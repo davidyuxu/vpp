@@ -354,9 +354,6 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
   else //in_flight_limit == 0
     pdcp_sess->in_flight_limit = 0x1FFFFFFFF; //0 means no in-flight limit, set limit to 2^32 + 1
 
-  clib_warning("ppf_pdcp_create_session: configuring in-flight-limit to 0x%lx, received configuration value 0x%x \n",
-		  pdcp_sess->in_flight_limit, in_flight_limit);
-
   pdcp_sess->protect = &ppf_pdcp_nop;
   pdcp_sess->validate = &ppf_pdcp_nop;
   pdcp_sess->encrypt = &ppf_pdcp_nop;

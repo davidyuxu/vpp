@@ -53,7 +53,7 @@ u8 * format_ppf_srb_nb_tx_trace  (u8 * s, va_list * args)
 
   s = format (s, "PPF SRB-NB TX: srb incoming msg from sb tunnel %d \n",
 	      t->tunnel_index);
-  s = format (s, "  call-id %d, transaction-id %d, request-id %d, integrity_status %d, length %d \n",
+  s = format (s, "  call-id %d, transaction-id %d, request-id %d, integrity_status %d, length %d",
               clib_net_to_host_u32(t->srb.call_id),
               clib_net_to_host_u32(t->srb.transaction_id),
               clib_net_to_host_u32(t->srb.msg.in.request_id),

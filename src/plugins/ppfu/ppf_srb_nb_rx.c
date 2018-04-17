@@ -56,7 +56,7 @@ u8 * format_ppf_srb_nb_rx_trace  (u8 * s, va_list * args)
 
   s = format (s, "PPF SRB-NB RX: srb outgoing msg received for the call %d \n",
 	      clib_net_to_host_u32(t->srb.call_id));
-  s = format (s, "  transaction-id %d, request-id %d, sb_num %d, sb_id %d %d %d, length %d \n",
+  s = format (s, "  transaction-id %d, request-id %d, sb_num %d, sb_id %d %d %d, length %d",
               clib_net_to_host_u32(t->srb.transaction_id),
               clib_net_to_host_u32(t->srb.msg.out.request_id),
               t->srb.msg.out.sb_num,

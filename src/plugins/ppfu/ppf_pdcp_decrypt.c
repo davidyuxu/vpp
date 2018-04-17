@@ -57,6 +57,7 @@ typedef struct {
   u32 hfn;
   u32 integrity_status;
   u32 error;
+  u32 next_index;
 } ppf_pdcp_decrypt_trace_t;
 
 u8 * format_ppf_pdcp_decrypt_trace  (u8 * s, va_list * args)
@@ -66,10 +67,10 @@ u8 * format_ppf_pdcp_decrypt_trace  (u8 * s, va_list * args)
 
   ppf_pdcp_decrypt_trace_t * t = va_arg (*args, ppf_pdcp_decrypt_trace_t *);
   
-  s = format (s, "PDCP_DECRYPT: tunnel_index %d, call_id %d (type %U, ue_bearer %x)\nsn %u, hfn %u, integrity_status %d, error %s",
+  s = format (s, "PDCP_DECRYPT: tunnel_index %d, call_id %d (type %U, ue_bearer %x)\nsn %u, hfn %u, integrity_status %d, error %s, next_index %d",
 		  t->tunnel_index, t->call_id, 
 		  format_ppf_call_type, t->call_type, t->ue_bearer_id,
-		  t->sn, t->hfn, t->integrity_status, ppf_pdcp_decrypt_error_strings[t->error]);
+		  t->sn, t->hfn, t->integrity_status, ppf_pdcp_decrypt_error_strings[t->error], t->next_index);
 
   return s;
 }
@@ -611,53 +612,53 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 
 	while (n_left_from > 0 && n_left_to_next > 0)
 	  {
-	    ppf_pdcp_decrypt_next_t next0 = next_index;
-	    u32 bi0;
-	    vlib_buffer_t * b0;
-	    u32 error0 = 0;
-	    u32 tunnel_index0;
-  	    ppf_gtpu_tunnel_t * t0;
-	    u32 call_id0;
-  	    ppf_callline_t * c0 = NULL;
-	    ppf_pdcp_session_t * pdcp0 = NULL;
-	    u8 * buf0;
-	    u8 dc0 = 0;
-	    u32 sn0 = 0;
-	    u32 w0 = 0;
-	    u32 hfn0 = 0;
-	    u32 count0 = 0;
-	    u32 count_last_fwd0 = 0;
-	    u32 len0 = 0;
-	    ppf_pdcp_security_param_t sp0;
-	    u8 xmaci[16];
-
-	    /* speculatively enqueue b0 to the current next frame */
-	    bi0 = from[0];
-	    to_next[0] = bi0;
-	    from += 1;
-	    to_next += 1;
-	    n_left_from -= 1;
-	    n_left_to_next -= 1;
-
-	    b0 = vlib_get_buffer (vm, bi0);
-	    buf0 = vlib_buffer_get_current (b0);
-	    len0 = vlib_buffer_length_in_chain(vm, b0);
-
+        ppf_pdcp_decrypt_next_t next0 = next_index;
+        u32 bi0;
+        vlib_buffer_t * b0;
+        u32 error0 = 0;
+        u32 tunnel_index0;
+            ppf_gtpu_tunnel_t * t0;
+        u32 call_id0;
+            ppf_callline_t * c0 = NULL;
+        ppf_pdcp_session_t * pdcp0 = NULL;
+        u8 * buf0;
+        u8 dc0 = 0;
+        u32 sn0 = 0;
+        u32 w0 = 0;
+        u32 hfn0 = 0;
+        u32 count0 = 0;
+        u32 count_last_fwd0 = 0;
+        u32 len0 = 0;
+        ppf_pdcp_security_param_t sp0;
+        u8 xmaci[16];
+        
+        /* speculatively enqueue b0 to the current next frame */
+        bi0 = from[0];
+        to_next[0] = bi0;
+        from += 1;
+        to_next += 1;
+        n_left_from -= 1;
+        n_left_to_next -= 1;
+        
+        b0 = vlib_get_buffer (vm, bi0);
+        buf0 = vlib_buffer_get_current (b0);
+        len0 = vlib_buffer_length_in_chain(vm, b0);
+        
         /* Get tunnel index from buffer */
-	    tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
-
+        tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
+        
         /* Find rx tunnel */
-	    t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
+        t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
 
         /* Handle buffer 0 */
         
         /* Find callline */
-	    call_id0 = t0->call_id;
-	    if (PREDICT_FALSE(~0 == call_id0)) {
-              error0 = PPF_PDCP_DECRYPT_ERROR_NO_SUCH_CALL;
-              next0 = PPF_PDCP_DECRYPT_NEXT_DROP;
-              goto trace00;
-	    }
+        call_id0 = t0->call_id;
+        if (PREDICT_FALSE(~0 == call_id0)) {
+          error0 = PPF_PDCP_DECRYPT_ERROR_NO_SUCH_CALL;
+          next0 = PPF_PDCP_DECRYPT_NEXT_DROP;
+          goto trace00;
+        }
 	    
 	    c0 = &(pm->ppf_calline_table[call_id0]);
 
@@ -669,12 +670,14 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    }
 
         /* Get rx 'dc' and 'sn' from buffer */
-	    pdcp0->decap_header (buf0, &dc0, &sn0);	    
+	    pdcp0->decap_header (buf0, &dc0, &sn0);
+		#if 0 /* skip dc check for now */
 	    if (PREDICT_FALSE(0 == dc0)) {
-              error0 = PPF_PDCP_DECRYPT_ERROR_INVALID_DC;
-              next0 = PPF_PDCP_DECRYPT_NEXT_DROP;
-              goto trace00;
+          error0 = PPF_PDCP_DECRYPT_ERROR_INVALID_DC;
+          next0 = PPF_PDCP_DECRYPT_NEXT_DROP;
+          goto trace00;
 	    }
+		#endif
 
         hfn0 = pdcp0->rx_hfn;
 		pdcp0->rx_next_expected_sn = sn0; // Fix later!!! bypass reorder for now
@@ -702,24 +705,23 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 		  count0 = PPF_PDCP_COUNT (hfn0, sn0, pdcp0->sn_length);
         }
         
-
-		sp0.pdcp_sess = pdcp0;
-		sp0.count = count0;
-		sp0.bearer = PPF_BEARER(c0->ue_bearer_id);
-		sp0.dir = PPF_PDCP_DIR_DEC;
+        sp0.pdcp_sess = pdcp0;
+        sp0.count = count0;
+        sp0.bearer = PPF_BEARER(c0->ue_bearer_id);
+        sp0.dir = PPF_PDCP_DIR_DEC;
 
         /* Decrypt */
-	    pdcp0->decrypt (buf0 + pdcp0->header_length,
-	    	            buf0 + pdcp0->header_length,
-	    	            len0 - pdcp0->header_length,
-	    	            &sp0);
+        pdcp0->decrypt (buf0 + pdcp0->header_length,
+                        buf0 + pdcp0->header_length,
+                        len0 - pdcp0->header_length,
+                        &sp0);
 	    
         /* Validate */
-	    if (pdcp0->mac_length) {
+        if (pdcp0->mac_length) {
           pdcp0->validate (buf0, xmaci, len0 - pdcp0->mac_length, &sp0);
-	      b0->current_length -= pdcp0->mac_length;
+          b0->current_length -= pdcp0->mac_length;
 
-	      if (BYTES_EQUAL (xmaci, (buf0 + len0 - pdcp0->mac_length), pdcp0->mac_length))
+          if (BYTES_EQUAL (xmaci, (buf0 + len0 - pdcp0->mac_length), pdcp0->mac_length))
             vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status = 1;
           else {
             vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status = 2;
@@ -730,22 +732,22 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    }
 
         /* FIX later!!! reorder here */
-		if (next0 == PPF_PDCP_DECRYPT_NEXT_REORDER) {
+        if (next0 == PPF_PDCP_DECRYPT_NEXT_REORDER) {
           BITMAP_SET (pdcp0->rx_replay_bitmap, count0);
-		  if (PREDICT_FALSE(count0 - count_last_fwd0 > vec_len (pdcp0->rx_reorder_buffers))) {
+          if (PREDICT_FALSE(count0 - count_last_fwd0 > vec_len (pdcp0->rx_reorder_buffers))) {
             error0 = PPF_PDCP_DECRYPT_ERROR_REORDER_WINDOW_FULL;
             next0 = PPF_PDCP_DECRYPT_NEXT_DROP;
             goto trace00;
           }
-
-		  if (VEC_ELT_NE (pdcp0->rx_reorder_buffers, count0, INVALID_BUFFER_INDEX)) {
+          
+          if (VEC_ELT_NE (pdcp0->rx_reorder_buffers, count0, INVALID_BUFFER_INDEX)) {
             error0 = PPF_PDCP_DECRYPT_ERROR_REORDER_DUPLICATE;
             next0 = PPF_PDCP_DECRYPT_NEXT_DROP;
             goto trace00;
-		  }
-
-		  VEC_SET (pdcp0->rx_reorder_buffers, count0, bi0);
-		  goto trace00;
+          }
+          
+          VEC_SET (pdcp0->rx_reorder_buffers, count0, bi0);
+          goto trace00;
         }
 
 	    /* Send to next */
@@ -783,6 +785,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
               t->hfn = hfn0;
               t->integrity_status = vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status;
               t->error = error0;
+			  t->next_index = next0;
             }
           }
 
