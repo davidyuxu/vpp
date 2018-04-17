@@ -314,19 +314,19 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      /* Fix GTPU length */
 	      ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
 	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0) - sizeof(*udp0));
+					     - sizeof (*ip4_0) - sizeof(*udp0) - 8);
 	      ppf_gtpu0->length = new_l0;
 	      ppf_gtpu1 = (ppf_gtpu_header_t *)(udp1+1);
 	      new_l1 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1)
-					     - sizeof (*ip4_1) - sizeof(*udp1));
+					     - sizeof (*ip4_1) - sizeof(*udp1) - 8);
 	      ppf_gtpu1->length = new_l1;
 	      ppf_gtpu2 = (ppf_gtpu_header_t *)(udp2+1);
 	      new_l2 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
-					     - sizeof (*ip4_2) - sizeof(*udp2));
+					     - sizeof (*ip4_2) - sizeof(*udp2) - 8);
 	      ppf_gtpu2->length = new_l2;
 	      ppf_gtpu3 = (ppf_gtpu_header_t *)(udp1+3);
 	      new_l3 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
-					     - sizeof (*ip4_3) - sizeof(*udp3));
+					     - sizeof (*ip4_3) - sizeof(*udp3) - 8);
 	      ppf_gtpu3->length = new_l3;
 	    }
 	  else /* ipv6 */
@@ -413,19 +413,19 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      /* Fix GTPU length */
 	      ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
 	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0) - sizeof(*udp0));
+					     - sizeof (*ip4_0) - sizeof(*udp0) - 8);
 	      ppf_gtpu0->length = new_l0;
 	      ppf_gtpu1 = (ppf_gtpu_header_t *)(udp1+1);
 	      new_l1 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1)
-					     - sizeof (*ip4_1) - sizeof(*udp1));
+					     - sizeof (*ip4_1) - sizeof(*udp1) - 8);
 	      ppf_gtpu1->length = new_l1;
 	      ppf_gtpu2 = (ppf_gtpu_header_t *)(udp2+1);
 	      new_l2 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
-					     - sizeof (*ip4_2) - sizeof(*udp2));
+					     - sizeof (*ip4_2) - sizeof(*udp2) - 8);
 	      ppf_gtpu2->length = new_l2;
 	      ppf_gtpu3 = (ppf_gtpu_header_t *)(udp3+1);
 	      new_l3 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
-					     - sizeof (*ip4_3) - sizeof(*udp3));
+					     - sizeof (*ip4_3) - sizeof(*udp3) - 8);
 	      ppf_gtpu3->length = new_l3;
 	    }
 
@@ -580,7 +580,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      /* Fix GTPU length */
 	      ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
 	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0) - sizeof(*udp0));
+					     - sizeof (*ip4_0) - sizeof(*udp0) - 8);
 	      ppf_gtpu0->length = new_l0;
 	    }
 
@@ -616,7 +616,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      /* Fix GTPU length */
 	      ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
 	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0) - sizeof(*udp0));
+					     - sizeof (*ip4_0) - sizeof(*udp0) - 8);
 	      ppf_gtpu0->length = new_l0;
 	    }
 
