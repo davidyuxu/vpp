@@ -57,6 +57,7 @@ _(PPF_SRB_NB_TX, "ppf_srb_nb_tx")
 
 typedef enum {
     PPF_PDCP_DECRYPT_NEXT_DROP,
+    PPF_PDCP_DECRYPT_NEXT_REORDER,
     PPF_PDCP_DECRYPT_NEXT_IP4_LOOKUP,
     PPF_PDCP_DECRYPT_NEXT_IP6_LOOKUP,
     PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP,
@@ -129,6 +130,80 @@ do {                                       \
 #define PPF_PDCP_SN_INC(sn, len)           (((sn) + 1) & pow2_mask((len)))
 #define PPF_PDCP_SN_DEC(sn, len)           (((sn) - 1) & pow2_mask((len)))
 #define PPF_PDCP_COUNT_HFN_DEC(count, len) ((255 == (len)) ? (((count) >> (len)) - 1) : ((((count) >> (len)) - 1) & pow2_mask(32 - (len))))
+
+/* PDCP replay bitmap operations */
+#define BITMAP_LEN(bm)               (vec_len((bm)))
+#define BITMAP_WORD_INDEX_MASK(bm)   (BITMAP_LEN((bm)) - 1)
+#define BITMAP_WORD_SHIFTS(bm) 	     (max_log2(BITS((bm)[0])))
+#define BITMAP_WORD_BITS(bm)         (BITS((bm)[0]))
+#define BITMAP_BIT_MASK(bm)          (BITMAP_WORD_BITS(bm) - 1)
+
+#define BITMAP_WORD_INDEX(bm, bit)        ((bit) >> BITMAP_WORD_SHIFTS(bm))
+#define BITMAP_WORD_INDEX_ROUND(bm, bit)  (BITMAP_WORD_INDEX((bm), (bit)) & BITMAP_WORD_INDEX_MASK((bm)))
+#define	BITMAP_WORD(bm, bit)              ((bm)[BITMAP_WORD_INDEX_ROUND(bm, bit)])
+#define	BITMAP_BIT(bm, bit)               (1UL << ((bit) & BITMAP_BIT_MASK(bm)))
+
+
+always_inline void
+__bitmap_advance__(uword * bitmap, u32 old, u32 new, u32 window)
+{
+	u32 index, index2, index_cur, id;
+	u32 diff;
+	u32 max_bit = ~0;
+	u32 old_max = old + window;
+	u32 new_max = new + window;
+	
+	/**
+	 * now update the bit
+	 */
+	index = BITMAP_WORD_INDEX (bitmap, new_max);
+	
+	/**
+	 * first check if the sequence number is in the range
+	 */
+		
+	if (new_max > old_max) {
+		index_cur = BITMAP_WORD_INDEX (bitmap, old_max);
+		diff = index - index_cur;
+		if (diff > BITMAP_LEN(bitmap)) {  /* something unusual in this case */
+			diff = BITMAP_LEN(bitmap);
+		}
+
+		for (id = 0; id < diff; ++id) {
+			bitmap[(id + index_cur + 1) & BITMAP_WORD_INDEX_MASK(bitmap)] = 0;
+		}	
+	} else {
+		index2 = BITMAP_WORD_INDEX (bitmap, max_bit);
+		index_cur = BITMAP_WORD_INDEX (bitmap, old_max);
+
+		/* lastseq -> max_seq */
+		diff = index2 - index_cur;
+		if (diff > BITMAP_LEN(bitmap)) {  /* something unusual in this case */
+			diff = BITMAP_LEN(bitmap);
+		}
+		
+		for (id = 0; id < diff; ++id) {
+			bitmap[(id + index_cur + 1) & BITMAP_WORD_INDEX_MASK(bitmap)] = 0;
+		}
+
+		/* 0 -> sequence */
+		diff = index;
+		for (id = 0; id <= diff; ++id) {
+			bitmap[(id) & BITMAP_WORD_INDEX_MASK(bitmap)] = 0;
+		}
+	}
+}
+
+#define	BITMAP_ON(bm, bit)             (BITMAP_WORD(bm, bit) & BITMAP_BIT(bm, bit))
+#define	BITMAP_SET(bm, bit)		       (BITMAP_WORD(bm, bit) |= BITMAP_BIT(bm, bit))
+#define	BITMAP_CLR(bm, bit)		       (BITMAP_WORD(bm, bit) &= ~BITMAP_BIT(bm, bit))
+#define BITMAP_SHL(bm, o, n, w)        __bitmap_advance__(bm, o, n, w)
+
+#define VEC_INDEX_MASK(v)    (vec_len((v)) - 1)
+#define VEC_AT(v, i)         (vec_elt((v), (i) & VEC_INDEX_MASK ((v))))
+#define VEC_SET(v, i, e)     (VEC_AT (v, i) = (e))
+#define VEC_ELT_NE(v, i, e)  ((e) != VEC_AT(v, i))
+#define VEC_ELT_EQ(v, i, e)  ((e) == VEC_AT(v, i))
 
 
 enum pdcp_security_alg_t 
@@ -213,6 +288,7 @@ typedef struct
   u32 rx_hfn;
   u32 rx_next_expected_sn;
   u32 rx_last_forwarded_sn;
+  u32 replay_window;
   u64 in_flight_limit;
   uword * rx_replay_bitmap;  /* bitmap of rx sn */
   u32 * rx_reorder_buffers;  /* rx reordering vector*/
