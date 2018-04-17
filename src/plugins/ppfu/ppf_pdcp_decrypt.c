@@ -677,6 +677,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    }
 
         hfn0 = pdcp0->rx_hfn;
+		pdcp0->rx_next_expected_sn = sn0; // Fix later!!! bypass reorder for now
         if (PREDICT_FALSE(sn0 != pdcp0->rx_next_expected_sn)) {
           w0 = pdcp0->replay_window;
           if (sn0 + w0 < pdcp0->rx_last_forwarded_sn)
