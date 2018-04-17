@@ -425,6 +425,8 @@ int vnet_ppf_gtpu_add_del_tunnel
   ppf_gtpu_tunnel_id_type_t *it;
   u32 tunnel_id;
 
+  key4.teid = ~0;
+	
   if (!is_ip6)
     {
       key4.teid = clib_host_to_net_u32 (a->in_teid);
@@ -773,6 +775,8 @@ int vnet_ppf_gtpu_add_tunnel
   ppf_callline_t *callline;
   ppf_gtpu_tunnel_id_type_t *it;
   u32 tunnel_id;
+
+  key4.teid = ~0;
 
   if (!is_ip6)
     {
