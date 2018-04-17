@@ -812,9 +812,9 @@ __bitmap_advance__(uword * bitmap, u32 old, u32 new, u32 window)
 {
 	u32 index, index2, index_cur, id;
 	u32 diff;
-	u32 max_bit = ((~0) & (window - 1));
-	u32 old_max = (old + window) & (window - 1);
-	u32 new_max = (new + window) & (window - 1);
+	u32 max_bit = ~0;
+	u32 old_max = old + window;
+	u32 new_max = new + window;
 	
 	/**
 	 * now update the bit
@@ -874,6 +874,7 @@ test_bitmap_fn (vlib_main_t * vm,
   clib_error_t *error = NULL;
   u32 bit, from, to;
   u32 op = 0;
+  u32 loop = 0;
   
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
@@ -887,6 +888,8 @@ test_bitmap_fn (vlib_main_t * vm,
 	    op = 4;
       else if (unformat (input, "reset window %d", &test_window_bits))
 	    op = 5;
+      else if (unformat (input, "auto %d", &loop))
+	    op = 6;
       else
       {
         error = clib_error_return (0, "parse error: '%U'", format_unformat_error, input);
@@ -901,9 +904,9 @@ test_bitmap_fn (vlib_main_t * vm,
   	clib_bitmap_zero (test_bitmap);
   }
 
-  bit &= (test_window - 1);
-  from &= (test_window - 1);
-  to &= (test_window - 1);
+  //bit &= BITMAP_WORD_INDEX_MASK(test_bitmap);
+  //from &= BITMAP_WORD_INDEX_MASK(test_bitmap);
+  //to &= BITMAP_WORD_INDEX_MASK(test_bitmap);
   switch (op) {
   	case 1:
 	  BITMAP_SET (test_bitmap, bit);
@@ -932,12 +935,28 @@ test_bitmap_fn (vlib_main_t * vm,
 	  }
 	  break;
 
+	case 6:
+	  bit = 0;
+	  while (loop) {
+	  	BITMAP_SET (test_bitmap, bit);
+		if (bit > 0)
+		  BITMAP_SHL (test_bitmap, bit - 1, bit, test_window);
+
+		vlib_cli_output (vm, "loop %u - window [%u, %u], Bitmap: %u bits\n %U",
+					loop, bit + 1, bit + test_window,
+					BITMAP_LEN (test_bitmap) * BITMAP_WORD_BITS (test_bitmap), format_bitmap_hex, test_bitmap);
+
+		loop--;
+		bit++;
+	  }
+	  break;
+
 	default:
 	  break;
   }
   
   if (test_bitmap) {
-  	vlib_cli_output (vm, "Bitmap: %u bytes length\n %U", clib_bitmap_bytes (test_bitmap), format_bitmap_hex, test_bitmap);
+  	vlib_cli_output (vm, "Bitmap: %u bits\n %U", BITMAP_LEN (test_bitmap) * BITMAP_WORD_BITS (test_bitmap), format_bitmap_hex, test_bitmap);
   }
 
 done:
