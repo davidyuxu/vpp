@@ -100,6 +100,7 @@ void throughput_stats_validate(u32 sw_if_index);
 static void throughput_stats_verbose ();
 static void throughput_stats_del(u32 sw_if_index);
 static void throughput_stats_clear ();
+static void throughput_show ();
 
 static clib_error_t *
 throughput_trace_command_fn (vlib_main_t * vm,
@@ -126,6 +127,8 @@ throughput_trace_command_fn (vlib_main_t * vm,
             }
         } else if (unformat (input, "verbose %d", &verbose)) {
             throughput_stats_verbose(verbose);
+        } else if (unformat (input, "verbose")) {
+            throughput_show();
         } else if (unformat (input, "clear")) {
             throughput_stats_clear();
         } else {
@@ -190,10 +193,12 @@ throughput_stats_counter_clear(vlib_if_stats_main_t *sm)
 static void
 throughput_stats_counter_show_(vlib_if_stats_main_t *sm)
 {
-    vlib_if_counter_t *c;
+    vlib_if_counter_t *c, ct;
     int i;
     vlib_main_t *vm = stats_main.vlib_main;
     int show_title = 1;
+
+    memset (&ct, 0x00, sizeof (ct));
     
     vec_foreach_index (i, sm->counters) {
         c = vec_elt_at_index(sm->counters, i);
@@ -205,7 +210,15 @@ throughput_stats_counter_show_(vlib_if_stats_main_t *sm)
             vlib_cli_output(vm, "           %10d %15llu %15llu %20llu %20llu\n", i,
                  c->rx.packets, c->tx.packets, c->rx.bytes, c->tx.bytes);
         }
+        
+        ct.rx.packets += c->rx.packets;
+        ct.tx.packets += c->tx.packets;
+        ct.rx.bytes += c->rx.bytes;
+        ct.tx.bytes += c->tx.bytes;
     }
+
+    vlib_cli_output(vm, "           %10s %15llu %15llu %20llu %20llu\n", "Total",
+         ct.rx.packets, ct.tx.packets, ct.rx.bytes, ct.tx.bytes);
 
 }
 
@@ -227,7 +240,7 @@ throughput_stats_verbose (int verbose)
     }
 
     if (verbose == 1) {
-        vlib_cli_output(vm, "Slot counters:\n");
+        vlib_cli_output(vm, "Slot counters: (Current slot %u)\n", throughput_slot);
         vlib_cli_output(vm, "\n%10s %10s %15s %15s %20s %20s\n", "Interface", "Thread", "RxPkts", "TxPkts", "RxBytes", "TxBytes");
         for (i = 0; i < SYSTEM_THROUGHPUT_MAX_BINS; i++) {
             vlib_cli_output(vm, "Slot number: %d\n", i);
