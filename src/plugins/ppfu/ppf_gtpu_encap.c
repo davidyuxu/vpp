@@ -75,7 +75,10 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
   vnet_main_t * vnm = gtm->vnet_main;
   vnet_interface_main_t * im = &vnm->interface_main;
   u32 pkts_encapsulated = 0;
-  u16 old_l0 = 0, old_l1 = 0, old_l2 = 0, old_l3 = 0;
+  CLIB_UNUSED(u16 old_l0) = 0;
+  CLIB_UNUSED(u16 old_l1) = 0;
+  CLIB_UNUSED(u16 old_l2) = 0;
+  CLIB_UNUSED(u16 old_l3) = 0;
   u32 thread_index = vlib_get_thread_index();
   u32 stats_sw_if_index, stats_n_packets, stats_n_bytes;
   //u32 sw_if_index0 = 0, sw_if_index1 = 0, sw_if_index2 = 0, sw_if_index3 = 0;
@@ -117,7 +120,10 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
           u32 * copy_src_last2, * copy_dst_last2;
           u32 * copy_src_last3, * copy_dst_last3;
           u16 new_l0, new_l1, new_l2, new_l3;
-          ip_csum_t sum0, sum1, sum2, sum3;
+          CLIB_UNUSED(ip_csum_t sum0);
+          CLIB_UNUSED(ip_csum_t sum1);
+          CLIB_UNUSED(ip_csum_t sum2);
+          CLIB_UNUSED(ip_csum_t sum3);
 
 	  /* Prefetch next iteration. */
 	  {
@@ -260,6 +266,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
               copy_dst_last3[0] = copy_src_last3[0];
 
 	      /* Fix the IP4 checksum and length */
+		  #if 0 /* Fix odd length packets chechsum issue */
 	      sum0 = ip4_0->checksum;
 	      new_l0 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
@@ -267,6 +274,14 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_0->checksum = ip_csum_fold (sum0);
 	      ip4_0->length = new_l0;
+		  #else
+	      new_l0 = /* old_l0 always 0, see the rewrite setup */
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
+	      ip4_0->length = new_l0;
+	      ip4_0->checksum = ip4_header_checksum (ip4_0);
+		  #endif
+		  
+		  #if 0 /* Fix odd length packets chechsum issue */
 	      sum1 = ip4_1->checksum;
 	      new_l1 = /* old_l1 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b1));
@@ -274,6 +289,14 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_1->checksum = ip_csum_fold (sum1);
 	      ip4_1->length = new_l1;
+		  #else
+	      new_l1 = /* old_l1 always 0, see the rewrite setup */
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b1));
+	      ip4_1->length = new_l1;
+	      ip4_1->checksum = ip4_header_checksum (ip4_1);
+		  #endif
+
+		  #if 0 /* Fix odd length packets chechsum issue */
 	      sum2 = ip4_2->checksum;
 	      new_l2 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b2));
@@ -281,6 +304,14 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_2->checksum = ip_csum_fold (sum2);
 	      ip4_2->length = new_l2;
+		  #else
+	      new_l2 = /* old_l2 always 0, see the rewrite setup */
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b2));
+	      ip4_2->length = new_l2;
+	      ip4_2->checksum = ip4_header_checksum (ip4_2);
+		  #endif
+		  
+		  #if 0 /* Fix odd length packets chechsum issue */
 	      sum3 = ip4_3->checksum;
 	      new_l3 = /* old_l1 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b3));
@@ -288,6 +319,12 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_3->checksum = ip_csum_fold (sum3);
 	      ip4_3->length = new_l3;
+		  #else
+	      new_l3 = /* old_l3 always 0, see the rewrite setup */
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b3));
+	      ip4_3->length = new_l3;
+	      ip4_3->checksum = ip4_header_checksum (ip4_3);
+		  #endif
 
 	      /* Fix UDP length and set source port */
 	      udp0 = (udp_header_t *)(ip4_0+1);
@@ -515,7 +552,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
           u64 * copy_src0, * copy_dst0;
           u32 * copy_src_last0, * copy_dst_last0;
           u16 new_l0;
-          ip_csum_t sum0;
+          CLIB_UNUSED(ip_csum_t sum0);
 
 	  bi0 = from[0];
 	  to_next[0] = bi0;
@@ -562,6 +599,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
               copy_dst_last0[0] = copy_src_last0[0];
 
 	      /* Fix the IP4 checksum and length */
+		  #if 0 /* Fix odd length packets chechsum issue */
 	      sum0 = ip4_0->checksum;
 	      new_l0 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
@@ -569,6 +607,12 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_0->checksum = ip_csum_fold (sum0);
 	      ip4_0->length = new_l0;
+		  #else
+	      new_l0 = /* old_l0 always 0, see the rewrite setup */
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
+	      ip4_0->length = new_l0;
+	      ip4_0->checksum = ip4_header_checksum (ip4_0);
+		  #endif
 
 	      /* Fix UDP length and set source port */
 	      udp0 = (udp_header_t *)(ip4_0+1);
