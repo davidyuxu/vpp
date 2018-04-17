@@ -402,7 +402,8 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
 
   /* Initialize anti-replay & reorder window */
   if (255 != sn_length) {
-    clib_bitmap_alloc (pdcp_sess->rx_replay_bitmap, PDCP_REPLAY_WINDOW_SIZE (sn_length));
+  	pdcp_sess->replay_window = PDCP_REPLAY_WINDOW_SIZE (sn_length);
+    clib_bitmap_alloc (pdcp_sess->rx_replay_bitmap, pdcp_sess->replay_window << 1);
 	clib_bitmap_zero (pdcp_sess->rx_replay_bitmap);
 	
     vec_validate_init_empty (pdcp_sess->rx_reorder_buffers, PDCP_REORDER_WINDOW_SIZE, INVALID_BUFFER_INDEX);
@@ -793,74 +794,6 @@ VLIB_CLI_COMMAND (create_ppf_pdcp_session_command, static) = {
   .function = ppf_pdcp_add_del_session_command_fn,
 };
 /* *INDENT-ON* */
-
-
-#define BITMAP_LEN(bm)               (vec_len((bm)))
-#define BITMAP_WORD_INDEX_MASK(bm)   (BITMAP_LEN((bm)) - 1)
-#define BITMAP_WORD_SHIFTS(bm) 	     (max_log2(BITS((bm)[0])))
-#define BITMAP_WORD_BITS(bm)         (BITS((bm)[0]))
-#define BITMAP_BIT_MASK(bm)          (BITMAP_WORD_BITS(bm) - 1)
-
-#define BITMAP_WORD_INDEX(bm, bit)        ((bit) >> BITMAP_WORD_SHIFTS(bm))
-#define BITMAP_WORD_INDEX_ROUND(bm, bit)  (BITMAP_WORD_INDEX((bm), (bit)) & BITMAP_WORD_INDEX_MASK((bm)))
-#define	BITMAP_WORD(bm, bit)              ((bm)[BITMAP_WORD_INDEX_ROUND(bm, bit)])
-#define	BITMAP_BIT(bm, bit)               (1UL << ((bit) & BITMAP_BIT_MASK(bm)))
-
-
-always_inline void
-__bitmap_advance__(uword * bitmap, u32 old, u32 new, u32 window)
-{
-	u32 index, index2, index_cur, id;
-	u32 diff;
-	u32 max_bit = ~0;
-	u32 old_max = old + window;
-	u32 new_max = new + window;
-	
-	/**
-	 * now update the bit
-	 */
-	index = BITMAP_WORD_INDEX (bitmap, new_max);
-	
-	/**
-	 * first check if the sequence number is in the range
-	 */
-		
-	if (new_max > old_max) {
-		index_cur = BITMAP_WORD_INDEX (bitmap, old_max);
-		diff = index - index_cur;
-		if (diff > BITMAP_LEN(bitmap)) {  /* something unusual in this case */
-			diff = BITMAP_LEN(bitmap);
-		}
-
-		for (id = 0; id < diff; ++id) {
-			bitmap[(id + index_cur + 1) & BITMAP_WORD_INDEX_MASK(bitmap)] = 0;
-		}	
-	} else {
-		index2 = BITMAP_WORD_INDEX (bitmap, max_bit);
-		index_cur = BITMAP_WORD_INDEX (bitmap, old_max);
-
-		/* lastseq -> max_seq */
-		diff = index2 - index_cur;
-		if (diff > BITMAP_LEN(bitmap)) {  /* something unusual in this case */
-			diff = BITMAP_LEN(bitmap);
-		}
-		
-		for (id = 0; id < diff; ++id) {
-			bitmap[(id + index_cur + 1) & BITMAP_WORD_INDEX_MASK(bitmap)] = 0;
-		}
-
-		/* 0 -> sequence */
-		diff = index;
-		for (id = 0; id <= diff; ++id) {
-			bitmap[(id) & BITMAP_WORD_INDEX_MASK(bitmap)] = 0;
-		}
-	}
-}
-
-#define	BITMAP_ON(bm, bit)             (BITMAP_WORD(bm, bit) & BITMAP_BIT(bm, bit))
-#define	BITMAP_SET(bm, bit)		       (BITMAP_WORD(bm, bit) |= BITMAP_BIT(bm, bit))
-#define	BITMAP_CLR(bm, bit)		       (BITMAP_WORD(bm, bit) &= ~BITMAP_BIT(bm, bit))
-#define BITMAP_SHL(bm, o, n, w)        __bitmap_advance__(bm, o, n, w)
 
 uword * test_bitmap = 0;
 u32     test_window_bits = 8;
