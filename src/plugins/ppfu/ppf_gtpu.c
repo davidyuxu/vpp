@@ -2147,10 +2147,18 @@ ppf_gtpu_init (vlib_main_t * vm)
 				       sizeof (ip46_address_t),
 				       sizeof (mcast_shared_t));
 
-  udp_register_dst_port (vm, UDP_DST_PORT_GTPU,
-			 ppf_gtpu4_input_node.index, /* is_ip4 */ 1);
-  udp_register_dst_port (vm, UDP_DST_PORT_GTPU6,
-			 ppf_gtpu6_input_node.index, /* is_ip4 */ 0);
+
+  if (PPFU_HANDOFF == 1) {
+	udp_register_dst_port (vm, UDP_DST_PORT_GTPU,
+			 worker_ppfu_handoff_node.index, /* is_ip4 */ 1);
+	udp_register_dst_port (vm, UDP_DST_PORT_GTPU,
+			 worker_ppfu_handoff_node.index, /* is_ip4 */ 0);
+  } else {
+  	  udp_register_dst_port (vm, UDP_DST_PORT_GTPU,
+				 ppf_gtpu4_input_node.index, /* is_ip4 */ 1);
+	  udp_register_dst_port (vm, UDP_DST_PORT_GTPU6,
+				 ppf_gtpu6_input_node.index, /* is_ip4 */ 0);
+  }
 
   gtm->fib_node_type = fib_node_register_new_type (&ppf_gtpu_vft);
 

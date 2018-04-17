@@ -273,6 +273,7 @@ extern vlib_node_registration_t ppf_gtpu4_input_node;
 extern vlib_node_registration_t ppf_gtpu6_input_node;
 extern vlib_node_registration_t ppf_gtpu4_encap_node;
 extern vlib_node_registration_t ppf_gtpu6_encap_node;
+extern vlib_node_registration_t worker_ppfu_handoff_node;
 
 u8 *format_ppf_gtpu_encap_trace (u8 * s, va_list * args);
 

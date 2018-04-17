@@ -274,6 +274,7 @@ typedef struct
   vnet_main_t *vnet_main;
 } ppf_sb_main_t;
 
+#define PPFU_HANDOFF		1
 #define DEF_MAX_PPF_SESSION 100000
 #define MAX_SB_PER_CALL  3
 
