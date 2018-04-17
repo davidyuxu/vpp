@@ -75,7 +75,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
 {
   ppf_sb_main_t *psm = &ppf_sb_main;
   ppf_gtpu_main_t *pgm = &ppf_gtpu_main;
-  u16 old_l0 = 0;
+  CLIB_UNUSED(u16 old_l0) = 0;
   u32 n_left_from, next_index, * from, * to_next;
   u32 stats_n_packets, stats_n_bytes;
   u32 next0 = PPF_SRB_NB_TX_NEXT_IP4_LOOKUP;
@@ -105,7 +105,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           u64 * copy_src0, * copy_dst0;
           u32 * copy_src_last0, * copy_dst_last0;
           u16 new_l0;
-          ip_csum_t sum0;
+          CLIB_UNUSED(ip_csum_t sum0);
           u32 tunnel_index0;
           ppf_gtpu_tunnel_t * t0;
 		  uword * p0;
@@ -140,6 +140,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           copy_dst_last0[0] = copy_src_last0[0];
           
           /* Fix the IP4 checksum and length */
+		  #if 0 // fix odd ehecksum calculate issue
           sum0 = ip4_0->checksum;
           new_l0 = /* old_l0 always 0, see the rewrite setup */
             clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
@@ -147,6 +148,12 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           		     length /* changed member */);
           ip4_0->checksum = ip_csum_fold (sum0);
           ip4_0->length = new_l0;
+		  #else
+          new_l0 = /* old_l0 always 0, see the rewrite setup */
+            clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
+          ip4_0->length = new_l0;
+		  ip4_0->checksum = ip4_header_checksum (ip4_0);
+		  #endif
           
           /* Fix UDP length and set source port */
           udp0 = (udp_header_t *)(ip4_0+1);
