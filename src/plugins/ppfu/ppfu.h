@@ -49,6 +49,7 @@ typedef enum {
 
 #define foreach_ppf_pdcp_decrypt_next        \
 _(DROP, "error-drop")                  \
+_(IP4_LOOKUP, "ip4-lookup") 		\
 _(IP4_LOOKUP, "ip4-lookup")		    \
 _(IP6_LOOKUP, "ip6-lookup")		    \
 _(PPF_GTPU4_ENCAP, "ppf_gtpu4-encap")    \
@@ -57,7 +58,6 @@ _(PPF_SRB_NB_TX, "ppf_srb_nb_tx")
 
 typedef enum {
     PPF_PDCP_DECRYPT_NEXT_DROP,
-    PPF_PDCP_DECRYPT_NEXT_REORDER,
     PPF_PDCP_DECRYPT_NEXT_IP4_LOOKUP,
     PPF_PDCP_DECRYPT_NEXT_IP6_LOOKUP,
     PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP,
