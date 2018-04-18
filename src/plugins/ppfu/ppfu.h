@@ -316,6 +316,8 @@ typedef struct
   u32 pdcp_decrypt_next_index;
   u32 pdcp_encrypt_next_index;
 
+  u32 rx_reorder;
+
    /**
    * Node type for registering to fib changes.
    */
