@@ -57,6 +57,8 @@ ppf_pdcp_init (vlib_main_t * vm)
   ppm->pdcp_decrypt_next_index = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
   ppm->pdcp_encrypt_next_index = PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU4_ENCAP;
 
+  ppm->rx_reorder = 0;
+
   if (ppf_main.max_capacity) {
     pool_init_fixed (ppm->sessions, ppf_main.max_capacity);
   }
@@ -403,7 +405,7 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
     clib_bitmap_alloc (pdcp_sess->rx_replay_bitmap, pdcp_sess->replay_window << 1);
 	clib_bitmap_zero (pdcp_sess->rx_replay_bitmap);
 	
-    vec_validate_init_empty (pdcp_sess->rx_reorder_buffers, PDCP_REORDER_WINDOW_SIZE, INVALID_BUFFER_INDEX);
+    vec_validate_init_empty (pdcp_sess->rx_reorder_buffers, PDCP_REORDER_WINDOW_SIZE - 1, INVALID_BUFFER_INDEX);
   }
   
   session_id = (u32)(pdcp_sess - ppm->sessions);
@@ -511,6 +513,8 @@ u32
 ppf_pdcp_clear_session (ppf_pdcp_session_t * pdcp_sess)
 {
   if (pdcp_sess) {
+    uword i;
+
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 	EVP_CIPHER_CTX_free (pdcp_sess->crypto_ctx);
 	EVP_CIPHER_CTX_free (pdcp_sess->integrity_ctx);
@@ -520,6 +524,12 @@ ppf_pdcp_clear_session (ppf_pdcp_session_t * pdcp_sess)
 #endif
 
   	clib_bitmap_free (pdcp_sess->rx_replay_bitmap);
+
+    vec_foreach_index(i, pdcp_sess->rx_reorder_buffers) {
+      if (VEC_ELT_NE (pdcp_sess->rx_reorder_buffers, i, INVALID_BUFFER_INDEX)) {
+        vlib_buffer_free_one (&vlib_global_main, vec_elt (pdcp_sess->rx_reorder_buffers, i));
+      }
+    }
   	vec_free (pdcp_sess->rx_reorder_buffers);
     pool_put (ppf_pdcp_main.sessions, pdcp_sess);
   }
@@ -635,32 +645,61 @@ format_pdcp_security_alg (u8 * s, va_list * args)
 }
 
 u8 *
+format_vec32_adv (u8 * s, va_list * va)
+{
+  u32 *v = va_arg (*va, u32 *);
+  char *fmt = va_arg (*va, char *);
+  u32 num_per_row = va_arg (*va, u32);
+  uword i;
+  for (i = 0; i < vec_len (v); i++)
+    {
+      if (i > 0) {
+	    s = format (s, ", ");
+		if ((i % num_per_row) == 0)
+		  s = format (s, "\n");
+      }
+
+      s = format (s, fmt, v[i]);
+
+    }
+  return s;
+}
+
+u8 *
 format_ppf_pdcp_session (u8 * s, va_list * va)
 {
   ppf_pdcp_session_t * pdcp_session = va_arg (*va, ppf_pdcp_session_t *);
 
   s = format (s, "sn-length %d, header-length %d, mac-length %d, in-flight-limit %lx\n", 
-  	pdcp_session->sn_length, 
-  	pdcp_session->header_length,
-  	pdcp_session->mac_length,
-  	pdcp_session->in_flight_limit);
+              pdcp_session->sn_length, 
+              pdcp_session->header_length,
+              pdcp_session->mac_length,
+              pdcp_session->in_flight_limit);
 
   s = format (s, "tx-hfn %u, tx-next %u\n", 
-  	pdcp_session->tx_hfn, 
-  	pdcp_session->tx_next_sn);
+              pdcp_session->tx_hfn, 
+              pdcp_session->tx_next_sn);
 
   s = format (s, "rx-hfn %u, rx-next-expected %u, rx-last-forwarded %u\n", 
-  	pdcp_session->rx_hfn, 
-  	pdcp_session->rx_next_expected_sn, 
-  	pdcp_session->rx_last_forwarded_sn);
+              pdcp_session->rx_hfn, 
+              pdcp_session->rx_next_expected_sn, 
+              pdcp_session->rx_last_forwarded_sn);
+
+  s = format (s, "replay-window %u, rx-replay-bitmap (%u bits)\n %U\n", 
+              pdcp_session->replay_window, 
+              clib_bitmap_bytes(pdcp_session->rx_replay_bitmap) * BITS(u8),
+              format_bitmap_hex, pdcp_session->rx_replay_bitmap);
+
+  s = format (s, "reorder-window %u, details\n%U\n", vec_len (pdcp_session->rx_reorder_buffers), 
+              format_vec32_adv, pdcp_session->rx_reorder_buffers, "%d", 8);
 
   s = format (s, "integrity-alg %U, intergity-key %U\n", 
-  	format_pdcp_security_alg, pdcp_session->security_algorithms & 0xf0, 
-  	format_hex_bytes, pdcp_session->integrity_key, MAX_PDCP_KEY_LEN);
+              format_pdcp_security_alg, pdcp_session->security_algorithms & 0xf0, 
+              format_hex_bytes, pdcp_session->integrity_key, MAX_PDCP_KEY_LEN);
 
   s = format (s, "crypto-alg %U, crypto-key %U\n", 
-  	format_pdcp_security_alg, pdcp_session->security_algorithms & 0x0f, 
-  	format_hex_bytes, pdcp_session->crypto_key, MAX_PDCP_KEY_LEN);
+              format_pdcp_security_alg, pdcp_session->security_algorithms & 0x0f, 
+              format_hex_bytes, pdcp_session->crypto_key, MAX_PDCP_KEY_LEN);
 
   return s;
 }
@@ -791,6 +830,44 @@ VLIB_CLI_COMMAND (create_ppf_pdcp_session_command, static) = {
   .function = ppf_pdcp_add_del_session_command_fn,
 };
 /* *INDENT-ON* */
+
+
+static clib_error_t *
+ppf_pdcp_set_reorder_command_fn (vlib_main_t * vm,
+					unformat_input_t * input,
+					vlib_cli_command_t * cmd)
+{
+  clib_error_t *error = NULL;
+  u32 enable = 0;
+  
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "enable"))
+	    enable = 1;
+      else if (unformat (input, "disable"))
+	    enable = 0;
+      else
+      {
+        error = clib_error_return (0, "parse error: '%U'", format_unformat_error, input);
+        return error;
+      }
+    }
+
+  ppf_pdcp_main.rx_reorder = enable;
+  vlib_cli_output (vm, "PPF PDCP reorder is set to %s\n", (ppf_pdcp_main.rx_reorder ? "enable" : "disable"));
+
+  return error;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (set_ppf_pdcp_reorder_command, static) = {
+  .path = "set ppf_pdcp reorder",
+  .short_help =	"set ppf_pdcp reorder <enable/disable> ",
+  .function = ppf_pdcp_set_reorder_command_fn,
+};
+/* *INDENT-ON* */
+
+
 
 uword * test_bitmap = 0;
 u32     test_window_bits = 8;

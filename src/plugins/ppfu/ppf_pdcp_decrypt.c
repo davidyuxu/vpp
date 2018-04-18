@@ -75,7 +75,9 @@ u8 * format_ppf_pdcp_decrypt_trace  (u8 * s, va_list * args)
   return s;
 }
 
-#define BYTES_EQUAL(src, dst, len)    (0 == memcmp((char *)(src), (char *)(dst), (len)))
+#define BYTES_EQUAL(s, d, l)          (0 == memcmp((char *)(s), (char *)(d), (l)))
+#define WORD_EQUAL(s, d)              (((s)[0] == (d)[0]) && ((s)[1] == (d)[1]) && ((s)[2] == (d)[2]) && ((s)[3] == (d)[3]))
+#define PDCP_MAC_VALIDATE(s, d, l)    ((4 == (l)) ? WORD_EQUAL(s,d) : BYTES_EQUAL(s,d,l))
 
 always_inline uword
 ppf_pdcp_decrypt_inline (vlib_main_t * vm,
@@ -684,7 +686,10 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 		#endif
 
         hfn0 = pdcp0->rx_hfn;
-		pdcp0->rx_next_expected_sn = sn0; // Fix later!!! bypass reorder for now
+
+		if (!ppm->rx_reorder)
+          pdcp0->rx_next_expected_sn = sn0;
+
         if (PREDICT_FALSE(sn0 != pdcp0->rx_next_expected_sn)) {
           w0 = pdcp0->replay_window;
           if (sn0 + w0 < pdcp0->rx_last_forwarded_sn)
@@ -725,7 +730,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           pdcp0->validate (buf0, xmaci, len0 - pdcp0->mac_length, &sp0);
           b0->current_length -= pdcp0->mac_length;
 
-          if (BYTES_EQUAL (xmaci, (buf0 + len0 - pdcp0->mac_length), pdcp0->mac_length))
+          if (PDCP_MAC_VALIDATE (xmaci, (buf0 + len0 - pdcp0->mac_length), pdcp0->mac_length))
             vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status = 1;
           else {
             vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status = 2;
@@ -735,7 +740,6 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           }
 	    }
 
-        /* FIX later!!! reorder here */
         if (reorder0) {
           BITMAP_SET (pdcp0->rx_replay_bitmap, count0);
           if (PREDICT_FALSE(count0 - count_last_fwd0 > vec_len (pdcp0->rx_reorder_buffers))) {
@@ -750,6 +754,11 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
             goto trace00;
           }
           
+          vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn = sn0;
+          vnet_buffer2(b0)->ppf_du_metadata.pdcp.count = count0;
+          
+          vlib_buffer_advance (b0, (word)(pdcp0->header_length));
+
           VEC_SET (pdcp0->rx_reorder_buffers, count0, bi0);
           goto trace00;
         }
@@ -797,6 +806,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 
         if (reorder0) {
 		  to_next -= 1;
+          n_left_to_next += 1;
           continue;
         }
 		
@@ -806,26 +816,40 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         				 bi0, next0);
 
         /* Start to send the buffer reordered */
-		if (VEC_ELT_NE (pdcp0->rx_reorder_buffers, count0 + 1, INVALID_BUFFER_INDEX) && (n_left_to_next > 0)) {
-          count0 = count0 + 1;
-          sn0  = PPF_PDCP_SN (count0, pdcp0->sn_length);
-          hfn0 = PPF_PDCP_HFN (count0, pdcp0->sn_length);
-
-		  if (sn0 < pdcp0->rx_last_forwarded_sn)
-		  	pdcp0->rx_hfn++;
-          pdcp0->rx_last_forwarded_sn = sn0;
-          pdcp0->rx_next_expected_sn  = PPF_PDCP_SN_INC (sn0, pdcp0->sn_length);
-
-		  bi0 = VEC_AT (pdcp0->rx_reorder_buffers, count0);
-		  to_next[0] = bi0;
-		  to_next += 1;
-		  n_left_to_next -= 1;
-
+        while (VEC_ELT_NE (pdcp0->rx_reorder_buffers, count0 + 1, INVALID_BUFFER_INDEX)) {		  
 		  next0 = next_index;
+          while (VEC_ELT_NE (pdcp0->rx_reorder_buffers, count0 + 1, INVALID_BUFFER_INDEX) && (n_left_to_next > 0)) {
+            bi0 = VEC_AT (pdcp0->rx_reorder_buffers, count0 + 1);
+			VEC_SET (pdcp0->rx_reorder_buffers, count0 + 1, INVALID_BUFFER_INDEX);
 
-          VEC_SET (pdcp0->rx_reorder_buffers, count0, INVALID_BUFFER_INDEX);
-		  goto next00;
-		}
+			b0  = vlib_get_buffer (vm, bi0);		
+            ASSERT((count0 + 1) == vnet_buffer2(b0)->ppf_du_metadata.pdcp.count);
+			sn0  = vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn;
+			count0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.count;
+		  
+			if (sn0 < pdcp0->rx_last_forwarded_sn)
+			  pdcp0->rx_hfn++;
+			pdcp0->rx_last_forwarded_sn = sn0;
+			pdcp0->rx_next_expected_sn	= PPF_PDCP_SN_INC (sn0, pdcp0->sn_length);
+		  
+			to_next[0] = bi0;
+			to_next += 1;
+			n_left_to_next -= 1;
+		  		  			
+			if (c0->call_type == PPF_SRB_CALL)
+			  next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
+			else if (c0->call_type == PPF_DRB_CALL)
+			  next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+                        
+            /* verify speculative enqueue, maybe switch current next frame */
+            vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
+                                             to_next, n_left_to_next,
+                                             bi0, next0);
+		  }
+
+          vlib_put_next_frame (vm, node, next_index, n_left_to_next);          
+          vlib_get_next_frame (vm, node, next_index, to_next, n_left_to_next);
+        }
 	  }
 
 	vlib_put_next_frame (vm, node, next_index, n_left_to_next);
