@@ -613,13 +613,14 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	while (n_left_from > 0 && n_left_to_next > 0)
 	  {
         ppf_pdcp_decrypt_next_t next0 = next_index;
+        u32 reorder0 = 0;
         u32 bi0;
         vlib_buffer_t * b0;
         u32 error0 = 0;
         u32 tunnel_index0;
-            ppf_gtpu_tunnel_t * t0;
+        ppf_gtpu_tunnel_t * t0;
         u32 call_id0;
-            ppf_callline_t * c0 = NULL;
+        ppf_callline_t * c0 = NULL;
         ppf_pdcp_session_t * pdcp0 = NULL;
         u8 * buf0;
         u8 dc0 = 0;
@@ -643,6 +644,9 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         b0 = vlib_get_buffer (vm, bi0);
         buf0 = vlib_buffer_get_current (b0);
         len0 = vlib_buffer_length_in_chain(vm, b0);
+
+        /* Initialize reorder flag */
+        reorder0 = 0;
         
         /* Get tunnel index from buffer */
         tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
@@ -697,7 +701,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 			// Fix later!!! should continue to decrypt/validate and report to the CP, only apply for SRB?
 		  }
 
-		  next0 = PPF_PDCP_DECRYPT_NEXT_REORDER;
+		  reorder0 = 1;
         } else {
           if (sn0 < pdcp0->rx_last_forwarded_sn)
             hfn0 = pdcp0->rx_hfn + 1;
@@ -732,7 +736,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    }
 
         /* FIX later!!! reorder here */
-        if (next0 == PPF_PDCP_DECRYPT_NEXT_REORDER) {
+        if (reorder0) {
           BITMAP_SET (pdcp0->rx_replay_bitmap, count0);
           if (PREDICT_FALSE(count0 - count_last_fwd0 > vec_len (pdcp0->rx_reorder_buffers))) {
             error0 = PPF_PDCP_DECRYPT_ERROR_REORDER_WINDOW_FULL;
@@ -791,7 +795,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 
         pkts_processed += 1;
 
-        if (next0 == PPF_PDCP_DECRYPT_NEXT_REORDER) {
+        if (reorder0) {
 		  to_next -= 1;
           continue;
         }
