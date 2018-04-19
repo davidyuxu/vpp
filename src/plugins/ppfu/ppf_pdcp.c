@@ -669,6 +669,7 @@ u8 *
 format_ppf_pdcp_session (u8 * s, va_list * va)
 {
   ppf_pdcp_session_t * pdcp_session = va_arg (*va, ppf_pdcp_session_t *);
+  int verbose = va_arg (*va, int);
 
   s = format (s, "sn-length %d, header-length %d, mac-length %d, in-flight-limit %lx\n", 
               pdcp_session->sn_length, 
@@ -685,13 +686,14 @@ format_ppf_pdcp_session (u8 * s, va_list * va)
               pdcp_session->rx_next_expected_sn, 
               pdcp_session->rx_last_forwarded_sn);
 
-  s = format (s, "replay-window %u, rx-replay-bitmap (%u bits)\n %U\n", 
-              pdcp_session->replay_window, 
-              clib_bitmap_bytes(pdcp_session->rx_replay_bitmap) * BITS(u8),
-              format_bitmap_hex, pdcp_session->rx_replay_bitmap);
-
-  s = format (s, "reorder-window %u, details\n%U\n", vec_len (pdcp_session->rx_reorder_buffers), 
-              format_vec32_adv, pdcp_session->rx_reorder_buffers, "%d", 8);
+  if (verbose > 1) {
+    s = format (s, "replay-window %u, rx-replay-bitmap (%u bits)\n %U\n", 
+                pdcp_session->replay_window, 
+                clib_bitmap_bytes(pdcp_session->rx_replay_bitmap) * BITS(u8),
+                format_bitmap_hex, pdcp_session->rx_replay_bitmap);
+    s = format (s, "reorder-window %u, details\n%U\n", vec_len (pdcp_session->rx_reorder_buffers), 
+                format_vec32_adv, pdcp_session->rx_reorder_buffers, "%d", 8);
+  }
 
   s = format (s, "integrity-alg %U, intergity-key %U\n", 
               format_pdcp_security_alg, pdcp_session->security_algorithms & 0xf0, 
@@ -801,7 +803,7 @@ ppf_pdcp_add_del_session_command_fn (vlib_main_t * vm,
 
 	callline->pdcp.session_id = sess_id;
     vlib_cli_output (vm, "[PDCP session created], details: %U",
-		format_ppf_pdcp_session, pool_elt_at_index(ppf_pdcp_main.sessions, sess_id));
+		format_ppf_pdcp_session, pool_elt_at_index(ppf_pdcp_main.sessions, sess_id), 2);
   }
   else { /* del */
   	if (~0 != callline->pdcp.session_id) {
