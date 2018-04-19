@@ -435,7 +435,7 @@ format_ppf_pdcp_simple (u8 * s, va_list * va)
   if ((verbose > 0) && (~0 != pdcp->session_id)) {
     pdcp_session = pool_elt_at_index (ppm->sessions, pdcp->session_id);
     if (pdcp_session) {
-      s = format (s, "\ndetails %U\n", format_ppf_pdcp_session, pdcp_session);
+      s = format (s, "\ndetails %U\n", format_ppf_pdcp_session, pdcp_session, verbose);
     }
   }
 
@@ -471,7 +471,7 @@ format_ppf_callline (u8 * s, va_list * va)
 
   if (PPF_SRB_CALL == callline->call_type) {    
     if (verbose > 0) {
-      s = format (s, "\nnb msg hash: %U\n", format_hash, callline->rb.srb.nb_out_msg_by_sn, verbose);
+      s = format (s, "\nnb msg hash: %U\n", format_hash, callline->rb.srb.nb_out_msg_by_sn, ((verbose > 2) ? 1 : 0));
       
       for (sb = 0; sb < MAX_SB_PER_CALL; sb++) {
         s = format (s, "\nsb tunnel %U\n", format_ppf_gtpu_tunnel_simple, &(callline->rb.srb.sb_tunnel[sb]), verbose);
@@ -517,11 +517,11 @@ ppf_show_callline (vlib_main_t * vm,
 
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT) {
     if (unformat (input, "%d", &call_id))
-	;
+      ;
     else if (unformat (input, "verbose"))
-	verbose++;
+      verbose++;
     else
-    	break;
+      break;
   }
 
   if (~0 == call_id) { /* show all */
