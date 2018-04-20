@@ -58,6 +58,7 @@ ppf_pdcp_init (vlib_main_t * vm)
   ppm->pdcp_encrypt_next_index = PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU4_ENCAP;
 
   ppm->rx_reorder = 0;
+  ppm->rx_max_reorder_window = (1 << max_log2(PDCP_DEF_REORDER_WINDOW_SIZE));
 
   if (ppf_main.max_capacity) {
     pool_init_fixed (ppm->sessions, ppf_main.max_capacity);
@@ -405,7 +406,7 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
     clib_bitmap_alloc (pdcp_sess->rx_replay_bitmap, pdcp_sess->replay_window << 1);
 	clib_bitmap_zero (pdcp_sess->rx_replay_bitmap);
 	
-    vec_validate_init_empty (pdcp_sess->rx_reorder_buffers, PDCP_REORDER_WINDOW_SIZE - 1, INVALID_BUFFER_INDEX);
+    vec_validate_init_empty (pdcp_sess->rx_reorder_buffers, clib_min (ppm->rx_max_reorder_window, pdcp_sess->replay_window) - 1, INVALID_BUFFER_INDEX);
   }
   
   session_id = (u32)(pdcp_sess - ppm->sessions);
@@ -841,6 +842,7 @@ ppf_pdcp_set_reorder_command_fn (vlib_main_t * vm,
 {
   clib_error_t *error = NULL;
   u32 enable = 0;
+  u32 window = 0;
   
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
@@ -848,6 +850,8 @@ ppf_pdcp_set_reorder_command_fn (vlib_main_t * vm,
 	    enable = 1;
       else if (unformat (input, "disable"))
 	    enable = 0;
+      else if (unformat (input, "window %d", &window))
+	    ;
       else
       {
         error = clib_error_return (0, "parse error: '%U'", format_unformat_error, input);
@@ -856,7 +860,12 @@ ppf_pdcp_set_reorder_command_fn (vlib_main_t * vm,
     }
 
   ppf_pdcp_main.rx_reorder = enable;
-  vlib_cli_output (vm, "PPF PDCP reorder is set to %s\n", (ppf_pdcp_main.rx_reorder ? "enable" : "disable"));
+  if (window) {
+    if (window > PDCP_MAX_REORDER_WINDOW_SIZE)
+      window = PDCP_MAX_REORDER_WINDOW_SIZE;
+    ppf_pdcp_main.rx_max_reorder_window = (1 << max_log2 (window));
+  }
+  vlib_cli_output (vm, "PPF PDCP reorder is set to %s, window %d\n", (ppf_pdcp_main.rx_reorder ? "enable" : "disable"), ppf_pdcp_main.rx_max_reorder_window);
 
   return error;
 }
@@ -864,7 +873,7 @@ ppf_pdcp_set_reorder_command_fn (vlib_main_t * vm,
 /* *INDENT-OFF* */
 VLIB_CLI_COMMAND (set_ppf_pdcp_reorder_command, static) = {
   .path = "set ppf_pdcp reorder",
-  .short_help =	"set ppf_pdcp reorder <enable/disable> ",
+  .short_help =	"set ppf_pdcp reorder [enable/disable] [window <nnn>]",
   .function = ppf_pdcp_set_reorder_command_fn,
 };
 /* *INDENT-ON* */

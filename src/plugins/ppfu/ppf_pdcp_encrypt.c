@@ -92,7 +92,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	vlib_get_next_frame (vm, node, next_index,
 				   to_next, n_left_to_next);
 				   
-	while (n_left_from >= 12 && n_left_to_next >= 4)
+	while (n_left_from >= 8 && n_left_to_next >= 4)
 	  {
 	    ppf_pdcp_encrypt_next_t next0 = next_index;
 	    ppf_pdcp_encrypt_next_t next1 = next_index;
