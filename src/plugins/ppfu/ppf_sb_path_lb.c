@@ -83,7 +83,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 				   to_next, n_left_to_next);
 				   
 
-	while (n_left_from >= 12 && n_left_to_next >= 4)
+	while (n_left_from >= 8 && n_left_to_next >= 4)
 	  {
 	    ppf_sb_path_lb_next_t next0 = next_index;
 	    ppf_sb_path_lb_next_t next1 = next_index;

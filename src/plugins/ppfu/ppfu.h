@@ -113,7 +113,8 @@ _(IP4_LOOKUP, "ip4-lookup")
 
 #define MAX_PDCP_KEY_LEN              16    /* 128 bits */
 #define PDCP_REPLAY_WINDOW_SIZE(l)    (1 << ((l) - 1))
-#define PDCP_REORDER_WINDOW_SIZE      64
+#define PDCP_DEF_REORDER_WINDOW_SIZE  64
+#define PDCP_MAX_REORDER_WINDOW_SIZE  1024
 #define INVALID_BUFFER_INDEX          ~0
 
 #define PPF_PDCP_COUNT(hfn, sn, len)   ((255 == (len)) ? (sn) : (((hfn) << (1 << (len))) | (sn)))
@@ -317,6 +318,7 @@ typedef struct
   u32 pdcp_encrypt_next_index;
 
   u32 rx_reorder;
+  u32 rx_max_reorder_window;
 
    /**
    * Node type for registering to fib changes.
@@ -340,6 +342,8 @@ typedef struct
   /* tunnel src (vpp) and dst (cp) addresses, ipv4 is enough */
   u32 src;
   u32 dst;
+
+  u32 want_feedback;
 
   u32 srb_rx_next_index;
   u32 sb_lb_next_index;  

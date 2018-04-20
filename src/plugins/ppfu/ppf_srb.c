@@ -102,6 +102,8 @@ ppf_srb_init (vlib_main_t * vm)
   psm->srb_rx_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
   psm->sb_lb_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
 
+  psm->want_feedback = 0;
+
   ppf_srb_ip_udp_rewrite ();
 
   udp_register_dst_port (vm, SRB_NB_PORT,
@@ -111,6 +113,45 @@ ppf_srb_init (vlib_main_t * vm)
 }
 
 VLIB_INIT_FUNCTION (ppf_srb_init);
+
+
+static clib_error_t *
+ppf_srb_set_command_fn (vlib_main_t * vm,
+					unformat_input_t * input,
+					vlib_cli_command_t * cmd)
+{
+  clib_error_t *error = NULL;
+  u32 want_feedback = 0;
+  
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "feedback")) {
+	    if (unformat (input, "enable"))
+          want_feedback = 1;
+        else if (unformat (input, "disable"))
+	      want_feedback = 0;
+      }
+      else
+      {
+        error = clib_error_return (0, "parse error: '%U'", format_unformat_error, input);
+        return error;
+      }
+    }
+
+  ppf_sb_main.want_feedback = want_feedback;
+  vlib_cli_output (vm, "PPF SRB want_feedback is set to %s\n", (ppf_sb_main.want_feedback ? "enable" : "disable"));
+
+  return error;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (set_ppf_srb_command, static) = {
+  .path = "set ppf_srb",
+  .short_help =	"set ppf_srb [feedback <enable|disable>]",
+  .function = ppf_srb_set_command_fn,
+};
+/* *INDENT-ON* */
+
 
 /*
  * fd.io coding-style-patch-verification: ON
