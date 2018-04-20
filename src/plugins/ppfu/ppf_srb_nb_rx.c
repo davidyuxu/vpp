@@ -103,7 +103,7 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           ppf_callline_t * c0;
           ppf_pdcp_session_t * pdcp0;
           uword key0;
-          ppf_srb_msg_id_t msg0;
+          CLIB_UNUSED(ppf_srb_msg_id_t msg0);
           u32 tunnel_index0;
           u32 error0;
           u32 len0;
@@ -162,9 +162,11 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           /* Sequence advance */
 		  PPF_PDCP_COUNT_INC (pdcp0->tx_hfn, pdcp0->tx_next_sn, pdcp0->sn_length);
 	  
-          msg0.transaction_id = clib_net_to_host_u32(srb0->transaction_id);
-          msg0.request_id = clib_net_to_host_u32(srb0->msg.out.request_id);
-          hash_set (c0->rb.srb.nb_out_msg_by_sn, key0, msg0.as_u64);
+          if (psm->want_feedback) {
+            msg0.transaction_id = clib_net_to_host_u32(srb0->transaction_id);
+            msg0.request_id = clib_net_to_host_u32(srb0->msg.out.request_id);
+            hash_set (c0->rb.srb.nb_out_msg_by_sn, key0, msg0.as_u64);
+          }
           
           /* Determine downlink tunnel */
                     
