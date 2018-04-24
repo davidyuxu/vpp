@@ -28,6 +28,7 @@
 #include <vnet/adj/adj_mcast.h>
 #include <vnet/dpo/dpo.h>
 #include <vnet/plugin/plugin.h>
+#include <vnet/pg/pg.h>
 #include <vpp/app/version.h>
 #include <ppfu/ppfu.h>
 
@@ -91,30 +92,6 @@ ppf_srb_ip_udp_rewrite ()
   return;
 }
 
-clib_error_t *
-ppf_srb_init (vlib_main_t * vm)
-{
-  ppf_sb_main_t *psm = &ppf_sb_main;
-
-  psm->vnet_main = vnet_get_main ();
-  psm->vlib_main = vm;
-	
-  psm->srb_rx_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
-  psm->sb_lb_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
-
-  psm->want_feedback = 0;
-
-  ppf_srb_ip_udp_rewrite ();
-
-  udp_register_dst_port (vm, SRB_NB_PORT,
-			 ppf_srb_nb_rx_node.index, /* is_ip4 */ 1);
-  
-  return 0;
-}
-
-VLIB_INIT_FUNCTION (ppf_srb_init);
-
-
 static clib_error_t *
 ppf_srb_set_command_fn (vlib_main_t * vm,
 					unformat_input_t * input,
@@ -151,6 +128,217 @@ VLIB_CLI_COMMAND (set_ppf_srb_command, static) = {
   .function = ppf_srb_set_command_fn,
 };
 /* *INDENT-ON* */
+
+
+
+/**************************Start of pg***************************/
+
+#define PPF_SRB_PG_EDIT_LENGTH (1 << 0)
+
+/* Only used for pg */
+typedef struct
+{
+  u32 call_id;
+  u32 transaction_id;
+  u32 request_id;
+  u8  sb_id[3];
+  u8  sb_num;
+  u32 data_l;
+} ppf_srb_in_header_t;
+
+typedef struct
+{
+  pg_edit_t call_id;
+  pg_edit_t transaction_id;
+  pg_edit_t request_id;
+  pg_edit_t sb_id[3];
+  pg_edit_t sb_num;
+  pg_edit_t data_l;
+} pg_ppf_srb_in_header_t;
+
+always_inline void
+ppf_srb_pg_edit_function_inline (pg_main_t * pg,
+                                       pg_stream_t * s,
+                                       pg_edit_group_t * g,
+                                       u32 * packets, u32 n_packets, u32 flags)
+{
+  vlib_main_t *vm = vlib_get_main ();
+  u32 srb_offset;
+
+  srb_offset = g->start_byte_offset;
+
+  while (n_packets >= 1)
+    {
+      vlib_buffer_t *p0;
+      ppf_srb_in_header_t *srb0;
+      u32 srb_len0;
+
+      p0 = vlib_get_buffer (vm, packets[0]);
+      n_packets -= 1;
+      packets += 1;
+
+      srb0 = (void *) (p0->data + srb_offset);
+      srb_len0 = vlib_buffer_length_in_chain (vm, p0) -	srb_offset - sizeof (srb0[0]);
+
+      if (flags & PPF_SRB_PG_EDIT_LENGTH)
+        srb0->data_l = clib_host_to_net_u32 (srb_len0);
+    }
+}
+
+static void
+ppf_srb_pg_edit_function (pg_main_t * pg,
+                               pg_stream_t * s,
+                               pg_edit_group_t * g, u32 * packets, u32 n_packets)
+{
+  switch (g->edit_function_opaque)
+  {
+    case PPF_SRB_PG_EDIT_LENGTH:
+      ppf_srb_pg_edit_function_inline (pg, s, g, packets, n_packets,
+                                       PPF_SRB_PG_EDIT_LENGTH);
+      break;
+
+    default:
+      ASSERT (0);
+      break;
+  }
+}
+
+static inline void
+pg_ppf_srb_header_init (pg_ppf_srb_in_header_t * p)
+{
+  /* Initialize fields that are not bit fields in the IP header. */
+#define _(f) pg_edit_init (&p->f, ppf_srb_in_header_t, f);
+  _(call_id);
+  _(transaction_id);
+  _(request_id);
+  _(sb_id[0]);
+  _(sb_id[1]);
+  _(sb_id[2]);
+  _(sb_num);
+  _(data_l);
+#undef _
+}
+
+uword
+unformat_pg_ppf_srb_header (unformat_input_t * input, va_list * args)
+{
+  pg_stream_t *s = va_arg (*args, pg_stream_t *);
+  unformat_input_t sub_input = { 0 };
+  pg_ppf_srb_in_header_t *p;
+  u32 group_index;
+
+  p = pg_create_edit_group (s, sizeof (p[0]), sizeof (ppf_srb_in_header_t),
+			    &group_index);
+  pg_ppf_srb_header_init (p);
+
+  /* Defaults. */
+  p->call_id.type        = PG_EDIT_UNSPECIFIED;
+  p->transaction_id.type = PG_EDIT_UNSPECIFIED;
+  p->request_id.type     = PG_EDIT_UNSPECIFIED;
+  p->sb_id[0].type       = PG_EDIT_UNSPECIFIED;
+  p->sb_id[1].type       = PG_EDIT_UNSPECIFIED;
+  p->sb_id[2].type       = PG_EDIT_UNSPECIFIED;
+  p->sb_num.type         = PG_EDIT_UNSPECIFIED;
+  p->data_l.type         = PG_EDIT_UNSPECIFIED;
+
+  if (!unformat (input, "SRB %U", unformat_input, &sub_input))
+    goto error;
+
+  /* Parse options. */
+  while (1)
+    {
+      if (unformat (&sub_input, "call-id %U",
+		    unformat_pg_edit, unformat_pg_number, &p->call_id))
+	    ;
+
+      else if (unformat (&sub_input, "transaction-id %U",
+			 unformat_pg_edit, unformat_pg_number, &p->transaction_id))
+	    ;
+
+      else if (unformat (&sub_input, "request-id %U",
+			 unformat_pg_edit, unformat_pg_number, &p->request_id))
+	    ;
+
+      else if (unformat (&sub_input, "sb-num %U",
+			 unformat_pg_edit, unformat_pg_number, &p->sb_num))
+	    ;
+
+      else if (unformat (&sub_input, "sb-id0 %U",
+			 unformat_pg_edit, unformat_pg_number, &p->sb_id[0]))
+	    ;
+
+      else if (unformat (&sub_input, "sb-id1 %U",
+			 unformat_pg_edit, unformat_pg_number, &p->sb_id[1]))
+	    ;
+
+      else if (unformat (&sub_input, "sb-id2 %U",
+			 unformat_pg_edit, unformat_pg_number, &p->sb_id[2]))
+	    ;
+
+      else if (unformat (&sub_input, "length %U",
+			 unformat_pg_edit, unformat_pg_number, &p->data_l))
+	    ;
+
+      /* Can't parse input: try next protocol level. */
+      else
+	    break;
+    }
+
+  {
+    if (!unformat_user (&sub_input, unformat_pg_payload, s))
+      goto error;
+
+    p = pg_get_edit_group (s, group_index);
+    if (p->data_l.type == PG_EDIT_UNSPECIFIED)
+    {
+      pg_edit_group_t *g = pg_stream_get_group (s, group_index);
+      g->edit_function = ppf_srb_pg_edit_function;
+      g->edit_function_opaque = 0;
+      if (p->data_l.type == PG_EDIT_UNSPECIFIED)
+        g->edit_function_opaque |= PPF_SRB_PG_EDIT_LENGTH;
+    }
+
+	unformat_free (&sub_input);
+    return 1;
+  }
+
+error:
+  /* Free up any edits we may have added. */
+  pg_free_edit_group (s);
+  unformat_free (&sub_input);
+
+  return 0;
+}
+
+/***************************End of pg****************************/
+
+clib_error_t *
+ppf_srb_init (vlib_main_t * vm)
+{
+  ppf_sb_main_t *psm = &ppf_sb_main;
+  udp_dst_port_info_t *pi;
+
+  psm->vnet_main = vnet_get_main ();
+  psm->vlib_main = vm;
+	
+  psm->srb_rx_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
+  psm->sb_lb_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
+
+  psm->want_feedback = 0;
+
+  ppf_srb_ip_udp_rewrite ();
+
+  udp_register_dst_port (vm, SRB_NB_PORT,
+			 ppf_srb_nb_rx_node.index, /* is_ip4 */ 1);
+
+  pi = udp_get_dst_port_info (&udp_main, SRB_NB_PORT, 1);
+  if (pi)
+    pi->unformat_pg_edit = unformat_pg_ppf_srb_header;
+  
+  return 0;
+}
+
+VLIB_INIT_FUNCTION (ppf_srb_init);
 
 
 /*

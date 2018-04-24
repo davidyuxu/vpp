@@ -102,6 +102,9 @@ typedef struct
 
   /* Next index for this type. */
   u32 next_index;
+
+  /* Parser for packet generator edits for this protocol, by Jordy */
+  unformat_function_t *unformat_pg_edit;
 } udp_dst_port_info_t;
 
 typedef enum
