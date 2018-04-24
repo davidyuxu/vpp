@@ -265,6 +265,11 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
               copy_src_last3 = (u32 *)(&copy_src3[4]);
               copy_dst_last3[0] = copy_src_last3[0];
 
+		b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+		b1->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+		b2->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+		b3->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+		
 	      /* Fix the IP4 checksum and length */
 		  #if 0 /* Fix odd length packets chechsum issue */
 	      sum0 = ip4_0->checksum;
@@ -597,6 +602,8 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
               copy_dst_last0 = (u32 *)(&copy_dst0[4]);
               copy_src_last0 = (u32 *)(&copy_src0[4]);
               copy_dst_last0[0] = copy_src_last0[0];
+
+             b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
 
 	      /* Fix the IP4 checksum and length */
 		  #if 0 /* Fix odd length packets chechsum issue */
