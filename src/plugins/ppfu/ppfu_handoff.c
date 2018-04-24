@@ -37,6 +37,8 @@ typedef struct
   vlib_main_t *vlib_main;
   vnet_main_t *vnet_main;
 
+  u32 error_node_index;
+
   u32 (*hash_fn) (ppf_gtpu_header_t*);
 } ppfu_handoff_main_t;
 
@@ -79,9 +81,11 @@ worker_ppfu_handoff_node_fn (vlib_main_t * vm,
     = 0;
   vlib_frame_queue_elt_t *hf = 0;
   int i;
-  u32 n_left_to_next_worker = 0, *to_next_worker = 0;
+  u32 n_left_to_next_worker = 0, *to_next_worker = 0, *to_next_drop = 0;
   u32 next_worker_index = 0;
   u32 current_worker_index = ~0;
+  vlib_frame_queue_t *fq;
+  vlib_frame_t *d = 0;
 
   if (PREDICT_FALSE (ppfu_handoff_queue_elt_by_worker_index == 0))
     {
@@ -137,6 +141,27 @@ worker_ppfu_handoff_node_fn (vlib_main_t * vm,
 
       if (next_worker_index != current_worker_index)
 	{
+	
+		fq =
+		is_vlib_frame_queue_congested (hm->frame_queue_index, next_worker_index,
+						 PPFU_HANDOFF_QUEUE_HI_THRESHOLD,
+						 congested_ppfu_handoff_queue_by_worker_index);
+		
+		if (fq)
+		{
+		  /* if this is 1st frame */
+		  if (!d)
+		    {
+			d = vlib_get_frame_to_node (vm, hm->error_node_index);
+			to_next_drop = vlib_frame_vector_args (d);
+		    }
+		
+		  to_next_drop[0] = bi0;
+		  to_next_drop += 1;
+		  d->n_vectors++;
+		  goto trace0;
+		}
+	
 	  if (hf)
 	    hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_worker;
 
@@ -163,6 +188,7 @@ worker_ppfu_handoff_node_fn (vlib_main_t * vm,
 	  hf = 0;
 	}
 
+	trace0:
       if (PREDICT_FALSE ((node->flags & VLIB_NODE_FLAG_TRACE)
 			 && (b0->flags & VLIB_BUFFER_IS_TRACED)))
 	{
@@ -176,9 +202,12 @@ worker_ppfu_handoff_node_fn (vlib_main_t * vm,
 
     }
 
+  if (d)
+    vlib_put_frame_to_node (vm, hm->error_node_index, d);
+ 
   if (hf)
     hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_worker;
-
+ 
   /* Ship frames to the worker nodes */
   for (i = 0; i < vec_len (ppfu_handoff_queue_elt_by_worker_index); i++)
     {
@@ -438,15 +467,16 @@ ppfu_handoff_init (vlib_main_t * vm)
   hm->vlib_main = vm;
   hm->vnet_main = &vnet_main;
 
-  if (PPFU_HANDOFF == 1)  {	
-	hm->frame_queue_index =
+  vlib_node_t *error_drop_node =
+	  vlib_get_node_by_name (vm, (u8 *) "error-drop");
+
+  hm->frame_queue_index =
 	vlib_frame_queue_main_init (ppfu_handoff_dispatch_node.index, 0);
 
+  hm->error_node_index = error_drop_node->index;
 
 	/* *INDENT-ON* */
-    }
-
-  return 0;
+   return 0;
 }
 
 VLIB_INIT_FUNCTION (ppfu_handoff_init);

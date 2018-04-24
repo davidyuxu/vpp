@@ -19,6 +19,8 @@
 #include <vlib/vlib.h>
 #include <ppfu/ppf_gtpu.h>
 
+#define PPFU_HANDOFF_QUEUE_HI_THRESHOLD 30
+
 typedef enum
 {
   PPFU_HANDOFF_DISPATCH_NEXT_DROP,
