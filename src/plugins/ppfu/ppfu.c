@@ -330,7 +330,7 @@ ppf_init (vlib_main_t * vm)
 
   }
 
-  pm->ue_mode = 0;
+  pm->ue_mode = 1;
   
   return 0;
 }
@@ -364,6 +364,8 @@ ppf_config (vlib_main_t * vm, unformat_input_t * input)
     }
 
   ppf_main.max_capacity = capacity;
+
+  ppf_main.ue_mode = 1;
 
   return 0;
 }

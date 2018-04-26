@@ -405,7 +405,7 @@ typedef struct
   vnet_main_t *vnet_main;
 } ppf_sb_main_t;
 
-#define PPFU_HANDOFF		1
+#define PPFU_HANDOFF		0
 #define DEF_MAX_PPF_SESSION 100000
 #define MAX_SB_PER_CALL  3
 
@@ -472,6 +472,7 @@ typedef struct
   ppf_pdcp_callline_t pdcp;
   u32 sb_policy;
   u32 ue_bearer_id;
+  u32 lbo_mode;
 } ppf_callline_t;
 
 #define PPF_BEARER(ub)  (((ub) >> 25) & 0x1f)

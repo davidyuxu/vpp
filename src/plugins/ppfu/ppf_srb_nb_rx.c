@@ -178,12 +178,12 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
             tunnel_index0 = c0->rb.srb.sb_tunnel[srb0->msg.out.sb_id[0]].tunnel_id;	    
             
             /* Set tunnel-id in buffer */
-            vnet_buffer(b0)->sw_if_index[VLIB_TX] = tunnel_index0;	    
+            vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_index0;	    
             
             next0 = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
           } else {
             /* Set call-id in buffer */
-            vnet_buffer(b0)->sw_if_index[VLIB_TX] = srb0->call_id;
+            vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = srb0->call_id;
             
             /* Set path-info in buffer */
             vnet_buffer2(b0)->ppf_du_metadata.path.sb_num = srb0->msg.out.sb_num;
