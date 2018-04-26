@@ -114,11 +114,11 @@ ppf_gtpu_input (vlib_main_t * vm,
           ppf_gtpu_header_t * ppf_gtpu0, * ppf_gtpu1;
           u32 ppf_gtpu_hdr_len0 = 0, ppf_gtpu_hdr_len1 =0 ;
 	    uword * p0, * p1;
-          u32 tunnel_index0, tunnel_index1;
-          ppf_gtpu_tunnel_t * t0, * t1, * mt0 = NULL, * mt1 = NULL;
+          u32 tunnel_index0 = ~0, tunnel_index1 = ~0;
+          ppf_gtpu_tunnel_t * t0, * t1;
           ppf_gtpu4_tunnel_key_t key4_0, key4_1;
           ppf_gtpu6_tunnel_key_t key6_0, key6_1;
-          u32 error0, error1;
+          u32 error0 = 0, error1 = 0;
 	    u32 sw_if_index0, sw_if_index1, len0, len1;
 	    ppf_callline_t callline0, callline1;
 	    u32 next_tunne_id0 = ~0, next_tunne_id1= ~0 ;
@@ -181,13 +181,7 @@ ppf_gtpu_input (vlib_main_t * vm,
               (b1, sizeof(*ip6_1)+sizeof(udp_header_t));
           }
 
-          tunnel_index0 = ~0;
-          error0 = 0;
-
-          tunnel_index1 = ~0;
-          error1 = 0;
-
-	  if (PREDICT_FALSE ((ppf_gtpu0->ver_flags & PPF_GTPU_VER_MASK) != PPF_GTPU_V1_VER))
+  	  if (PREDICT_FALSE ((ppf_gtpu0->ver_flags & PPF_GTPU_VER_MASK) != PPF_GTPU_V1_VER))
 	    {
 	      error0 = PPF_GTPU_ERROR_BAD_VER;
 	      next0 = PPF_GTPU_INPUT_NEXT_DROP;
@@ -237,17 +231,6 @@ ppf_gtpu_input (vlib_main_t * vm,
 	      goto next0; /* valid packet */
 	    }
 	    	
-	    if (PREDICT_FALSE (ip4_address_is_multicast (&ip4_0->dst_address)))
-	      {
-		key4_0.teid = ppf_gtpu0->teid;
-		/* Make sure mcast PPF_GTPU tunnel exist by packet DIP and teid */
-		p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u32);
-		if (PREDICT_TRUE (p0 != NULL))
-		  {
-		    mt0 = pool_elt_at_index (gtm->tunnels, p0[0]);
-		    goto next0; /* valid packet */
-		  }
-	      }
 	    error0 = PPF_GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next0 = PPF_GTPU_INPUT_NEXT_DROP;
 	    goto trace0;
@@ -284,17 +267,19 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    /* Validate PPF_GTPU tunnel SIP against packet DIP */
 	    if (PREDICT_TRUE (ip6_address_is_equal (&ip6_0->dst_address,
 						    &t0->src.ip6)))
-		goto next0; /* valid packet */
-	    if (PREDICT_FALSE (ip6_address_is_multicast (&ip6_0->dst_address)))
-	      {
-		key6_0.teid = ppf_gtpu0->teid;
-		p0 = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6_0);
-		if (PREDICT_TRUE (p0 != NULL))
-		  {
-		    mt0 = pool_elt_at_index (gtm->tunnels, p0[0]);
-		    goto next0; /* valid packet */
-		  }
+
+		{
+
+		if (t0->tunnel_type == PPF_GTPU_SB) {
+
+			callline0 = pm->ppf_calline_table[t0->call_id];
+
+			next_tunne_id0 = callline0.rb.drb.nb_tunnel.tunnel_id;
 	      }
+
+	      goto next0; /* valid packet */
+	    }
+
 	    error0 = PPF_GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next0 = PPF_GTPU_INPUT_NEXT_DROP;
 	    goto trace0;
@@ -330,15 +315,18 @@ ppf_gtpu_input (vlib_main_t * vm,
           if (PREDICT_TRUE(next0 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
             vnet_update_l2_len (b0);
 
-          /* Set packet input sw_if_index to unicast PPF_GTPU tunnel for learning */
-          vnet_buffer(b0)->sw_if_index[VLIB_RX] = tunnel_index0;
-          vnet_buffer(b0)->sw_if_index[VLIB_TX] = next_tunne_id0;
-	    sw_if_index0 = (mt0) ? mt0->sw_if_index : sw_if_index0;
+          if (sw_if_index0 != ~0) {
+	    	vnet_buffer(b0)->sw_if_index[VLIB_RX] = sw_if_index0;
+	    }         
+
+          vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_index0;
+          vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = next_tunne_id0;
 
           pkts_decapsulated ++;
           stats_n_packets += 1;
           stats_n_bytes += len0;
 
+	  //to be done
 	  #if 0 
 	  /* Batch stats increment on the same ppf_gtpu tunnel so counter
 	     is not incremented per packet */
@@ -421,17 +409,6 @@ ppf_gtpu_input (vlib_main_t * vm,
 	      goto next1; /* valid packet */
 	    }
 	    
-	    if (PREDICT_FALSE (ip4_address_is_multicast (&ip4_1->dst_address)))
-	      {
-		key4_1.teid = ppf_gtpu1->teid;
-		/* Make sure mcast PPF_GTPU tunnel exist by packet DIP and teid */
-		p1 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_1.as_u32);
-		if (PREDICT_TRUE (p1 != NULL))
-		  {
-		    mt1 = pool_elt_at_index (gtm->tunnels, p1[0]);
-		    goto next1; /* valid packet */
-		  }
-	      }
 	    error1 = PPF_GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next1 = PPF_GTPU_INPUT_NEXT_DROP;
 	    goto trace1;
@@ -470,17 +447,18 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    /* Validate PPF_GTPU tunnel SIP against packet DIP */
 	    if (PREDICT_TRUE (ip6_address_is_equal (&ip6_1->dst_address,
 						    &t1->src.ip6)))
-		goto next1; /* valid packet */
-	    if (PREDICT_FALSE (ip6_address_is_multicast (&ip6_1->dst_address)))
-	      {
-		key6_1.teid = ppf_gtpu1->teid;
-		p1 = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6_1);
-		if (PREDICT_TRUE (p1 != NULL))
-		  {
-		    mt1 = pool_elt_at_index (gtm->tunnels, p1[0]);
-		    goto next1; /* valid packet */
-		  }
+	    {
+	    	
+		if (t1->tunnel_type == PPF_GTPU_SB) {
+
+			callline1 = pm->ppf_calline_table[t1->call_id];
+
+			next_tunne_id1 = callline1.rb.drb.nb_tunnel.tunnel_id;
 	      }
+	    	
+	      goto next1; /* valid packet */
+	    }
+
 	    error1 = PPF_GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next1 = PPF_GTPU_INPUT_NEXT_DROP;
 	    goto trace1;
@@ -516,15 +494,19 @@ ppf_gtpu_input (vlib_main_t * vm,
           if (PREDICT_TRUE(next1 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
             vnet_update_l2_len (b1);
 
-          /* Set packet input sw_if_index to unicast PPF_GTPU tunnel for learning */
-          vnet_buffer(b1)->sw_if_index[VLIB_RX] = tunnel_index1;
-          vnet_buffer(b1)->sw_if_index[VLIB_TX] = next_tunne_id1;
-	  sw_if_index1 = (mt1) ? mt1->sw_if_index : sw_if_index1;
+	    if (sw_if_index1 != ~0) {
+	    	vnet_buffer(b1)->sw_if_index[VLIB_RX] = sw_if_index1;
+
+	    }
+     
+          vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_index1;
+          vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = next_tunne_id1;
 
           pkts_decapsulated ++;
           stats_n_packets += 1;
           stats_n_bytes += len1;
 
+	  //to be done, count the stats of the tunnel later
 	  #if 0
 	  /* Batch stats increment on the same ppf_gtpu tunnel so counter
 	     is not incremented per packet */
@@ -572,7 +554,7 @@ ppf_gtpu_input (vlib_main_t * vm,
           u32 ppf_gtpu_hdr_len0 = 0;
 	  uword * p0;
           u32 tunnel_index0;
-          ppf_gtpu_tunnel_t * t0,* mt0 = NULL;
+          ppf_gtpu_tunnel_t * t0;
           ppf_gtpu4_tunnel_key_t key4_0;
           ppf_gtpu6_tunnel_key_t key6_0;
           u32 error0;
@@ -661,25 +643,7 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    	
 	      goto next00; /* valid packet */
 	    }
-	    
-	    /* Validate PPF_GTPU tunnel SIP against packet DIP */
-	    if (PREDICT_TRUE (ip4_0->dst_address.as_u32 == t0->src.ip4.as_u32))
-	    {
-
-	      goto next00; /* valid packet */
-	    }
-	
-	    if (PREDICT_FALSE (ip4_address_is_multicast (&ip4_0->dst_address)))
-	      {
-		key4_0.teid = ppf_gtpu0->teid;
-		/* Make sure mcast PPF_GTPU tunnel exist by packet DIP and teid */
-		p0 = hash_get (gtm->ppf_gtpu4_tunnel_by_key, key4_0.as_u32);
-		if (PREDICT_TRUE (p0 != NULL))
-		  {
-		    mt0 = pool_elt_at_index (gtm->tunnels, p0[0]);
-		    goto next00; /* valid packet */
-		  }
-	      }
+	      
 	    error0 = PPF_GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next0 = PPF_GTPU_INPUT_NEXT_DROP;
 	    goto trace00;
@@ -716,17 +680,18 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    /* Validate PPF_GTPU tunnel SIP against packet DIP */
 	    if (PREDICT_TRUE (ip6_address_is_equal (&ip6_0->dst_address,
 						    &t0->src.ip6)))
-		goto next00; /* valid packet */
-	    if (PREDICT_FALSE (ip6_address_is_multicast (&ip6_0->dst_address)))
-	      {
-		key6_0.teid = ppf_gtpu0->teid;
-		p0 = hash_get_mem (gtm->ppf_gtpu6_tunnel_by_key, &key6_0);
-		if (PREDICT_TRUE (p0 != NULL))
-		  {
-		    mt0 = pool_elt_at_index (gtm->tunnels, p0[0]);
-		    goto next00; /* valid packet */
-		  }
+	    {
+
+		if (t0->tunnel_type == PPF_GTPU_SB) {
+
+			callline0 = pm->ppf_calline_table[t0->call_id];
+
+			next_tunne_id0 = callline0.rb.drb.nb_tunnel.tunnel_id;
 	      }
+	    	
+	      goto next00; /* valid packet */
+	    }
+
 	    error0 = PPF_GTPU_ERROR_NO_SUCH_TUNNEL;
 	    next0 = PPF_GTPU_INPUT_NEXT_DROP;
 	    goto trace00;
@@ -755,22 +720,25 @@ ppf_gtpu_input (vlib_main_t * vm,
 	  vlib_buffer_advance (b0, ppf_gtpu_hdr_len0);
 
 	  next0 = t0->decap_next_index;
-	  sw_if_index0 = t0->sw_if_index;
+	  sw_if_index0 = t0->sw_if_index;		//most case sw_if_index = ~0
 	  len0 = vlib_buffer_length_in_chain (vm, b0);
 
           /* Required to make the l2 tag push / pop code work on l2 subifs */
           if (PREDICT_TRUE(next0 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
             vnet_update_l2_len (b0);
 
-          /* Set packet input sw_if_index to unicast PPF_GTPU tunnel for learning */
-          vnet_buffer(b0)->sw_if_index[VLIB_RX] = tunnel_index0;
-          vnet_buffer(b0)->sw_if_index[VLIB_TX] = next_tunne_id0;
-	  sw_if_index0 = (mt0) ? mt0->sw_if_index : sw_if_index0;
+	    if (sw_if_index0 != ~0) {
+	    	vnet_buffer(b0)->sw_if_index[VLIB_RX] = sw_if_index0;
+
+	    }
+          vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_index0;
+          vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = next_tunne_id0;
 
           pkts_decapsulated ++;
           stats_n_packets += 1;
           stats_n_bytes += len0;
 
+	  //to be done
 	  #if 0
 	  /* Batch stats increment on the same ppf_gtpu tunnel so counter
 	     is not incremented per packet */

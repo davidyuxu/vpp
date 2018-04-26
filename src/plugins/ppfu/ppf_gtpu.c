@@ -924,9 +924,14 @@ int vnet_ppf_gtpu_add_tunnel
 			  hi = vnet_get_hw_interface (vnm, hw_if_index);
 			}
 
+			#if 0
 		      /* Set ppf_gtpu tunnel output node */
 		      u32 encap_index = !is_ip6 ?
-			ppf_gtpu4_encap_node.index : ppf_gtpu6_encap_node.index;
+			ppf_sb_path_lb_node.index : ppf_gtpu6_encap_node.index;
+		      vnet_set_interface_output_node (vnm, hw_if_index, encap_index);
+		      #endif
+
+		      u32 encap_index = ppf_sb_path_lb_node.index;
 		      vnet_set_interface_output_node (vnm, hw_if_index, encap_index);
 
 		      t->hw_if_index = hw_if_index;
@@ -974,7 +979,8 @@ int vnet_ppf_gtpu_add_tunnel
 			flood_class;
 
 		}
-	}
+	} else 
+		t->sw_if_index = ~0;
 
     }
 

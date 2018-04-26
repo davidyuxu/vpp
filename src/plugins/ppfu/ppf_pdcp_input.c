@@ -135,11 +135,11 @@ ppf_pdcp_input_inline (vlib_main_t * vm,
 	    // ASSERT (b2->current_data == 0);
 	    // ASSERT (b3->current_data == 0);
 
-	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
-	    sw_if_index1 = vnet_buffer(b1)->sw_if_index[VLIB_RX];
-	    sw_if_index2 = vnet_buffer(b2)->sw_if_index[VLIB_RX];
-	    sw_if_index3 = vnet_buffer(b3)->sw_if_index[VLIB_RX];
-
+	    sw_if_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+	    sw_if_index1 = vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+	    sw_if_index2 = vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+	    sw_if_index3 = vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+	    
     	    if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
 	    {
 		  if (b0->flags & VLIB_BUFFER_IS_TRACED) 
@@ -213,7 +213,7 @@ ppf_pdcp_input_inline (vlib_main_t * vm,
 
 	    //ASSERT (b0->current_data == 0);
 		
-	    sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
+	    sw_if_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
 
 	    if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
 	    {

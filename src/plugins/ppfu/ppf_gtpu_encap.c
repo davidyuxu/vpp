@@ -164,43 +164,17 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  b3 = vlib_get_buffer (vm, bi3);
 
 
-	 
-          flow_hash0 = vnet_l2_compute_flow_hash (b0);
-          flow_hash1 = vnet_l2_compute_flow_hash (b1);
-          flow_hash2 = vnet_l2_compute_flow_hash (b2);
-          flow_hash3 = vnet_l2_compute_flow_hash (b3);
-	  #if 0
-	  /* Get next node index and adj index from tunnel next_dpo */
-	  t0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
-	  t1 = vnet_buffer(b1)->sw_if_index[VLIB_TX];
-	  t2 = vnet_buffer(b2)->sw_if_index[VLIB_TX];
-	  t3 = vnet_buffer(b3)->sw_if_index[VLIB_TX];
-	  hi0 = vnet_get_sup_hw_interface (vnm, sw_if_index0);
-	  hi1 = vnet_get_sup_hw_interface (vnm, sw_if_index1);
-	  hi2 = vnet_get_sup_hw_interface (vnm, sw_if_index2);
-	  hi3 = vnet_get_sup_hw_interface (vnm, sw_if_index3);
-	  t0 = &gtm->tunnels[hi0->dev_instance];
-	  t1 = &gtm->tunnels[hi1->dev_instance];
-	  t2 = &gtm->tunnels[hi2->dev_instance];
-	  t3 = &gtm->tunnels[hi3->dev_instance];
+	  flow_hash0 = vnet_l2_compute_flow_hash (b0);
+        flow_hash1 = vnet_l2_compute_flow_hash (b1);
+        flow_hash2 = vnet_l2_compute_flow_hash (b2);
+        flow_hash3 = vnet_l2_compute_flow_hash (b3);
 
-	  /* Note: change to always set next0 if it may be set to drop */
-	  next0 = t0->next_dpo.dpoi_next_node;
-          vnet_buffer(b0)->ip.adj_index[VLIB_TX] = t0->next_dpo.dpoi_index;
-	  next1 = t1->next_dpo.dpoi_next_node;
-          vnet_buffer(b1)->ip.adj_index[VLIB_TX] = t1->next_dpo.dpoi_index;
-	  next2 = t2->next_dpo.dpoi_next_node;
-          vnet_buffer(b2)->ip.adj_index[VLIB_TX] = t2->next_dpo.dpoi_index;
-	  next3 = t3->next_dpo.dpoi_next_node;
-          vnet_buffer(b3)->ip.adj_index[VLIB_TX] = t3->next_dpo.dpoi_index;
-	  #endif
-
-	  tid0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
-	  tid1 = vnet_buffer(b1)->sw_if_index[VLIB_TX];
-	  tid2 = vnet_buffer(b2)->sw_if_index[VLIB_TX];
-	  tid3 = vnet_buffer(b3)->sw_if_index[VLIB_TX];
-
-  	  t0 = &gtm->tunnels[tid0];
+	  tid0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
+	  tid1 = vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
+	  tid2 = vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
+	  tid3 = vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
+	  
+	  t0 = &gtm->tunnels[tid0];
    	  t1 = &gtm->tunnels[tid1];
         t2 = &gtm->tunnels[tid2];
         t3 = &gtm->tunnels[tid3];
@@ -568,15 +542,9 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 
 	  b0 = vlib_get_buffer (vm, bi0);
 
-          flow_hash0 = vnet_l2_compute_flow_hash(b0);
+        flow_hash0 = vnet_l2_compute_flow_hash(b0);
 
-	  #if 0
-	  /* Get next node index and adj index from tunnel next_dpo */
-	  sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
-	  hi0 = vnet_get_sup_hw_interface (vnm, sw_if_index0);
-	  t0 = &gtm->tunnels[hi0->dev_instance];
-	  #endif 
-	  tid0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
+	  tid0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
 
 	  t0 = &gtm->tunnels[tid0];
 
