@@ -591,6 +591,29 @@ vnet_create_sw_interface_no_callbacks (vnet_main_t * vnm,
     vnet_interface_counter_unlock (im);
   }
 
+	if(!(sw->flags & VNET_SW_INTERFACE_FLAG_HIDDEN))
+  {
+		vnet_interface_counter_t *c;
+		u32 index;
+
+		pool_get_aligned (im->instant_if_counters, c, CLIB_CACHE_LINE_BYTES);
+
+		index = c - im->instant_if_counters;
+
+		sw->counter_index = index;
+
+		vlib_thread_main_t *tm = vlib_get_thread_main ();
+
+		for (int i = 0; i < VNET_N_COMBINED_INTERFACE_COUNTER; i++)
+		  {
+				vec_validate (c->combined_per_thread[i], tm->n_vlib_mains - 1);
+		  }
+		for (int i = 0; i < VNET_N_SIMPLE_INTERFACE_COUNTER; i++)
+		  {
+		    vec_validate (c->simple_per_thread[i], tm->n_vlib_mains - 1);
+		  }
+  }
+
   return sw_if_index;
 }
 
@@ -1190,7 +1213,8 @@ vnet_interface_init (vlib_main_t * vm)
   /* Init interface pool, by Jordy */
   if (vm->max_interfaces) {
   	pool_alloc (im->hw_interfaces, vm->max_interfaces);
-	pool_init (im->sw_interfaces, vm->max_interfaces);
+		pool_init (im->sw_interfaces, vm->max_interfaces);
+	//pool_alloc (im->instant_if_counters, vm->max_interfaces);
   }
 
   /*

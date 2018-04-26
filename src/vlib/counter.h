@@ -113,6 +113,22 @@ vlib_get_simple_counter (vlib_simple_counter_main_t * cm, u32 index)
   return v;
 }
 
+always_inline counter_t
+vlib_get_simple_counter_per_thread (vlib_simple_counter_main_t * cm, u32 index, u32 thread_index)
+{
+  counter_t *my_counters;
+  counter_t v;
+
+  ASSERT (index < vlib_simple_counter_n_counters (cm));
+  ASSERT (thread_index < vec_len (cm->counters));
+
+  my_counters = cm->counters[thread_index];
+  v = my_counters[index];
+
+  return v;
+}
+
+
 /** Clear a simple counter
     Clears the set of per-thread u16 counters, and the u64 counter
 
@@ -265,6 +281,23 @@ vlib_get_combined_counter (const vlib_combined_counter_main_t * cm,
       result->bytes += counter->bytes;
     }
 }
+
+static inline void
+vlib_get_combined_counter_per_thread (const vlib_combined_counter_main_t * cm,
+			   u32 index, u32 thread_index, vlib_counter_t * result)
+{
+  vlib_counter_t *my_counters, *counter;
+
+  ASSERT (index < vlib_combined_counter_n_counters (cm));
+  ASSERT (thread_index < vec_len (cm->counters));
+
+  my_counters = cm->counters[thread_index];
+
+  counter = vec_elt_at_index (my_counters, index);
+  result->packets = counter->packets;
+  result->bytes = counter->bytes;
+}
+
 
 /** Clear a combined counter
     Clears the set of per-thread counters.

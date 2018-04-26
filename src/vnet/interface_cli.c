@@ -276,6 +276,7 @@ show_sw_interfaces (vlib_main_t * vm,
   u8 show_addresses = 0;
   u8 show_features = 0;
   u8 show_tag = 0;
+  u8 show_verbose = 0;
 
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
@@ -292,6 +293,8 @@ show_sw_interfaces (vlib_main_t * vm,
 	show_features = 1;
       else if (unformat (input, "tag"))
 	show_tag = 1;
+	  else if (unformat (input, "verbose"))
+	show_verbose = 1;
       else
 	{
 	  error = clib_error_return (0, "unknown input `%U'",
@@ -336,14 +339,15 @@ show_sw_interfaces (vlib_main_t * vm,
     }
 
   if (!show_addresses)
-    vlib_cli_output (vm, "%U\n", format_vnet_sw_interface, vnm, 0);
+    vlib_cli_output (vm, "%U\n", format_vnet_sw_interface, vnm, 0, 0);
 
   if (vec_len (sorted_sis) == 0)	/* Get all interfaces */
     {
       /* Gather interfaces. */
-      sorted_sis =
-	vec_new (vnet_sw_interface_t, pool_elts (im->sw_interfaces));
-      _vec_len (sorted_sis) = 0;
+	  // kingwel, don't do this, most of interfaces are actually hidden 
+      //sorted_sis =
+	//vec_new (vnet_sw_interface_t, pool_elts (im->sw_interfaces));
+      //_vec_len (sorted_sis) = 0;
       pool_foreach (si, im->sw_interfaces, (
 					     {
 					     int visible =
@@ -444,7 +448,7 @@ show_sw_interfaces (vlib_main_t * vm,
     {
       vec_foreach (si, sorted_sis)
       {
-	vlib_cli_output (vm, "%U\n", format_vnet_sw_interface, vnm, si);
+	vlib_cli_output (vm, "%U\n", format_vnet_sw_interface, vnm, si, show_verbose);
       }
     }
 
@@ -456,7 +460,7 @@ done:
 /* *INDENT-OFF* */
 VLIB_CLI_COMMAND (show_sw_interfaces_command, static) = {
   .path = "show interface",
-  .short_help = "show interface [address|addr|features|feat] [<interface> [<interface> [..]]]",
+  .short_help = "show interface [address|addr|features|feat] [<interface> [<interface> [..]]] [verbose]",
   .function = show_sw_interfaces,
 };
 /* *INDENT-ON* */

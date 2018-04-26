@@ -563,6 +563,36 @@ typedef enum
   VNET_FLOOD_CLASS_TUNNEL_NORMAL
 } vnet_flood_class_t;
 
+typedef enum
+{
+  /* Simple counters. */
+  VNET_INTERFACE_COUNTER_DROP = 0,
+  VNET_INTERFACE_COUNTER_PUNT = 1,
+  VNET_INTERFACE_COUNTER_IP4 = 2,
+  VNET_INTERFACE_COUNTER_IP6 = 3,
+  VNET_INTERFACE_COUNTER_RX_NO_BUF = 4,
+  VNET_INTERFACE_COUNTER_RX_MISS = 5,
+  VNET_INTERFACE_COUNTER_RX_ERROR = 6,
+  VNET_INTERFACE_COUNTER_TX_ERROR = 7,
+  VNET_INTERFACE_COUNTER_MPLS = 8,
+  VNET_N_SIMPLE_INTERFACE_COUNTER = 9,
+  /* Combined counters. */
+  VNET_INTERFACE_COUNTER_RX = 0,
+  VNET_INTERFACE_COUNTER_TX = 1,
+  VNET_N_COMBINED_INTERFACE_COUNTER = 2,
+} vnet_interface_counter_type_t;
+
+/* A copy of Interfcae counters for any visible interface */
+ typedef struct
+{
+  f64 last_show_time;   /**< Last show cpu time. */
+  vlib_counter_t *combined_per_thread[VNET_N_COMBINED_INTERFACE_COUNTER];	  /**< Last show counter . */
+  vlib_counter_t combined_total[VNET_N_COMBINED_INTERFACE_COUNTER];
+  counter_t *simple_per_thread[VNET_N_SIMPLE_INTERFACE_COUNTER]; /**< Last show counter . */
+  counter_t simple_total[VNET_N_SIMPLE_INTERFACE_COUNTER];
+} vnet_interface_counter_t;
+
+
 /* Software-interface.  This corresponds to a Ethernet VLAN, ATM vc, a
    tunnel, etc.  Configuration (e.g. IP address) gets attached to
    software interface. */
@@ -603,6 +633,8 @@ typedef struct
 
   u32 link_speed;
 
+  u32 counter_index;
+
   union
   {
     /* VNET_SW_INTERFACE_TYPE_HARDWARE. */
@@ -618,24 +650,6 @@ typedef struct
   vnet_flood_class_t flood_class;
 } vnet_sw_interface_t;
 
-typedef enum
-{
-  /* Simple counters. */
-  VNET_INTERFACE_COUNTER_DROP = 0,
-  VNET_INTERFACE_COUNTER_PUNT = 1,
-  VNET_INTERFACE_COUNTER_IP4 = 2,
-  VNET_INTERFACE_COUNTER_IP6 = 3,
-  VNET_INTERFACE_COUNTER_RX_NO_BUF = 4,
-  VNET_INTERFACE_COUNTER_RX_MISS = 5,
-  VNET_INTERFACE_COUNTER_RX_ERROR = 6,
-  VNET_INTERFACE_COUNTER_TX_ERROR = 7,
-  VNET_INTERFACE_COUNTER_MPLS = 8,
-  VNET_N_SIMPLE_INTERFACE_COUNTER = 9,
-  /* Combined counters. */
-  VNET_INTERFACE_COUNTER_RX = 0,
-  VNET_INTERFACE_COUNTER_TX = 1,
-  VNET_N_COMBINED_INTERFACE_COUNTER = 2,
-} vnet_interface_counter_type_t;
 
 typedef struct
 {
@@ -661,6 +675,8 @@ typedef struct
 
   /* Software interfaces. */
   vnet_sw_interface_t *sw_interfaces;
+
+  vnet_interface_counter_t *instant_if_counters;
 
   /* Hash table mapping sub intfc sw_if_index by sup sw_if_index and sub id */
   uword *sw_if_index_by_sup_and_sub;
