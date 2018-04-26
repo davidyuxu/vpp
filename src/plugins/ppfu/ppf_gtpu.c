@@ -2133,7 +2133,7 @@ ppf_gtpu_pg_edit_function_inline (pg_main_t * pg,
       packets += 1;
 
       gtpu0 = (void *) (p0->data + gtpu_offset);
-      gtpu_len0 = vlib_buffer_length_in_chain (vm, p0) - gtpu_offset - 8;
+      gtpu_len0 = vlib_buffer_length_in_chain (vm, p0) - gtpu_offset - PPF_GTPU_HEADER_MIN;
 
       if (flags & PPF_GTPU_PG_EDIT_LENGTH)
         gtpu0->length = clib_host_to_net_u16 (gtpu_len0);

@@ -33,43 +33,6 @@
 
 ppf_pdcp_main_t ppf_pdcp_main; 
 
-static clib_error_t *
-ppf_pdcp_config (vlib_main_t * vm, unformat_input_t * input)
-{
-  //ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
-  clib_error_t *error = 0;
-  
-
-  return error;
-}
-
-VLIB_CONFIG_FUNCTION (ppf_pdcp_config, "ppf_pdcp");
-
-clib_error_t *
-ppf_pdcp_init (vlib_main_t * vm)
-{
-  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
-
-  ppm->vnet_main = vnet_get_main ();
-  ppm->vlib_main = vm;
-	
-  ppm->pdcp_input_next_index = PPF_PDCP_INPUT_NEXT_PPF_PDCP_DECRYPT;
-  ppm->pdcp_decrypt_next_index = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
-  ppm->pdcp_encrypt_next_index = PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU4_ENCAP;
-
-  ppm->rx_reorder = 0;
-  ppm->rx_max_reorder_window = (1 << max_log2(PDCP_DEF_REORDER_WINDOW_SIZE));
-
-  if (ppf_main.max_capacity) {
-    pool_init_fixed (ppm->sessions, ppf_main.max_capacity);
-  }
-
-  return 0;
-}
-
-VLIB_INIT_FUNCTION (ppf_pdcp_init);
-
-
 void 
 ppf_pdcp_encap_header_5bsn (u8 * buf, u8 dc, u32 sn)
 {
@@ -991,6 +954,122 @@ VLIB_CLI_COMMAND (test_bitmap_command, static) = {
 };
 /* *INDENT-ON* */
 
+
+/**************************Start of pg***************************/
+
+typedef struct
+{
+  u16 dc_sn;
+} ppf_pdcp_header_t;
+
+
+typedef struct
+{
+  pg_edit_t dc;
+  pg_edit_t rev;
+  pg_edit_t sn;
+} pg_ppf_pdcp_header_t;
+
+static inline void
+pg_ppf_pdcp_header_init (pg_ppf_pdcp_header_t * p)
+{
+  pg_edit_init_bitfield (&p->sn, ppf_pdcp_header_t, dc_sn, 0, 12);
+  pg_edit_init_bitfield (&p->rev, ppf_pdcp_header_t, dc_sn, 12, 3);
+  pg_edit_init_bitfield (&p->dc, ppf_pdcp_header_t, dc_sn, 15, 1);
+}
+
+uword
+unformat_pg_ppf_pdcp_header (unformat_input_t * input, va_list * args)
+{
+  pg_stream_t *s = va_arg (*args, pg_stream_t *);
+  unformat_input_t sub_input = { 0 };
+  pg_ppf_pdcp_header_t *p;
+  u32 group_index;
+
+  p = pg_create_edit_group (s, sizeof (p[0]), sizeof (ppf_pdcp_header_t),
+			    &group_index);
+  pg_ppf_pdcp_header_init (p);
+
+  /* Defaults. */
+  pg_edit_set_fixed (&p->dc, 0);  
+  pg_edit_set_fixed (&p->rev, 0); 
+  p->sn.type   = PG_EDIT_UNSPECIFIED;
+
+  if (!unformat (input, "PDCP %U", unformat_input, &sub_input))
+    goto error;
+
+  /* Parse options. */
+  while (1)
+    {
+      if (unformat (&sub_input, "sn %U",
+		    unformat_pg_edit, unformat_pg_number, &p->sn))
+	    ;
+
+      else if (unformat (&sub_input, "dc") || unformat (&sub_input, "DC"))
+        pg_edit_set_fixed (&p->dc, 1);
+
+      /* Can't parse input: try next protocol level. */
+      else
+	    break;
+    }
+
+  {
+    if (!unformat_user (&sub_input, unformat_pg_payload, s))
+      goto error;
+
+	unformat_free (&sub_input);
+    return 1;
+  }
+
+error:
+  /* Free up any edits we may have added. */
+  pg_free_edit_group (s);
+  unformat_free (&sub_input);
+
+  return 0;
+}
+
+/***************************End of pg****************************/
+
+
+static clib_error_t *
+ppf_pdcp_config (vlib_main_t * vm, unformat_input_t * input)
+{
+  //ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
+  clib_error_t *error = 0;
+  
+
+  return error;
+}
+
+VLIB_CONFIG_FUNCTION (ppf_pdcp_config, "ppf_pdcp");
+
+clib_error_t *
+ppf_pdcp_init (vlib_main_t * vm)
+{
+  ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
+  pg_node_t *pn = pg_get_node (ppf_pdcp_input_node.index);
+
+  pn->unformat_edit = unformat_pg_ppf_pdcp_header;
+
+  ppm->vnet_main = vnet_get_main ();
+  ppm->vlib_main = vm;
+	
+  ppm->pdcp_input_next_index = PPF_PDCP_INPUT_NEXT_PPF_PDCP_DECRYPT;
+  ppm->pdcp_decrypt_next_index = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+  ppm->pdcp_encrypt_next_index = PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU4_ENCAP;
+
+  ppm->rx_reorder = 0;
+  ppm->rx_max_reorder_window = (1 << max_log2(PDCP_DEF_REORDER_WINDOW_SIZE));
+
+  if (ppf_main.max_capacity) {
+    pool_init_fixed (ppm->sessions, ppf_main.max_capacity);
+  }
+
+  return 0;
+}
+
+VLIB_INIT_FUNCTION (ppf_pdcp_init);
 
 
 /*
