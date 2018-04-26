@@ -317,6 +317,9 @@ ppf_srb_init (vlib_main_t * vm)
 {
   ppf_sb_main_t *psm = &ppf_sb_main;
   udp_dst_port_info_t *pi;
+  pg_node_t *pn = pg_get_node (ppf_srb_nb_rx_node.index);
+
+  pn->unformat_edit = unformat_pg_ppf_srb_header;
 
   psm->vnet_main = vnet_get_main ();
   psm->vlib_main = vm;

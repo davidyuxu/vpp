@@ -2290,6 +2290,11 @@ ppf_gtpu_init (vlib_main_t * vm)
 {
   ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
   udp_dst_port_info_t *pi;
+  pg_node_t *pn = pg_get_node (ppf_gtpu4_input_node.index);
+
+  pn->unformat_edit = unformat_pg_ppf_gtpu_header;
+  pn = pg_get_node (ppf_gtpu6_input_node.index);
+  pn->unformat_edit = unformat_pg_ppf_gtpu_header;
 
   gtm->vnet_main = vnet_get_main ();
   gtm->vlib_main = vm;
