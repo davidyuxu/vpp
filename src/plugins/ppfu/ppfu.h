@@ -506,14 +506,6 @@ typedef CLIB_PACKED(struct
 }) ip4_srb_header_t;
 /* *INDENT-ON* */
 
-typedef struct _ppf_pdcp_header_t
-{
-  u8 sn;
-  u8 sn_cont[0];  // depends on the sn length
-} ppf_pdcp_header_t;
-
-// typedef u32 ppf_pdcp_mac_i_t;
-
 int vnet_ppf_del_callline (u32 call_id) ;
 
 int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c);

@@ -74,6 +74,8 @@ typedef struct
 #define PPF_GTPU_PT_GTP    (1<<4)
 #define PPF_GTPU_TYPE_PPF_GTPU  255
 
+#define PPF_GTPU_HEADER_MIN   (8)
+
 /* *INDENT-OFF* */
 typedef CLIB_PACKED(struct
 {

@@ -271,7 +271,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 		b3->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
 		
 	      /* Fix the IP4 checksum and length */
-		  #if 0 /* Fix odd length packets chechsum issue */
+		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum0 = ip4_0->checksum;
 	      new_l0 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
@@ -286,7 +286,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      ip4_0->checksum = ip4_header_checksum (ip4_0);
 		  #endif
 		  
-		  #if 0 /* Fix odd length packets chechsum issue */
+		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum1 = ip4_1->checksum;
 	      new_l1 = /* old_l1 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b1));
@@ -301,7 +301,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      ip4_1->checksum = ip4_header_checksum (ip4_1);
 		  #endif
 
-		  #if 0 /* Fix odd length packets chechsum issue */
+		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum2 = ip4_2->checksum;
 	      new_l2 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b2));
@@ -316,7 +316,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      ip4_2->checksum = ip4_header_checksum (ip4_2);
 		  #endif
 		  
-		  #if 0 /* Fix odd length packets chechsum issue */
+		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum3 = ip4_3->checksum;
 	      new_l3 = /* old_l1 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b3));
@@ -606,7 +606,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
              b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
 
 	      /* Fix the IP4 checksum and length */
-		  #if 0 /* Fix odd length packets chechsum issue */
+		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum0 = ip4_0->checksum;
 	      new_l0 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
