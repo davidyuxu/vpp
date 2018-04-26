@@ -30,6 +30,8 @@
 #include <vnet/plugin/plugin.h>
 #include <vpp/app/version.h>
 #include <ppfu/ppfu.h>
+#include <ppfu/snow3g.h>
+
 
 ppf_pdcp_main_t ppf_pdcp_main; 
 
@@ -174,61 +176,124 @@ ppf_pdcp_nop (u8 * in, u8 * out, u32 size, void * security_parameters)
 	return 0;
 }
 
-u32
-ppf_pdcp_eia0 (u8 * in, u8 * out, u32 size, void * security_parameters)
+bool
+ppf_pdcp_eia0 (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 {
-	memset (out, 0x00, 4);
-	return 0;
+
+	memset (vlib_buffer_put_uninit(b0, EIA_MAC_LEN), 0x00, EIA_MAC_LEN);
+	return true;
 }
 
-u32
-ppf_pdcp_eia1 (u8 * in, u8 * out, u32 size, void * security_parameters)
+bool
+ppf_pdcp_eia1 (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 {
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
 	CLIB_UNUSED(u8 iv[16]) = {0};
+	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
 
-	ppf_pdcp_gen_iv (PDCP_SNOW3G_INTEGRITY,
-				sec_para->count, sec_para->bearer, sec_para->dir, iv);
 
-	// TODO:
-	out[0] = 'S';
-	out[1] = '3';
-	out[2] = 'G';
-	out[3] = '^';
+	SNOW3G_CTX *ctx = &(pdcp_sess->snow3g_ctx);	
+	//no need generate IV, snow algorithm will generate it.
+	//ppf_pdcp_gen_iv (PDCP_SNOW3G_CIPHERING, sec_para->count, sec_para->bearer, sec_para->dir, iv);
+	u8 mact[MAX_PDCP_KEY_LEN] = {0};
+	u32 len;
+	u8 * buf0;
+	bool ret = true;
 
-	return 0;
+	
+	buf0 = vlib_buffer_get_current (b0);
+	len = vlib_buffer_length_in_chain(vm, b0);
+
+
+	if (PPF_PDCP_DIR_ENC == sec_para->dir) {
+		//append 4 octs at end of data for caculate MAC
+		snow3g_protect(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
+	} else {
+		//calculate mac exlucde 4 octs MAC-I
+		len -= EIA_MAC_LEN;	
+		snow3g_validate(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,mact);
+		ret = (buf0[len+0]== mact[0] && buf0[len+1]== mact[1] && buf0[len+2]== mact[2] && buf0[len+3]== mact[3]);
+		//trim 4 octs of MAC 
+		b0->current_length -= EIA_MAC_LEN;
+	}
+
+	return ret;
 }
+
 
 u32
 ppf_pdcp_eea1 (u8 * in, u8 * out, u32 size, void * security_parameters)
 {
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
 	CLIB_UNUSED(u8 iv[16]) = {0};
-
-	ppf_pdcp_gen_iv (PDCP_SNOW3G_CIPHERING,
-				sec_para->count, sec_para->bearer, sec_para->dir, iv);
-
-	// TODO:
+	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
 	
+	//no need generate IV, snow algorithm will generate it.
+	//ppf_pdcp_gen_iv (PDCP_SNOW3G_CIPHERING, sec_para->count, sec_para->bearer, sec_para->dir, iv);
+
+	SNOW3G_CTX *ctx = &(pdcp_sess->snow3g_ctx);
+
+	if (PPF_PDCP_DIR_ENC == sec_para->dir) {
+		snow3g_encrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,in,out,size);
+	} else {
+		snow3g_decrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,in,out,size);
+	}
+
 	return 0;
 }
 
-u32
-ppf_pdcp_eia2 (u8 * in, u8 * out, u32 size, void * security_parameters)
+bool
+ppf_pdcp_eia2 (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 {
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
-	CLIB_UNUSED(u8 iv[16]) = {0};
+	//CLIB_UNUSED(u8 iv[16]) = {0};
+	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
 
+//#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	CMAC_CTX *ctx = pdcp_sess->integrity_ctx;
+//#else
+//	CMAC_CTX *ctx = &(pdcp_sess->integrity_ctx);
+//#endif
+
+	u8 mact[MAX_PDCP_KEY_LEN] = {0};
+	u32 len;
+        size_t mactlen;
+	u8 * buf0;
+	bool ret = true;
+	//prepare IV
+	//org_len = vlib_buffer_length_in_chain(vm, b0);
+	vlib_buffer_advance (b0, -(word)EIA2_IV_LEN);
+	// length include IV
+    
+	buf0 = vlib_buffer_get_current (b0);
+	len = vlib_buffer_length_in_chain(vm, b0);
 	ppf_pdcp_gen_iv (PDCP_AES_INTEGRITY,
-				sec_para->count, sec_para->bearer, sec_para->dir, iv);
+				sec_para->count, sec_para->bearer, sec_para->dir, buf0);
 
-	// TODO:
-	out[0] = 'A';
-	out[1] = 'E';
-	out[2] = 'S';
-	out[3] = '^';
-	
-	return 0;
+
+	// 0 for uplink(DEC) and 1 for downlink(ENC)
+	if (PPF_PDCP_DIR_ENC == sec_para->dir) {
+		CMAC_Update(ctx, buf0, len);
+		CMAC_Final(ctx, mact, &mactlen);
+		//put mac to end of data
+		clib_memcpy (vlib_buffer_put_uninit(b0, EIA_MAC_LEN),mact,EIA_MAC_LEN);
+	} else {
+		//calculate mac exlucde 4 octs MAC-I
+		len -= EIA_MAC_LEN;
+		CMAC_Update(ctx, buf0, len);
+		CMAC_Final(ctx, mact, &mactlen);
+		//verify mac
+		ret = (buf0[len+0]== mact[0] && buf0[len+1]== mact[1] && buf0[len+2]== mact[2] && buf0[len+3]== mact[3]);
+		//trim 4 octs of MAC 
+		b0->current_length -= EIA_MAC_LEN;
+
+	}
+
+	//remove IV prepend
+	vlib_buffer_advance (b0, (word)EIA2_IV_LEN);
+
+
+	return ret;
 }
 
 u32
@@ -262,8 +327,8 @@ ppf_pdcp_eea2 (u8 * in, u8 * out, u32 size, void * security_parameters)
 	return 0;
 }
 
-u32
-ppf_pdcp_eia3 (u8 * in, u8 * out, u32 size, void * security_parameters)
+bool
+ppf_pdcp_eia3 (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 {
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
 	CLIB_UNUSED(u8 iv[16]) = {0};
@@ -272,10 +337,6 @@ ppf_pdcp_eia3 (u8 * in, u8 * out, u32 size, void * security_parameters)
 				sec_para->count, sec_para->bearer, sec_para->dir, iv);
 
 	// TODO:
-	out[0] = 'Z';
-	out[1] = 'U';
-	out[2] = 'C';
-	out[3] = '^';
 	
 	return 0;
 }
@@ -320,8 +381,8 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
   else //in_flight_limit == 0
     pdcp_sess->in_flight_limit = 0x1FFFFFFFF; //0 means no in-flight limit, set limit to 2^32 + 1
 
-  pdcp_sess->protect = &ppf_pdcp_nop;
-  pdcp_sess->validate = &ppf_pdcp_nop;
+  pdcp_sess->protect = &ppf_pdcp_eia0;
+  pdcp_sess->validate = &ppf_pdcp_eia0;
   pdcp_sess->encrypt = &ppf_pdcp_nop;
   pdcp_sess->decrypt = &ppf_pdcp_nop;
   pdcp_sess->mac_length = 0;
@@ -390,8 +451,8 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
     switch(config->integrity_algorithm)
     {
       case PDCP_EIA_NONE:
-      	pdcp_sess->protect = &ppf_pdcp_nop;
-        pdcp_sess->validate = &ppf_pdcp_nop;
+      	pdcp_sess->protect = &ppf_pdcp_eia0;
+        pdcp_sess->validate = &ppf_pdcp_eia0;
         pdcp_sess->mac_length = 0;
         break;
 	
@@ -451,11 +512,14 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
         pdcp_sess->security_algorithms |= PDCP_AES_CIPHERING;
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 		pdcp_sess->crypto_ctx    = EVP_CIPHER_CTX_new ();		
-		pdcp_sess->integrity_ctx = EVP_CIPHER_CTX_new ();
 #else
 		EVP_CIPHER_CTX_init (&(pdcp_sess->crypto_ctx));
-		EVP_CIPHER_CTX_init (&(pdcp_sess->integrity_ctx));
+		
 #endif
+
+	pdcp_sess->integrity_ctx = CMAC_CTX_new ();
+	CMAC_Init(pdcp_sess->integrity_ctx, pdcp_sess->integrity_key, 16, EVP_aes_128_cbc(), NULL);
+
         break;
 
       case PDCP_EEA3:
@@ -481,12 +545,10 @@ ppf_pdcp_clear_session (ppf_pdcp_session_t * pdcp_sess)
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 	EVP_CIPHER_CTX_free (pdcp_sess->crypto_ctx);
-	EVP_CIPHER_CTX_free (pdcp_sess->integrity_ctx);
 #else
 	EVP_CIPHER_CTX_cleanup (&(pdcp_sess->crypto_ctx));
-	EVP_CIPHER_CTX_cleanup (&(pdcp_sess->integrity_ctx));
 #endif
-
+	CMAC_CTX_free(pdcp_sess->integrity_ctx);
   	clib_bitmap_free (pdcp_sess->rx_replay_bitmap);
 
     vec_foreach_index(i, pdcp_sess->rx_reorder_buffers) {
