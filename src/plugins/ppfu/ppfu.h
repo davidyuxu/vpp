@@ -34,6 +34,9 @@
 #include <vnet/adj/adj_types.h>
 #include <vnet/fib/fib_table.h>
 #include <openssl/evp.h>
+#include <openssl/cmac.h>
+
+
 
 
 #define foreach_ppf_pdcp_input_next        \
@@ -109,6 +112,9 @@ _(IP4_LOOKUP, "ip4-lookup")
     PPF_SRB_NB_TX_NEXT_IP4_LOOKUP,
     PPF_SRB_NB_TX_N_NEXT,
 } ppf_srb_nb_tx_next_t;
+
+#define EIA2_IV_LEN              8    /* 64 bits */
+#define EIA_MAC_LEN              4    /* 32 bits */
 
 
 #define MAX_PDCP_KEY_LEN              16    /* 128 bits */
@@ -258,11 +264,49 @@ typedef struct _ppf_pdcp_config_t_
 
 
 enum {
-  PPF_PDCP_DIR_ENC = 0,
-  PPF_PDCP_DIR_DEC = 1
+//33.401	 DIRECTION bit shall be 0 for uplink(DEC) and 1 for downlink(ENC)
+
+  PPF_PDCP_DIR_DEC = 0,
+  PPF_PDCP_DIR_ENC = 1
 };
 
 typedef u32 (*pdcp_security_handler)(u8 * /* in */, u8 * /* out */, u32 /* len */, void * /* security parameters */);
+
+typedef bool (*pdcp_intergity_handler)(vlib_main_t * /* in */, vlib_buffer_t * /* in */, void * /* security parameters */);
+
+
+
+
+typedef struct
+{
+	/* LFSR */
+	u32 LFSR_S0;
+	u32 LFSR_S1;
+	u32 LFSR_S2;
+	u32 LFSR_S3;
+	u32 LFSR_S4;
+	u32 LFSR_S5;
+	u32 LFSR_S6;
+	u32 LFSR_S7;
+	u32 LFSR_S8;
+	u32 LFSR_S9;
+	u32 LFSR_S10;
+	u32 LFSR_S11;
+	u32 LFSR_S12;
+	u32 LFSR_S13;
+	u32 LFSR_S14;
+	u32 LFSR_S15;
+	/* FSM */
+	
+	u32 FSM_R1;
+	u32 FSM_R2;
+	u32 FSM_R3;
+
+}SNOW3G_CTX;
+
+
+
+
 
 typedef struct
 {
@@ -272,11 +316,16 @@ typedef struct
   EVP_CIPHER_CTX crypto_ctx;
 #endif
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  EVP_CIPHER_CTX *integrity_ctx;
-#else
-  EVP_CIPHER_CTX integrity_ctx;
-#endif
+//CMAC context
+//#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  CMAC_CTX *integrity_ctx;
+//#else
+//  CMAC_CTX integrity_ctx;
+//#endif
+
+  //snow 3g ctx
+  SNOW3G_CTX  snow3g_ctx;
+
 
   u8  integrity_key[MAX_PDCP_KEY_LEN];
   u8  crypto_key[MAX_PDCP_KEY_LEN];
@@ -295,8 +344,8 @@ typedef struct
   u32 * rx_reorder_buffers;  /* rx reordering vector*/
   void (*encap_header)(u8 *, u8, u32);
   void (*decap_header)(u8 *, u8 *, u32 *);
-  pdcp_security_handler protect;
-  pdcp_security_handler validate;
+  pdcp_intergity_handler protect;
+  pdcp_intergity_handler validate;
   pdcp_security_handler encrypt;
   pdcp_security_handler decrypt;
 } ppf_pdcp_session_t;
