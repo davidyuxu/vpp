@@ -429,10 +429,17 @@ do_set_random (pg_main_t * pg,
     *sum_result = sum;
 }
 
+#if 1 // Fix setbits bug, by Jordy
+#define _(i,t)							\
+  clib_mem_unaligned (a##i, t) =				\
+    clib_host_to_net_##t ((clib_net_to_host_mem_##t (a##i) &~ mask)	\
+			  | (v##i))
+#else
 #define _(i,t)							\
   clib_mem_unaligned (a##i, t) =				\
     clib_host_to_net_##t ((clib_net_to_host_mem_##t (a##i) &~ mask)	\
 			  | (v##i << shift))
+#endif
 
 always_inline void
 setbits_1 (void *a0,
@@ -808,7 +815,11 @@ do_it (pg_main_t * pg,
     max_bits = clib_max (max_pow2 (n_bits), 8);
 
     mask = ((u64) 1 << (u64) n_bits) - 1;
+#if 1 // fix setbits bug, by Jordy
+    mask &= ~((((u64) 1 << (u64) shift) - 1) << (n_bits - shift));
+#else
     mask &= ~(((u64) 1 << (u64) shift) - 1);
+#endif
 
     mask <<= max_bits - n_bits;
     shift += max_bits - n_bits;

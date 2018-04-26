@@ -140,7 +140,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           copy_dst_last0[0] = copy_src_last0[0];
           
           /* Fix the IP4 checksum and length */
-		  #if 0 // fix odd ehecksum calculate issue
+		  #if 1 // fix odd ehecksum calculate issue
           sum0 = ip4_0->checksum;
           new_l0 = /* old_l0 always 0, see the rewrite setup */
             clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
