@@ -217,10 +217,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp0.dir = PPF_PDCP_DIR_ENC;
 
         /* Integrity */
-	    len0 = vlib_buffer_length_in_chain(vm, b0);
-	    vlib_buffer_put_uninit (b0, pdcp0->mac_length);
-	    pdcp0->protect (buf0, buf0 + len0, len0, &sp0);
-
+	    pdcp0->protect (vm, b0, &sp0);
         /* Encrypt */
 	    len0 = vlib_buffer_length_in_chain(vm, b0);
 	    pdcp0->encrypt (buf0 + pdcp0->header_length,
@@ -264,10 +261,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp1.dir = PPF_PDCP_DIR_ENC;
 
         /* Integrity */
-	    len1 = vlib_buffer_length_in_chain(vm, b1);
-	    vlib_buffer_put_uninit (b1, pdcp1->mac_length);
-	    pdcp1->protect (buf1, buf1 + len1, len1, &sp1);
-
+	    pdcp0->protect (vm, b1, &sp1);
         /* Encrypt */
 	    len1 = vlib_buffer_length_in_chain(vm, b1);
 	    pdcp1->encrypt (buf1 + pdcp1->header_length,
@@ -311,10 +305,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp2.dir = PPF_PDCP_DIR_ENC;
 
         /* Integrity */
-	    len2 = vlib_buffer_length_in_chain(vm, b2);
-	    vlib_buffer_put_uninit (b2, pdcp2->mac_length);
-	    pdcp2->protect (buf2, buf2 + len2, len2, &sp2);
-
+	    pdcp2->protect (vm, b2, &sp2);
         /* Encrypt */
 	    len2 = vlib_buffer_length_in_chain(vm, b2);
 	    pdcp2->encrypt (buf2 + pdcp2->header_length,
@@ -358,10 +349,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp3.dir = PPF_PDCP_DIR_ENC;
 
         /* Integrity */
-	    len3 = vlib_buffer_length_in_chain(vm, b3);
-	    vlib_buffer_put_uninit (b3, pdcp3->mac_length);
-	    pdcp3->protect (buf3, buf3 + len3, len3, &sp3);
-
+	    pdcp3->protect (vm, b3, &sp3);
         /* Encrypt */
 	    len3 = vlib_buffer_length_in_chain(vm, b3);
 	    pdcp3->encrypt (buf3 + pdcp3->header_length,
@@ -452,9 +440,9 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp0.dir = PPF_PDCP_DIR_ENC;
 
         /* Integrity */
-	    len0 = vlib_buffer_length_in_chain(vm, b0);
-	    vlib_buffer_put_uninit (b0, pdcp0->mac_length);
-	    pdcp0->protect (buf0, buf0 + len0, len0, &sp0);
+	    //len0 = vlib_buffer_length_in_chain(vm, b0);
+	    //vlib_buffer_put_uninit (b0, pdcp0->mac_length);
+	    pdcp0->protect (vm, b0, &sp0);
 
         /* Encrypt */
 	    len0 = vlib_buffer_length_in_chain(vm, b0);
