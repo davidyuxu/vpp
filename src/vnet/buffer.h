@@ -419,8 +419,9 @@ typedef struct
         u8 sb_id[3];
       } path;
       
+	u32 tunnel_id [VLIB_N_RX_TX_TUNNEL];
+      
     } ppf_du_metadata;
-
   };
 } vnet_buffer_opaque2_t;
 

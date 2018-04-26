@@ -165,8 +165,8 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         reorder1 = 0;
 
         /* Get tunnel index from buffer */
-	    tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
-	    tunnel_index1 = vnet_buffer(b1)->sw_if_index[VLIB_RX];
+	    tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+	    tunnel_index1 = vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
 
         /* Find rx tunnel */
 	    t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
@@ -592,21 +592,21 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         reorder0 = 0;
         
         /* Get tunnel index from buffer */
-        tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
+        tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
         
         /* Find rx tunnel */
         t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
 
         /* Handle buffer 0 */
-        
-        /* Find callline */
+
+         /* Find callline */
         call_id0 = t0->call_id;
         if (PREDICT_FALSE(~0 == call_id0)) {
           error0 = PPF_PDCP_DECRYPT_ERROR_NO_SUCH_CALL;
           next0 = PPF_PDCP_DECRYPT_NEXT_DROP;
           goto trace00;
         }
-	    
+    
 	    c0 = &(pm->ppf_calline_table[call_id0]);
 
         /* Find pdcp session */
@@ -716,10 +716,15 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           
           vlib_buffer_advance (b0, (word)(pdcp0->header_length));
           
-          if (c0->call_type == PPF_SRB_CALL)
-            next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
-          else if (c0->call_type == PPF_DRB_CALL)
-            next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+          if (c0->call_type == PPF_SRB_CALL) {
+            	next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
+          }
+          else if (c0->call_type == PPF_DRB_CALL) {
+            if (pm->ue_mode == 1)
+			next0 = PPF_PDCP_DECRYPT_NEXT_IP4_LOOKUP;
+          	else         	
+        		next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+        	}
 
 	    trace00:
 	    	

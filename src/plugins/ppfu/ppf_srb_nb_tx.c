@@ -166,7 +166,7 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           len0 = clib_host_to_net_u32 (vlib_buffer_length_in_chain(vm, b0)
                                - sizeof (*ip4_0) - sizeof(*udp0) - sizeof(*srb0));
           srb0->msg.in.data_l = len0;
-          tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_RX];
+          tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
           t0 = pool_elt_at_index (pgm->tunnels, tunnel_index0);
           srb0->call_id = clib_host_to_net_u32(t0->call_id);
 

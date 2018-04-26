@@ -143,10 +143,10 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    b3 = vlib_get_buffer (vm, bi3);
 
         /* Find context */	    
-	    tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
-	    tunnel_index1 = vnet_buffer(b1)->sw_if_index[VLIB_TX];
-	    tunnel_index2 = vnet_buffer(b2)->sw_if_index[VLIB_TX];
-	    tunnel_index3 = vnet_buffer(b3)->sw_if_index[VLIB_TX];
+	    tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
+	    tunnel_index1 = vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
+	    tunnel_index2 = vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
+	    tunnel_index3 = vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
 
 	    t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
 	    t1 = pool_elt_at_index (gtm->tunnels, tunnel_index1);
@@ -410,7 +410,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    b0 = vlib_get_buffer (vm, bi0);
 
         /* Find context */
-	    tunnel_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
+	    tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
 	    t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
 	    c0 = &(pm->ppf_calline_table[t0->call_id]);
 	    pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
