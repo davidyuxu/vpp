@@ -388,6 +388,31 @@ void
 vl_msg_api_barrier_release (void)
 {
 }
+/* set to 1 if you want before/after message handler event logging */
+#define ELOG_API_MESSAGE_HANDLERS 1
+#if ELOG_API_MESSAGE_HANDLERS > 0
+static u32
+elog_id_for_msg_name (vlib_main_t * vm, char *msg_name)
+{
+  uword *p, r;
+  static uword *h;
+  u8 *name_copy;
+
+  if (!h)
+    h = hash_create_string (0, sizeof (uword));
+
+  p = hash_get_mem (h, msg_name);
+  if (p)
+    return p[0];
+  r = elog_string (&vm->elog_main, "%s", msg_name);
+
+  name_copy = format (0, "%s%c", msg_name, 0);
+
+  hash_set_mem (h, name_copy, r);
+
+  return r;
+}
+#endif
 
 always_inline void
 msg_handler_internal (api_main_t * am,
@@ -395,6 +420,29 @@ msg_handler_internal (api_main_t * am,
 {
   u16 id = ntohs (*((u16 *) the_msg));
   u8 *(*print_fp) (void *, void *);
+#if ELOG_API_MESSAGE_HANDLERS > 0
+    vlib_main_t *vm = (vlib_main_t *)am->vm;
+    if (vm) {
+        {
+          /* *INDENT-OFF* */
+          ELOG_TYPE_DECLARE (e) =
+            {
+              .format = "[i]api-msg: %s",
+              .format_args = "T4",
+            };
+          /* *INDENT-ON* */
+          struct
+          {
+            u32 c;
+          } *ed;
+          ed = ELOG_DATA (&vm->elog_main, e);
+          if (id < vec_len (am->msg_names))
+            ed->c = elog_id_for_msg_name (vm, (char *)(am->msg_names[id]));
+          else
+            ed->c = elog_id_for_msg_name (vm, "BOGUS");
+        }
+    }
+#endif
 
   if (id < vec_len (am->msg_handlers) && am->msg_handlers[id])
     {
@@ -434,34 +482,33 @@ msg_handler_internal (api_main_t * am,
 
   if (free_it)
     vl_msg_api_free (the_msg);
-}
 
-/* set to 1 if you want before/after message handler event logging */
-#define ELOG_API_MESSAGE_HANDLERS 1
-
+  
 #if ELOG_API_MESSAGE_HANDLERS > 0
-static u32
-elog_id_for_msg_name (vlib_main_t * vm, char *msg_name)
-{
-  uword *p, r;
-  static uword *h;
-  u8 *name_copy;
-
-  if (!h)
-    h = hash_create_string (0, sizeof (uword));
-
-  p = hash_get_mem (h, msg_name);
-  if (p)
-    return p[0];
-  r = elog_string (&vm->elog_main, "%s", msg_name);
-
-  name_copy = format (0, "%s%c", msg_name, 0);
-
-  hash_set_mem (h, name_copy, r);
-
-  return r;
-}
+    if (vm) {
+        {
+        /* *INDENT-OFF* */
+        ELOG_TYPE_DECLARE (e) = {
+          .format = "[i]api-msg-done: %s",
+          .format_args = "T4",
+        };
+        /* *INDENT-ON* */
+      
+          struct
+          {
+            u32 c;
+          } *ed;
+          ed = ELOG_DATA (&vm->elog_main, e);
+          if (id < vec_len (am->msg_names))
+            ed->c = elog_id_for_msg_name (vm, (char *)(am->msg_names[id]));
+          else
+            ed->c = elog_id_for_msg_name (vm, "BOGUS");
+        }
+    }
 #endif
+}
+
+
 
 /* This is only to be called from a vlib/vnet app */
 void
