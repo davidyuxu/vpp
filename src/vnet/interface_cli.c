@@ -347,7 +347,7 @@ show_sw_interfaces (vlib_main_t * vm,
     }
 
   if (!show_addresses)
-    vlib_cli_output (vm, "%U\n", format_vnet_sw_interface, vnm, 0);
+    vlib_cli_output (vm, "%U\n", format_vnet_sw_interface, vnm, 0, 0);
 
   if (vec_len (sorted_sis) == 0)	/* Get all interfaces */
     {

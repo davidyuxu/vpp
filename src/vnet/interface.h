@@ -683,6 +683,7 @@ typedef struct
 
   /* VNET_SW_INTERFACE_TYPE_HARDWARE. */
   u32 hw_if_index;
+  u32 counter_index;
 
   /* VNET_SW_INTERFACE_TYPE_SUB. */
   vnet_sub_interface_t sub;
@@ -717,6 +718,16 @@ typedef enum
   VNET_INTERFACE_COUNTER_TX_BROADCAST = 7,
   VNET_N_COMBINED_INTERFACE_COUNTER = 8,
 } vnet_interface_counter_type_t;
+
+/* A copy of Interfcae counters for any visible interface */
+ typedef struct
+{
+  f64 last_show_time;   /**< Last show cpu time. */
+  vlib_counter_t *combined_per_thread[VNET_N_COMBINED_INTERFACE_COUNTER];	  /**< Last show counter . */
+  vlib_counter_t combined_total[VNET_N_COMBINED_INTERFACE_COUNTER];
+  counter_t *simple_per_thread[VNET_N_SIMPLE_INTERFACE_COUNTER]; /**< Last show counter . */
+  counter_t simple_total[VNET_N_SIMPLE_INTERFACE_COUNTER];
+} vnet_interface_counter_t;
 
 #define foreach_rx_combined_interface_counter(_x)               \
   for (_x = VNET_INTERFACE_COUNTER_RX;                          \
@@ -770,6 +781,8 @@ typedef struct
 
   /* Software interfaces. */
   vnet_sw_interface_t *sw_interfaces;
+
+  vnet_interface_counter_t *instant_if_counters;
 
   /* Hash table mapping sub intfc sw_if_index by sup sw_if_index and sub id */
   uword *sw_if_index_by_sup_and_sub;
