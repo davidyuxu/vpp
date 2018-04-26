@@ -243,10 +243,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    
         /* Validate */
         if (pdcp0->mac_length) {
-          pdcp0->validate (buf0, xmaci, len0 - pdcp0->mac_length, &sp0);
-          b0->current_length -= pdcp0->mac_length;
-
-          if (PDCP_MAC_VALIDATE (xmaci, (buf0 + len0 - pdcp0->mac_length), pdcp0->mac_length))
+          if(pdcp0->validate (vm, b0, &sp0))
             vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status = 1;
           else {
             vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status = 2;
@@ -389,10 +386,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    
         /* Validate */
         if (pdcp1->mac_length) {
-          pdcp1->validate (buf1, xmaci, len1 - pdcp1->mac_length, &sp1);
-          b1->current_length -= pdcp1->mac_length;
-
-          if (PDCP_MAC_VALIDATE (xmaci, (buf1 + len1 - pdcp1->mac_length), pdcp1->mac_length))
+          if(pdcp1->validate (vm, b1, &sp1))
             vnet_buffer2(b1)->ppf_du_metadata.pdcp.integrity_status = 1;
           else {
             vnet_buffer2(b1)->ppf_du_metadata.pdcp.integrity_status = 2;
@@ -400,7 +394,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
             next1 = PPF_PDCP_DECRYPT_NEXT_DROP;
             goto trace1;
           }
-	    }
+	}
 
         if (reorder1) {
           BITMAP_SET (pdcp1->rx_replay_bitmap, count1);
@@ -581,7 +575,6 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         u32 count_last_fwd0 = 0;
         u32 len0 = 0;
         ppf_pdcp_security_param_t sp0;
-        u8 xmaci[16];
         
         /* speculatively enqueue b0 to the current next frame */
         bi0 = from[0];
@@ -675,10 +668,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    
         /* Validate */
         if (pdcp0->mac_length) {
-          pdcp0->validate (buf0, xmaci, len0 - pdcp0->mac_length, &sp0);
-          b0->current_length -= pdcp0->mac_length;
-
-          if (PDCP_MAC_VALIDATE (xmaci, (buf0 + len0 - pdcp0->mac_length), pdcp0->mac_length))
+          if(pdcp0->validate (vm, b0, &sp0))
             vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status = 1;
           else {
             vnet_buffer2(b0)->ppf_du_metadata.pdcp.integrity_status = 2;
