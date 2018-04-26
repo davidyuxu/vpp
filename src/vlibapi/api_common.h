@@ -339,6 +339,7 @@ typedef struct
   /** List of API client reaper functions */
   _vl_msg_api_function_list_elt_t *reaper_function_registrations;
 
+  u8 *vm;
 } api_main_t;
 
 extern api_main_t api_main;

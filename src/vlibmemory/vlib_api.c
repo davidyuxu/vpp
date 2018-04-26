@@ -269,6 +269,7 @@ vl_api_save_msg_table (void)
   vec_free (serialized_message_table);
 }
 
+
 u64 api_sleep_us = 200;
 static clib_error_t *
 api_sleep (vlib_main_t * vm,
@@ -331,6 +332,7 @@ vl_api_clnt_process (vlib_main_t * vm, vlib_node_runtime_t * node,
       clib_warning ("vlib_api_init returned %d, quitting...", rv);
       return 0;
     }
+
 
   shm = am->shmem_hdr;
   q = shm->vl_input_queue;
