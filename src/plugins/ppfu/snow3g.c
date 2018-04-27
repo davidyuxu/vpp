@@ -1,5 +1,19 @@
-#include "snow3g.h"
+#include <stdint.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <inttypes.h>
 
+#include <vlib/vlib.h>
+#include <vlib/unix/unix.h>
+#include <vnet/ethernet/ethernet.h>
+#include <vnet/fib/fib_entry.h>
+#include <vnet/fib/fib_table.h>
+#include <vnet/mfib/mfib_table.h>
+#include <vnet/adj/adj_mcast.h>
+#include <vnet/dpo/dpo.h>
+#include <vnet/plugin/plugin.h>
+#include <vpp/app/version.h>
+#include <ppfu/snow3g.h>
 
 
 /* move to context
@@ -388,7 +402,7 @@ void Initialize(SNOW3G_CTX* ctx, u32 k[4], u32 IV[4])
     ctx->FSM_R3 = 0x0;
     for(i=0;i<32;i++)
     {
-      F = ClockFSM();
+      F = ClockFSM(ctx);
       ClockLFSRInitializationMode(ctx,F);
     }
 }
@@ -405,15 +419,16 @@ void GenerateKeystream(SNOW3G_CTX* ctx, u32 n, u32 *ks)
 {
     u32 t = 0;
     u32 F = 0x0;
-    ClockFSM(); /* Clock FSM once. Discard the output. */
+    ClockFSM(ctx); /* Clock FSM once. Discard the output. */
     ClockLFSRKeyStreamMode(ctx); /* Clock LFSR in keystream mode once. */
     for ( t=0; t<n; t++)
     {
-      F = ClockFSM(); /* STEP 1 */
+      F = ClockFSM(ctx); /* STEP 1 */
+
       ks[t] = F ^ ctx->LFSR_S0; /* STEP 2 */
       /* Note that ks[t] corresponds to z_{t+1} in section 4.2
       */
-      ClockLFSRKeyStreamMode(); /* STEP 3 */
+      ClockLFSRKeyStreamMode(ctx); /* STEP 3 */
     }
 }
 
@@ -469,9 +484,9 @@ void f8(SNOW3G_CTX* ctx, u8 *key, u32 count, u32 bearer, u32 dir, u8 *data, u8 *
     IV[0] = IV[2];
 
     /* Run SNOW 3G algorithm to generate sequence of key stream bits KS*/
-    Initialize(K,IV);
+    Initialize(ctx,K,IV);
     KS = (u32 *)malloc(4*n);
-    GenerateKeystream(n,(u32*)KS);
+    GenerateKeystream(ctx,n,(u32*)KS);
 
     /* Exclusive-OR the input data with keystream to generate the output bit
        stream */
@@ -610,8 +625,8 @@ u8* f9(SNOW3G_CTX* ctx, u8* key, u32 count, u32 fresh, u32 dir, u8 *data, u64 le
     z[0] = z[1] = z[2] = z[3] = z[4] = 0;
 
     /* Run SNOW 3G to produce 5 keystream words z_1, z_2, z_3, z_4 and z_5. */
-    Initialize(K, IV);
-    GenerateKeystream(5, z);
+    Initialize(ctx,K, IV);
+    GenerateKeystream(ctx,5, z);
 
     P = (u64)z[0] << 32 | (u64)z[1];
     Q = (u64)z[2] << 32 | (u64)z[3];
@@ -686,7 +701,7 @@ void snow3g_decrypt(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *
 //@length exclude 4-bytes MAC 
 void snow3g_protect(SNOW3G_CTX* ctx, u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I)
 {
-	f9(ctx,count,bearer<<27,1,data,(length)<<3,MAC_I);
+	f9(ctx,key,count,bearer<<27,1,data,(length)<<3,MAC_I);
 
 }
 

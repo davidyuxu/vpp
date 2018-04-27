@@ -3,10 +3,6 @@
 #ifndef included_snow3g_h
 #define included_snow3g_h
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
 #include <ppfu/ppfu.h>
 
 
@@ -72,8 +68,15 @@ u8* f9(SNOW3G_CTX* ctx, u8* key, u32 count, u32 fresh, u32 dir, \
 void snow3g_encrypt(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length);
 void snow3g_decrypt(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length);
 	
-bool snow3g_protect(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I);
-bool snow3g_validate(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I);
+void snow3g_protect(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I);
+void snow3g_validate(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I);
 
 #endif /*included_snow3g_h*/
+/*
+ * fd.io coding-style-patch-verification: ON
+ *
+ * Local Variables:
+ * eval: (c-set-style "gnu")
+ * End:
+ */
 
