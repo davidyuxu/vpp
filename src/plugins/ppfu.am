@@ -28,7 +28,8 @@ ppfu_plugin_la_SOURCES =		\
 	ppfu/ppf_pdcp.c     \
 	ppfu/ppfu.c		\
 	ppfu/ppfu_api.c		\	
-        ppfu/ppfu_handoff.c
+        ppfu/ppfu_handoff.c    \
+        ppfu/snow3g.c
 
 
 BUILT_SOURCES +=			\

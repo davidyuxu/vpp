@@ -244,7 +244,8 @@ enum pdcp_integrity_alg_t
 };
 
 enum pdcp_crypt_alg_t 
-{ 
+{
+  PDCP_EEA_NONE, 
   PDCP_EEA0,
   PDCP_EEA1,
   PDCP_EEA2,

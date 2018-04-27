@@ -267,9 +267,17 @@ ppf_pdcp_eia2 (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
     
 	buf0 = vlib_buffer_get_current (b0);
 	len = vlib_buffer_length_in_chain(vm, b0);
-	ppf_pdcp_gen_iv (PDCP_AES_INTEGRITY,
-				sec_para->count, sec_para->bearer, sec_para->dir, buf0);
 
+	//ppf_pdcp_gen_iv (PDCP_AES_INTEGRITY,sec_para->count, sec_para->bearer, sec_para->dir, buf0);
+	//set IV
+        buf0[0] = ((sec_para->count >> 24) & 0xFF);
+	buf0[1] = ((sec_para->count >> 16) & 0xFF);
+	buf0[2] = ((sec_para->count >> 8)  & 0xFF);
+	buf0[3] = ((sec_para->count >> 0)  & 0xFF);
+	buf0[4] = ((((sec_para->bearer & 0x1F) << 1) | (sec_para->dir & 0x1)) << 2);
+	buf0[5] = 0;
+	buf0[6] = 0;
+	buf0[7] = 0;
 
 	// 0 for uplink(DEC) and 1 for downlink(ENC)
 	if (PPF_PDCP_DIR_ENC == sec_para->dir) {
@@ -475,6 +483,8 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
       	pdcp_sess->protect = &ppf_pdcp_eia2;
         pdcp_sess->validate = &ppf_pdcp_eia2;
         pdcp_sess->mac_length = 4;
+	pdcp_sess->integrity_ctx = CMAC_CTX_new ();
+	CMAC_Init(pdcp_sess->integrity_ctx, pdcp_sess->integrity_key, 16, EVP_aes_128_cbc(), NULL);
         break;
 
       case PDCP_EIA3:
@@ -516,9 +526,6 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
 		EVP_CIPHER_CTX_init (&(pdcp_sess->crypto_ctx));
 		
 #endif
-
-	pdcp_sess->integrity_ctx = CMAC_CTX_new ();
-	CMAC_Init(pdcp_sess->integrity_ctx, pdcp_sess->integrity_key, 16, EVP_aes_128_cbc(), NULL);
 
         break;
 
