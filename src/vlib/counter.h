@@ -391,6 +391,11 @@ typedef struct
 
 void throughput_stats_validate(u32 sw_if_index);
 
+extern void *counter_heap;
+
+void vlib_counter_heap_init(uword size);
+
+
 #endif /* included_vlib_counter_h */
 
 /*

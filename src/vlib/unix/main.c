@@ -429,6 +429,8 @@ application_global_config (vlib_main_t * vm, unformat_input_t * input)
   else
   	vm->counter_heap_size = 0;
 
+	vlib_counter_heap_init(vm->counter_heap_size);
+
   return error;
 }
 
