@@ -591,7 +591,21 @@ vnet_create_sw_interface_no_callbacks (vnet_main_t * vnm,
     vnet_interface_counter_unlock (im);
   }
 
-	if(!(sw->flags & VNET_SW_INTERFACE_FLAG_HIDDEN))
+  return sw_if_index;
+}
+
+static void
+vnet_create_sw_interface_couter_rate (vnet_main_t * vnm, u32 sw_if_index, int no_rate)
+{
+	vnet_interface_main_t *im = &vnm->interface_main;
+
+  vnet_sw_interface_t *sw =	pool_elt_at_index (im->sw_interfaces, sw_if_index);
+
+	if (no_rate)
+	{
+		sw->counter_index = ~0;
+	}
+	else		
   {
 		vnet_interface_counter_t *c;
 		u32 index;
@@ -614,7 +628,6 @@ vnet_create_sw_interface_no_callbacks (vnet_main_t * vnm,
 		  }
   }
 
-  return sw_if_index;
 }
 
 clib_error_t *
@@ -639,6 +652,11 @@ vnet_create_sw_interface (vnet_main_t * vnm, vnet_sw_interface_t * template,
     }
 
   *sw_if_index = vnet_create_sw_interface_no_callbacks (vnm, template);
+
+	/* kingwel, create counter for pps &  bps */
+	vnet_create_sw_interface_couter_rate (vnm, *sw_if_index, 
+					vnet_get_hw_interface_class (vnm, hi->hw_class_index)->flags & VNET_HW_INTERFACE_CLASS_FLAG_NO_RATE);
+	
   error = vnet_sw_interface_set_flags_helper
     (vnm, *sw_if_index, template->flags,
      VNET_INTERFACE_SET_FLAGS_HELPER_IS_CREATE);
@@ -757,6 +775,9 @@ vnet_register_interface (vnet_main_t * vnm,
     };
     hw->sw_if_index = vnet_create_sw_interface_no_callbacks (vnm, &sw);
   }
+
+	/* kingwel, create counter for pps &  bps */
+	vnet_create_sw_interface_couter_rate (vnm, hw->sw_if_index, hw_class->flags & VNET_HW_INTERFACE_CLASS_FLAG_NO_RATE);
 
   hw->dev_class_index = dev_class_index;
   hw->dev_instance = dev_instance;
@@ -1199,6 +1220,16 @@ vnet_sw_interface_is_p2p (vnet_main_t * vnm, u32 sw_if_index)
     vnet_get_hw_interface_class (vnm, hw->hw_class_index);
 
   return (hc->flags & VNET_HW_INTERFACE_CLASS_FLAG_P2P);
+}
+
+int
+vnet_sw_interface_has_rate (vnet_main_t * vnm, u32 sw_if_index)
+{
+  vnet_hw_interface_t *hw = vnet_get_sup_hw_interface (vnm, sw_if_index);
+  vnet_hw_interface_class_t *hc =
+    vnet_get_hw_interface_class (vnm, hw->hw_class_index);
+
+  return (!(hc->flags & VNET_HW_INTERFACE_CLASS_FLAG_NO_RATE));
 }
 
 clib_error_t *

@@ -352,7 +352,7 @@ show_sw_interfaces (vlib_main_t * vm,
 					     {
 					     int visible =
 					     vnet_swif_is_api_visible (si);
-					     if (visible)
+					     if (visible && si->counter_index != ~0)
 					     vec_add1 (sorted_sis, si[0]);}
 		    ));
 
