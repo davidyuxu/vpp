@@ -20,7 +20,6 @@
 #include <ppfu/ppfu.h>
 #include <ppfu/ppf_gtpu.h>
 
-
 /* Statistics (not all errors) */
 #define foreach_ppf_pdcp_decrypt_error    \
 _(DECRYPTED, "good packets decrypted") \
@@ -715,12 +714,15 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           vnet_buffer2(b0)->ppf_du_metadata.pdcp.count = count0;
           
           vlib_buffer_advance (b0, (word)(pdcp0->header_length));
+
+          if (c0->lbo_mode == PPF_LBO_MODE) 
+          	vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = ~0;
           
           if (c0->call_type == PPF_SRB_CALL) {
             	next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
           }
           else if (c0->call_type == PPF_DRB_CALL) {
-            if (pm->ue_mode == 1)
+            if (c0->lbo_mode == PPF_LBO_MODE)
 			next0 = PPF_PDCP_DECRYPT_NEXT_IP4_LOOKUP;
           	else         	
         		next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;

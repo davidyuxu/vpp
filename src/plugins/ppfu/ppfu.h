@@ -430,6 +430,12 @@ typedef enum
    PPF_DRB_CALL
  }ppf_calline_type_t;
 
+ typedef enum
+{
+   PPF_TUNNEL_MODE = 0,
+   PPF_LBO_MODE
+ }ppf_calline_mode_t;
+
 typedef struct
 {
   ppf_gtpu_tunnel_type_t tunnel_type;
@@ -473,6 +479,9 @@ typedef struct
   u32 sb_policy;
   u32 ue_bearer_id;
   u32 lbo_mode;
+  u32 inner_vrf_id;
+  u32 hw_if_index;
+  u32 sw_if_index;
 } ppf_callline_t;
 
 #define PPF_BEARER(ub)  (((ub) >> 25) & 0x1f)
@@ -483,13 +492,13 @@ typedef struct
   ppf_calline_type_t call_type;
   u32 sb_policy;
   u32 ue_bearer_id;
+  u32 lbo_mode;
 } vnet_ppf_add_callline_args_t;
 
 typedef struct
 {
   u32 max_capacity;
   ppf_callline_t * ppf_calline_table;
-  u32 ue_mode;
   
   u16 msg_id_base;
 } ppf_main_t;
@@ -569,8 +578,11 @@ u32 ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_fl
 u32 ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_config_t * config);
 u32 ppf_pdcp_clear_session (ppf_pdcp_session_t * pdcp_sess);
 
-void vnet_ppf_reset_calline (u32 call_id) ;
-void vnet_ppf_init_calline (u32 call_id, ppf_calline_type_t call_type) ;
+void ppf_reset_calline (u32 call_id) ;
+void ppf_init_calline (u32 call_id, ppf_calline_type_t call_type) ;
+
+void ppf_init_callline_intf (u32 call_id);
+void ppf_reset_callline_intf (u32 call_id);
 
 
 

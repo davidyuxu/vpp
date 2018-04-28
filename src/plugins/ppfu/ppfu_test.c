@@ -179,7 +179,7 @@ api_ppfu_plugin_bearer_install (vat_main_t * vam)
   unformat_input_t *line_input = vam->input;
   vl_api_ppfu_plugin_bearer_install_t *mp;
   
-  u32 call_id, ue_bearer_id, sb_policy = 0, transaction_id;
+  u32 call_id, ue_bearer_id, sb_policy = 0, transaction_id, lbo_mode = 0, inner_vrf_id = 0;
 
   ip46_address_t nb_src, nb_dst;
   u32 nb_encap_vrf_id = 0, nb_out_teid = 0, nb_port = 0, nb_dscp = 0, nb_type = 0, nb_protocol_configuration = 0; 
@@ -228,6 +228,12 @@ api_ppfu_plugin_bearer_install (vat_main_t * vam)
 	else if (unformat (line_input, "ue_bearer_id %d", &ue_bearer_id))
 	;
 	else if (unformat (line_input, "sb_policy %d", &sb_policy))
+	;
+	else if (unformat (line_input, "mode %d", &lbo_mode))
+	;
+	else if (unformat (line_input, "inner_vrf_id %d", &inner_vrf_id))
+	;
+	else if (unformat (line_input, "mode %d", &lbo_mode))
 	;
 	else if (unformat (line_input, "transaction_id %d", &transaction_id))
 	;
@@ -347,6 +353,8 @@ api_ppfu_plugin_bearer_install (vat_main_t * vam)
   mp->ue_bearer_id = clib_host_to_net_u32(ue_bearer_id);
   mp->sb_policy = clib_host_to_net_u32(sb_policy);
   mp->transaction_id = clib_host_to_net_u32(transaction_id);
+  mp->mode = clib_host_to_net_u32(lbo_mode);
+  mp->inner_vrf_id = clib_host_to_net_u32(inner_vrf_id);
 
   if (nb_set != 0)
   {

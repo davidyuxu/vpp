@@ -248,7 +248,7 @@ typedef struct
   u32 *free_ppf_gtpu_tunnel_hw_if_indices;
 
   /* Mapping from sw_if_index to tunnel index */
-  u32 *tunnel_index_by_sw_if_index;
+  u32 *calline_index_by_sw_if_index;
 
   /**
    * Node type for registering to fib changes.
@@ -300,8 +300,10 @@ typedef struct
   u32 type;
 } vnet_ppf_gtpu_add_del_tunnel_args_t;
 
+#if 0
 int vnet_ppf_gtpu_add_del_tunnel
   (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp);
+#endif
 
 int vnet_ppf_gtpu_add_tunnel
   (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp, u32 *tunnel_id_ret);

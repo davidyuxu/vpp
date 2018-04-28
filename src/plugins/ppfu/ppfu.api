@@ -180,6 +180,13 @@ define ppfu_plugin_bearer_install
  * STRICTORDER = 2 // 5G with Light Interworking.
 */
   u32 sb_policy;
+/*
+ * TUNNEL_SWITCH = 0,
+ * LBO = 1
+ */ 
+
+  u32 mode;
+  u32 inner_vrf_id;
 };
 
 /** \brief Reply to bearer install
