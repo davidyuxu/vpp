@@ -31,6 +31,7 @@ format_ipsec_name (u8 * s, va_list * args)
   return format (s, "ipsec%d", dev_instance);
 }
 
+#if 0
 static uword
 dummy_interface_tx (vlib_main_t * vm,
 		    vlib_node_runtime_t * node, vlib_frame_t * frame)
@@ -38,6 +39,7 @@ dummy_interface_tx (vlib_main_t * vm,
   clib_warning ("you shouldn't be here, leaking buffers...");
   return frame->n_vectors;
 }
+#endif
 
 static clib_error_t *
 ipsec_admin_up_down_function (vnet_main_t * vnm, u32 hw_if_index, u32 flags)
@@ -116,7 +118,7 @@ VNET_DEVICE_CLASS (ipsec_device_class, static) =
   .name = "IPSec",
   .format_device_name = format_ipsec_name,
   .format_tx_trace = format_ipsec_if_output_trace,
-  .tx_function = dummy_interface_tx,
+//  .tx_function = dummy_interface_tx,
   .admin_up_down_function = ipsec_admin_up_down_function,
 };
 /* *INDENT-ON* */
@@ -481,10 +483,7 @@ ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
 clib_error_t *
 ipsec_tunnel_if_init (vlib_main_t * vm)
 {
-  ipsec_main_t *im = &ipsec_main;
-
-  im->ipsec_if_pool_index_by_key = hash_create (0, sizeof (uword));
-
+  //ipsec_main_t *im = &ipsec_main;
   return 0;
 }
 
