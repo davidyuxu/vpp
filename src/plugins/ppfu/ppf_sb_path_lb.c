@@ -139,21 +139,23 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	   // ASSERT (b2->current_data == 0);
 	   // ASSERT (b3->current_data == 0);
 
-	    if (pm->ue_mode == 1) {
-	    	sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
+	   tunnel_sw_if_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+	   
+	   if (tunnel_sw_if_index0 == ~0) {
+	     sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
+	   
+	     call_id0 = gtm->calline_index_by_sw_if_index[sw_if_index0];
+	   
+	     vnet_buffer(b0)->sw_if_index[VLIB_RX] = sw_if_index0;
+	   
+	   } else {
+	   
+	     t0 = &(gtm->tunnels[tunnel_sw_if_index0]);
+	     call_id0 = t0->call_id; 
+	   }
+	   
+	   callline0 = &(pm->ppf_calline_table[call_id0]); 
 
-		tunnel_sw_if_index0 = gtm->tunnel_index_by_sw_if_index[sw_if_index0];
-
-		vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_sw_if_index0;
-		
-		vnet_buffer(b0)->sw_if_index[VLIB_RX] = sw_if_index0;
-		
-	    } else 	
-	    	tunnel_sw_if_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
-	    
-	    t0 = &(gtm->tunnels[tunnel_sw_if_index0]);
-	    call_id0 = t0->call_id;	    
-	    callline0 = &(pm->ppf_calline_table[call_id0]);
 
 	    if (callline0->call_type == PPF_SRB_CALL)
 	    	vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = 
@@ -173,22 +175,22 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   }
 	     }
 
-
-	    if (pm->ue_mode == 1) {
-	    	sw_if_index1 = vnet_buffer(b1)->sw_if_index[VLIB_TX];
-
-		tunnel_sw_if_index1 = gtm->tunnel_index_by_sw_if_index[sw_if_index1];
-
-		vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_sw_if_index1;
-		
-		vnet_buffer(b1)->sw_if_index[VLIB_RX] = sw_if_index1;
-		
-	    } else 	
-	    	tunnel_sw_if_index1 = vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+	    tunnel_sw_if_index1 = vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
 	    
-	    t1 = &(gtm->tunnels[tunnel_sw_if_index1]);
-	    call_id1 = t1->call_id;	    
-	    callline1 = &(pm->ppf_calline_table[call_id1]);
+	    if (tunnel_sw_if_index1 == ~0) {
+		sw_if_index1 = vnet_buffer(b1)->sw_if_index[VLIB_TX];
+	    
+		call_id1 = gtm->calline_index_by_sw_if_index[sw_if_index1];
+	    
+		vnet_buffer(b1)->sw_if_index[VLIB_RX] = sw_if_index1;
+	    
+	    } else {
+	    
+		t1 = &(gtm->tunnels[tunnel_sw_if_index1]);
+		call_id1 = t1->call_id; 
+	    }
+	    
+	    callline1 = &(pm->ppf_calline_table[call_id1]); 
 
 	    if (callline1->call_type == PPF_SRB_CALL)
 	    	vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = 
@@ -208,21 +210,22 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   }
 	     }
 
-          if (pm->ue_mode == 1) {
-	    	sw_if_index2 = vnet_buffer(b2)->sw_if_index[VLIB_TX];
-
-		tunnel_sw_if_index2 = gtm->tunnel_index_by_sw_if_index[sw_if_index2];
-
-		vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_sw_if_index2;
-		
-		vnet_buffer(b2)->sw_if_index[VLIB_RX] = sw_if_index2;
-		
-	    } else 	
-	    	tunnel_sw_if_index2 = vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+	    tunnel_sw_if_index2 = vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
 	    
-	    t2 = &(gtm->tunnels[tunnel_sw_if_index2]);
-	    call_id2 = t2->call_id;	    
-	    callline2 = &(pm->ppf_calline_table[call_id2]);
+	    if (tunnel_sw_if_index2 == ~0) {
+		sw_if_index2 = vnet_buffer(b2)->sw_if_index[VLIB_TX];
+	    
+		call_id2 = gtm->calline_index_by_sw_if_index[sw_if_index2];
+	    
+		vnet_buffer(b2)->sw_if_index[VLIB_RX] = sw_if_index2;
+	    
+	    } else {
+	    
+		t2 = &(gtm->tunnels[tunnel_sw_if_index2]);
+		call_id2 = t2->call_id; 
+	    }
+	    
+	    callline2 = &(pm->ppf_calline_table[call_id2]); 
 
 	    if (callline2->call_type == PPF_SRB_CALL)
 	    	vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = 
@@ -242,22 +245,23 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   }
 	     }
 
+	   tunnel_sw_if_index3 = vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
 	   
-	   if (pm->ue_mode == 1) {
+	   if (tunnel_sw_if_index3 == ~0) {
 	     sw_if_index3 = vnet_buffer(b3)->sw_if_index[VLIB_TX];
 	   
-	     tunnel_sw_if_index3 = gtm->tunnel_index_by_sw_if_index[sw_if_index3];
+	     call_id3 = gtm->calline_index_by_sw_if_index[sw_if_index3];
 	   
-	     vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_sw_if_index3;
-	     
 	     vnet_buffer(b3)->sw_if_index[VLIB_RX] = sw_if_index3;
-	     
-	   } else  
-	     tunnel_sw_if_index3 = vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
 	   
-	   t3 = &(gtm->tunnels[tunnel_sw_if_index3]);
-	   call_id3 = t3->call_id;	   
-	   callline3= &(pm->ppf_calline_table[call_id3]);
+	   } else {
+	   
+	     t3 = &(gtm->tunnels[tunnel_sw_if_index3]);
+	     call_id3 = t3->call_id; 
+	   }
+	   
+	   callline3 = &(pm->ppf_calline_table[call_id3]);
+
 	   
 	   if (callline3->call_type == PPF_SRB_CALL)
 	     vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = 
@@ -308,20 +312,21 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 
 	    //ASSERT (b0->current_data == 0);
 
-	    if (pm->ue_mode == 1) {
+	    tunnel_sw_if_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+
+	    if (tunnel_sw_if_index0 == ~0) {
 	    	sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
 
-		tunnel_sw_if_index0 = gtm->tunnel_index_by_sw_if_index[sw_if_index0];
+		call_id0 = gtm->calline_index_by_sw_if_index[sw_if_index0];
 
-		vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_sw_if_index0;
-		
 		vnet_buffer(b0)->sw_if_index[VLIB_RX] = sw_if_index0;
-		
-	    } else 	
-	    	tunnel_sw_if_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
+
+	    } else {
 	    
-	    t0 = &(gtm->tunnels[tunnel_sw_if_index0]);
-	    call_id0 = t0->call_id;	    
+		t0 = &(gtm->tunnels[tunnel_sw_if_index0]);
+		call_id0 = t0->call_id;	
+	    }
+	    
 	    callline0 = &(pm->ppf_calline_table[call_id0]);
 
 	    if (callline0->call_type == PPF_SRB_CALL)
@@ -337,7 +342,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		  {
 			  ppf_sb_path_lb_trace_t *t = 
 			    vlib_add_trace (vm, node, b0, sizeof (*t));
-			  t->sw_if_index = tunnel_sw_if_index0;
+			  t->sw_if_index = (tunnel_sw_if_index0 == ~0) ? sw_if_index0 : tunnel_sw_if_index0;
 			  t->next_index = next0;			  
 		   }
 	     }

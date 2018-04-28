@@ -34,6 +34,52 @@
 
 ppf_main_t ppf_main;
 
+static u8 *
+format_ppf_gtpu_name (u8 * s, va_list * args)
+{
+  u32 dev_instance = va_arg (*args, u32);
+  return format (s, "ppf_gtpu_calline%d", dev_instance);
+}
+
+static clib_error_t *
+ppf_gtpu_interface_admin_up_down (vnet_main_t * vnm, u32 hw_if_index, u32 flags)
+{
+  u32 hw_flags = (flags & VNET_SW_INTERFACE_FLAG_ADMIN_UP) ?
+    VNET_HW_INTERFACE_FLAG_LINK_UP : 0;
+  vnet_hw_interface_set_flags (vnm, hw_if_index, hw_flags);
+
+  return /* no error */ 0;
+}
+
+static u8 *
+format_ppf_gtpu_header_with_length (u8 * s, va_list * args)
+{
+  u32 dev_instance = va_arg (*args, u32);
+  s = format (s, "unimplemented dev %u", dev_instance);
+  return s;
+}
+
+/* *INDENT-OFF* */
+VNET_HW_INTERFACE_CLASS (ppf_gtpu_hw_class) =
+{
+  .name = "PPF_GTPU",
+  .format_header = format_ppf_gtpu_header_with_length,
+  .build_rewrite = default_build_rewrite,
+  .flags = VNET_HW_INTERFACE_CLASS_FLAG_P2P,
+};
+/* *INDENT-ON* */
+
+
+/* *INDENT-OFF* */
+VNET_DEVICE_CLASS (ppf_gtpu_device_class,static) = {
+  .name = "PPF_GTPU",
+  .format_device_name = format_ppf_gtpu_name,
+  .format_tx_trace = format_ppf_gtpu_encap_trace,
+  .admin_up_down_function = ppf_gtpu_interface_admin_up_down,
+};
+/* *INDENT-ON* */
+
+
 static uword
 unformat_ppf_call_type (unformat_input_t * input, va_list * args)
 {
@@ -49,8 +95,127 @@ unformat_ppf_call_type (unformat_input_t * input, va_list * args)
   return 1;
 }
 
+static uword
+unformat_ppf_call_mode (unformat_input_t * input, va_list * args)
+{
+  u32 *result = va_arg (*args, u32 *);
+  
+  if (unformat (input, "tunnel-switch"))
+    *result = PPF_TUNNEL_MODE;
+  else if (unformat (input, "lbo"))
+    *result = PPF_LBO_MODE;
+  else
+     return 0;
+
+  return 1;
+}
+
+void ppf_reset_callline_intf (u32 call_id)
+{
+	ppf_main_t *pm = &ppf_main;	
+	ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
+  	vnet_main_t *vnm = gtm->vnet_main;
+
+	ppf_callline_t *call_line = 0;
+
+	call_line = &(pm->ppf_calline_table [call_id]);
+
+	if ((call_line->lbo_mode == PPF_LBO_MODE) && (call_line->sw_if_index != ~0))  
+	{
+	      vnet_sw_interface_set_flags (vnm, call_line->sw_if_index, 0 /* down */ );
+	      vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, call_line->sw_if_index);
+	      si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
+
+	      /* make sure tunnel is removed from l2 bd or xconnect */
+	      set_int_l2_mode (gtm->vlib_main, vnm, MODE_L3, call_line->sw_if_index, 0, 0, 0,
+			       0);
+	      vec_add1 (gtm->free_ppf_gtpu_tunnel_hw_if_indices, call_line->hw_if_index);
+
+	      gtm->calline_index_by_sw_if_index[call_line->sw_if_index] = ~0;
+
+	      call_line->hw_if_index = ~0;
+	      call_line->sw_if_index = ~0;
+      }
+}
+
+
+void ppf_init_callline_intf (u32 call_id)
+{
+	ppf_main_t *pm = &ppf_main;	
+	ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
+	u32 hw_if_index = ~0;
+  	u32 sw_if_index = ~0;	
+  	vnet_main_t *vnm = gtm->vnet_main;
+
+	ppf_callline_t *call_line = 0;
+
+	call_line = &(pm->ppf_calline_table [call_id]);
+
+	 if (call_line->lbo_mode == PPF_LBO_MODE) 
+	  {
+			  vnet_hw_interface_t *hi;
+			  if (vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) > 0)
+			  {
+			    vnet_interface_main_t *im = &vnm->interface_main;
+			    hw_if_index = gtm->free_ppf_gtpu_tunnel_hw_if_indices
+				[vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) - 1];
+			    _vec_len (gtm->free_ppf_gtpu_tunnel_hw_if_indices) -= 1;
+	
+			    hi = vnet_get_hw_interface (vnm, hw_if_index);
+			    hi->dev_instance =call_line->call_index ;
+			    hi->hw_instance = hi->dev_instance;
+	
+			    /* clear old stats of freed tunnel before reuse */
+			    sw_if_index = hi->sw_if_index;
+			    vnet_interface_counter_lock (im);
+			    vlib_zero_combined_counter
+				(&im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_TX],
+				 sw_if_index);
+			    vlib_zero_combined_counter (&im->combined_sw_if_counters
+							  [VNET_INTERFACE_COUNTER_RX],
+							  sw_if_index);
+			    vlib_zero_simple_counter (&im->sw_if_counters
+							[VNET_INTERFACE_COUNTER_DROP],
+							sw_if_index);
+			    vnet_interface_counter_unlock (im);
+			  }
+			  else
+			  {
+			    hw_if_index = vnet_register_interface
+				(vnm, ppf_gtpu_device_class.index, call_line->call_index,
+				 ppf_gtpu_hw_class.index, call_line->call_index);
+			    hi = vnet_get_hw_interface (vnm, hw_if_index);
+			  }
+	
+			  u32 encap_index = ppf_sb_path_lb_node.index;
+			  vnet_set_interface_output_node (vnm, hw_if_index, encap_index);
+	
+			  call_line->hw_if_index = hw_if_index;
+			  call_line->sw_if_index = sw_if_index = hi->sw_if_index;
+	
+			  vec_validate_init_empty (gtm->calline_index_by_sw_if_index, sw_if_index,
+						   ~0);
+			  gtm->calline_index_by_sw_if_index[sw_if_index] = call_line->call_index;
+	
+			  vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, sw_if_index);
+			  si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
+			  vnet_sw_interface_set_flags (vnm, sw_if_index,
+						     VNET_SW_INTERFACE_FLAG_ADMIN_UP);	
+
+			  call_line->sw_if_index = sw_if_index;
+		  	  call_line->hw_if_index = hw_if_index;
+
+	  } else {
+		  call_line->sw_if_index = ~0;
+		  call_line->hw_if_index = ~0;
+	  }
+
+}
+
+
 int vnet_ppf_del_callline (u32 call_id)
 {
+
 	ppf_main_t *pm = &ppf_main;
 	ppf_callline_t *call_line = 0;
 	ppf_gtpu_tunnel_id_type_t *tunnel = 0;
@@ -98,15 +263,16 @@ int vnet_ppf_del_callline (u32 call_id)
 	  	}
 	  } else 
 	  	continue;	  
-	}
+	}	
 
-	vnet_ppf_reset_calline (call_line->call_index);
+	ppf_reset_calline (call_line->call_index);
 	
 	return 0;	
 }
 
-void vnet_ppf_reset_calline (u32 call_id) 
+void ppf_reset_calline (u32 call_id) 
 {
+
 	ppf_main_t *pm = &ppf_main;
 	ppf_pdcp_main_t *ppm = &ppf_pdcp_main;
 
@@ -138,13 +304,15 @@ void vnet_ppf_reset_calline (u32 call_id)
 	  	ppf_pdcp_clear_session (pdcp_sess);
 	  	call_line->pdcp.session_id = ~0;
   	}
+  	
+	ppf_reset_callline_intf (call_line->call_index);
 
+	call_line->ue_bearer_id = ~0;
 	call_line->call_type = INVALID_CALL_TYPE;
 	call_line->call_index = ~0;
 }
 
-
-void vnet_ppf_init_calline (u32 call_id, ppf_calline_type_t call_type) 
+void ppf_init_calline (u32 call_id, ppf_calline_type_t call_type) 
 {
 	ppf_main_t *pm = &ppf_main;
 
@@ -193,14 +361,16 @@ int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c)
 		return VNET_API_ERROR_CALLLNE_IN_USE;
 	}
 
-	vnet_ppf_init_calline (c->call_id, c->call_type);
+	ppf_init_calline (c->call_id, c->call_type);
 	
 	call_line->sb_policy = c->sb_policy;
 	call_line->ue_bearer_id = c->ue_bearer_id;
+	call_line->lbo_mode = c->lbo_mode;
 
-    return 0;
+	ppf_init_callline_intf (call_line->call_index);
+	
+      return 0;
 }
-
 
 
 static clib_error_t *
@@ -210,7 +380,7 @@ ppf_add_del_calline_command_fn (vlib_main_t * vm,
 {
   unformat_input_t _line_input, *line_input = &_line_input;
   u8 is_add = 1;
-  u32 call_id = ~0, sb_policy = ~0, ue_bearer_id = ~0;
+  u32 call_id = ~0, sb_policy = ~0, ue_bearer_id = ~0, lbo_mode = 0;
   ppf_calline_type_t call_type = INVALID_CALL_TYPE;
   int rv;
   clib_error_t *error = NULL;
@@ -233,6 +403,8 @@ ppf_add_del_calline_command_fn (vlib_main_t * vm,
 	;
 	else if (unformat (line_input, "sb_policy %d", &sb_policy))
 	;
+	else if (unformat (line_input, "mode %U", unformat_ppf_call_mode, &lbo_mode))
+	;
       else
 	{
 	  error = clib_error_return (0, "parse error: '%U'",
@@ -247,23 +419,27 @@ ppf_add_del_calline_command_fn (vlib_main_t * vm,
       goto done;
     }
 
-  if (is_add == 1 && ue_bearer_id == ~0) 
-   {
-      error = clib_error_return (0, "ue_bearer_id not specified");
-      goto done;
-    }
+  if (is_add == 1) {
+
+  	if (ue_bearer_id == ~0) 
+	{
+		error = clib_error_return (0, "ue_bearer_id not specified");
+		goto done;
+	}
     
-  if (is_add == 1 && call_type == ~0) 
-   {
-      error = clib_error_return (0, "call type not specified");
-      goto done;
-    }
+	if (is_add == 1 && call_type == ~0) 
+	{
+		error = clib_error_return (0, "call type not specified");
+		goto done;
+	}
+  }
 
   vnet_ppf_add_callline_args_t c = {
   	.call_id = call_id,
   	.call_type = call_type,
   	.sb_policy = sb_policy,
   	.ue_bearer_id = ue_bearer_id,
+  	.lbo_mode = lbo_mode,
   };
 
   if (is_add == 1) {
@@ -305,7 +481,8 @@ done:
 VLIB_CLI_COMMAND (create_ppf_calline_command, static) = {
   .path = "create ppf calline",
   .short_help =	  
-  "create ppf callline call-id <nn> [ call-type <type-name>] [ue-bear-id <nn>] [sb_policy <nn>] [del]",
+  "create ppf callline call-id <nn> [ call-type <type-name>] [ue-bear-id <nn>] [sb_policy <nn>]"
+  "[mode <tunnel-switch|lbo>] [lbo_vrf_id <nn>] [del]",
   .function = ppf_add_del_calline_command_fn,
 };
 
@@ -330,8 +507,6 @@ ppf_init (vlib_main_t * vm)
 
   }
 
-  pm->ue_mode = 1;
-  
   return 0;
 }
 
@@ -364,8 +539,6 @@ ppf_config (vlib_main_t * vm, unformat_input_t * input)
     }
 
   ppf_main.max_capacity = capacity;
-
-  ppf_main.ue_mode = 1;
 
   return 0;
 }
