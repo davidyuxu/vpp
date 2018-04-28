@@ -192,10 +192,14 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 
 	  if (is_ip4)
 	    {
-		next0 = PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
-	  	next1 = PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
-	 	next2 = PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
-	 	next3 = PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+		next0 = (t0->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
+	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+	  	next1 = (t1->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
+	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+	 	next2 = (t2->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
+	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+	 	next3 = (t3->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
+	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
 	    
 	      ip4_0 = vlib_buffer_get_current(b0);
 	      ip4_1 = vlib_buffer_get_current(b1);
@@ -549,7 +553,8 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  t0 = &gtm->tunnels[tid0];
 
 	  /* Note: change to always set next0 if it may be set to drop */
-	  next0 = PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+	  next0 = (t0->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
+	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
 	  vnet_buffer (b0)->sw_if_index[VLIB_TX] = t0->encap_fib_index;
 
           /* Apply the rewrite string. $$$$ vnet_rewrite? */

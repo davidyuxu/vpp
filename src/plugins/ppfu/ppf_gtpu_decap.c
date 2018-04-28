@@ -77,6 +77,7 @@ ppf_gtpu_input (vlib_main_t * vm,
   u32 n_left_from, next_index, * from, * to_next;
   ppf_main_t * pm = &ppf_main;
   ppf_gtpu_main_t * gtm = &ppf_gtpu_main;
+  ip4_main_t *ip4m = &ip4_main;
   vnet_main_t * vnm = gtm->vnet_main;
   vnet_interface_main_t * im = &vnm->interface_main;
   u32 last_tunnel_index = ~0;
@@ -120,7 +121,7 @@ ppf_gtpu_input (vlib_main_t * vm,
           ppf_gtpu6_tunnel_key_t key6_0, key6_1;
           u32 error0 = 0, error1 = 0;
 	    u32 sw_if_index0, sw_if_index1, len0, len1;
-	    ppf_callline_t callline0, callline1;
+	    ppf_callline_t *callline0, *callline1;
 	    u32 next_tunne_id0 = ~0, next_tunne_id1= ~0 ;
 
 	  /* Prefetch next iteration. */
@@ -221,11 +222,11 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    /* Validate PPF_GTPU tunnel SIP against packet DIP */
 	    if (PREDICT_TRUE (ip4_0->dst_address.as_u32 == t0->src.ip4.as_u32)) {
 
+	      callline0 = &(pm->ppf_calline_table[t0->call_id]);
+
 		if (t0->tunnel_type == PPF_GTPU_SB) {
 
-			callline0 = pm->ppf_calline_table[t0->call_id];
-
-			next_tunne_id0 = callline0.rb.drb.nb_tunnel.tunnel_id;
+			next_tunne_id0 = callline0->rb.drb.nb_tunnel.tunnel_id;
 	      }
 
 	      goto next0; /* valid packet */
@@ -268,13 +269,13 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    if (PREDICT_TRUE (ip6_address_is_equal (&ip6_0->dst_address,
 						    &t0->src.ip6)))
 
+		callline0 = &(pm->ppf_calline_table[t0->call_id]);
+
 		{
 
-		if (t0->tunnel_type == PPF_GTPU_SB) {
+		if (t0->tunnel_type == PPF_GTPU_SB) {	
 
-			callline0 = pm->ppf_calline_table[t0->call_id];
-
-			next_tunne_id0 = callline0.rb.drb.nb_tunnel.tunnel_id;
+			next_tunne_id0 = callline0->rb.drb.nb_tunnel.tunnel_id;
 	      }
 
 	      goto next0; /* valid packet */
@@ -321,6 +322,10 @@ ppf_gtpu_input (vlib_main_t * vm,
 
           vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_index0;
           vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = next_tunne_id0;
+
+		
+	    if (callline0->lbo_mode == PPF_LBO_MODE)
+	    	vnet_buffer(b0)->sw_if_index [VLIB_TX] = vec_elt (ip4m->fib_index_by_sw_if_index, callline0->sw_if_index);
 
           pkts_decapsulated ++;
           stats_n_packets += 1;
@@ -398,12 +403,12 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    /* Validate PPF_GTPU tunnel SIP against packet DIP */
 	    if (PREDICT_TRUE (ip4_1->dst_address.as_u32 == t1->src.ip4.as_u32)) 
 	    {
+
+	    	callline1 = &(pm->ppf_calline_table[t1->call_id]);
 	    	
 		if (t1->tunnel_type == PPF_GTPU_SB) {
 
-			callline1 = pm->ppf_calline_table[t1->call_id];
-
-			next_tunne_id1 = callline1.rb.drb.nb_tunnel.tunnel_id;
+			next_tunne_id1 = callline1->rb.drb.nb_tunnel.tunnel_id;
 	      }
 	    	
 	      goto next1; /* valid packet */
@@ -448,12 +453,12 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    if (PREDICT_TRUE (ip6_address_is_equal (&ip6_1->dst_address,
 						    &t1->src.ip6)))
 	    {
+
+		callline1 = &(pm->ppf_calline_table[t1->call_id]);	
 	    	
 		if (t1->tunnel_type == PPF_GTPU_SB) {
 
-			callline1 = pm->ppf_calline_table[t1->call_id];
-
-			next_tunne_id1 = callline1.rb.drb.nb_tunnel.tunnel_id;
+			next_tunne_id1 = callline1->rb.drb.nb_tunnel.tunnel_id;
 	      }
 	    	
 	      goto next1; /* valid packet */
@@ -501,6 +506,9 @@ ppf_gtpu_input (vlib_main_t * vm,
      
           vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_index1;
           vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = next_tunne_id1;
+
+          if (callline1->lbo_mode == PPF_LBO_MODE)
+	    	vnet_buffer(b1)->sw_if_index [VLIB_TX] = vec_elt (ip4m->fib_index_by_sw_if_index, callline1->sw_if_index);
 
           pkts_decapsulated ++;
           stats_n_packets += 1;
@@ -558,8 +566,8 @@ ppf_gtpu_input (vlib_main_t * vm,
           ppf_gtpu4_tunnel_key_t key4_0;
           ppf_gtpu6_tunnel_key_t key6_0;
           u32 error0;
-	  u32 sw_if_index0, len0;
-	  ppf_callline_t callline0;
+	  u32 len0;
+	  ppf_callline_t *callline0;
 	  u32 next_tunne_id0 = ~0;
 
 	  bi0 = from[0];
@@ -634,11 +642,11 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    if (PREDICT_TRUE (ip4_0->dst_address.as_u32 == t0->src.ip4.as_u32))
 	    {
 
+		callline0 = &(pm->ppf_calline_table[t0->call_id]);
+
 		if (t0->tunnel_type == PPF_GTPU_SB) {
 
-			callline0 = pm->ppf_calline_table[t0->call_id];
-
-			next_tunne_id0 = callline0.rb.drb.nb_tunnel.tunnel_id;
+			next_tunne_id0 = callline0->rb.drb.nb_tunnel.tunnel_id;
 	      }
 	    	
 	      goto next00; /* valid packet */
@@ -682,11 +690,11 @@ ppf_gtpu_input (vlib_main_t * vm,
 						    &t0->src.ip6)))
 	    {
 
+	      callline0 = &(pm->ppf_calline_table[t0->call_id]);
+
 		if (t0->tunnel_type == PPF_GTPU_SB) {
 
-			callline0 = pm->ppf_calline_table[t0->call_id];
-
-			next_tunne_id0 = callline0.rb.drb.nb_tunnel.tunnel_id;
+			next_tunne_id0 = callline0->rb.drb.nb_tunnel.tunnel_id;
 	      }
 	    	
 	      goto next00; /* valid packet */
@@ -720,19 +728,18 @@ ppf_gtpu_input (vlib_main_t * vm,
 	  vlib_buffer_advance (b0, ppf_gtpu_hdr_len0);
 
 	  next0 = t0->decap_next_index;
-	  sw_if_index0 = t0->sw_if_index;		//most case sw_if_index = ~0
+
 	  len0 = vlib_buffer_length_in_chain (vm, b0);
 
           /* Required to make the l2 tag push / pop code work on l2 subifs */
           if (PREDICT_TRUE(next0 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
             vnet_update_l2_len (b0);
-
-	    if (sw_if_index0 != ~0) {
-	    	vnet_buffer(b0)->sw_if_index[VLIB_RX] = sw_if_index0;
-
-	    }
+	    
           vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_index0;
           vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = next_tunne_id0;
+
+	    if (callline0->lbo_mode == PPF_LBO_MODE)
+	    	vnet_buffer(b0)->sw_if_index [VLIB_TX] = vec_elt (ip4m->fib_index_by_sw_if_index, callline0->sw_if_index);
 
           pkts_decapsulated ++;
           stats_n_packets += 1;

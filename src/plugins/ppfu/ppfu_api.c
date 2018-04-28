@@ -146,8 +146,22 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   else 
   	call_type = PPF_SRB_CALL;
 
-  vnet_ppf_init_calline (call_id, call_type);
+  ppf_init_calline (call_id, call_type);
   call_line_inited = 1;
+
+  callline->lbo_mode = clib_net_to_host_u32(mp->mode);
+  callline->inner_vrf_id = clib_net_to_host_u32(mp->inner_vrf_id);
+
+  ppf_init_callline_intf (callline->call_index);
+
+  if (callline->lbo_mode == PPF_LBO_MODE) 
+  {
+
+  	rv = ip_table_bind (FIB_PROTOCOL_IP4, callline->sw_if_index, callline->inner_vrf_id, 0);
+
+	  if (rv != 0)
+	      goto out;
+  }
 
   if (callline->call_type == PPF_DRB_CALL)
   {
@@ -282,7 +296,8 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   callline->sb_policy = clib_net_to_host_u32(mp->sb_policy);
   callline->ue_bearer_id = clib_net_to_host_u32(mp->ue_bearer_id);
-  
+
+
 out:
   /* *INDENT-OFF* */
   if (rv != 0) {
@@ -303,7 +318,7 @@ out:
  	} 	
 
       if (call_line_inited == 1) 
- 		vnet_ppf_reset_calline (callline->call_index); 	
+ 		ppf_reset_calline (callline->call_index); 	
   }
   
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
@@ -510,7 +525,6 @@ vl_api_ppfu_plugin_bearer_release_t_handler
   int rv = 0;
   ppf_main_t *ppfm = &ppf_main;
   ppf_callline_t *callline = NULL;
-  ppf_pdcp_session_t *pdcp_sess = NULL;
   int i = 0;
   ppf_gtpu_tunnel_id_type_t *nb_tunnel, *sb_tunnel[MAX_SB_PER_CALL];
   u32 call_id = clib_net_to_host_u32(mp->call_id);
@@ -557,19 +571,7 @@ vl_api_ppfu_plugin_bearer_release_t_handler
 	  
   }
 
-  pdcp_sess = &(ppf_pdcp_main.sessions[callline->pdcp.session_id]);
- 
-  /* Clear pdcp session */
-  ppf_pdcp_clear_session (pdcp_sess);
-
-  callline->pdcp.session_id = ~0;
-
-
-  if (callline->call_type == PPF_SRB_CALL)
-  	hash_free(callline->rb.srb.nb_out_msg_by_sn);
-
-  callline->ue_bearer_id = ~0;
-  callline->call_index = ~0;
+  ppf_reset_calline (callline->call_index);
   
 out:
   /* *INDENT-OFF* */
