@@ -598,6 +598,16 @@ ipsec_init (vlib_main_t * vm)
   if ((error = ikev2_init (vm)))
     return error;
 
+
+  im->ipsec_if_pool_index_by_key = hash_create (0, sizeof (uword));
+
+  
+  if (vm->max_capacity) {
+  	    pool_init_aligned (im->sad, vm->max_capacity * 2, CLIB_CACHE_LINE_BYTES);
+        pool_init_aligned (im->tunnel_interfaces, vm->max_capacity, CLIB_CACHE_LINE_BYTES);
+  }
+
+
   return 0;
 }
 
