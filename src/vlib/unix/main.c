@@ -54,7 +54,7 @@
 #include "backtrace-supported.h"
 
 /** Default CLI pager limit is not configured in startup.conf */
-#define UNIX_CLI_DEFAULT_PAGER_LIMIT 100000
+#define UNIX_CLI_DEFAULT_PAGER_LIMIT 300000
 
 /** Default CLI history depth if not configured in startup.conf */
 #define UNIX_CLI_DEFAULT_HISTORY 50
