@@ -195,7 +195,7 @@ format_mbps_pps (u8 * s, va_list * va)
     log_u = 30;
 
   u = (uword) 1 << log_u;
-  s = format (s, "%.3f", (f64) size / (f64) u);
+  s = format (s, "%+10.3f", (f64) size / (f64) u);
 
   if (log_u != 0)
     s = format (s, "%c", " KMG"[log_u / 10]);
@@ -305,25 +305,25 @@ format_vnet_sw_interface_cntrs (u8 * s, vnet_interface_main_t * im,
 	if (n)
 	  _vec_len (n) = 0;
 	n = format (n, "%s packets", cm->name);
-	s = format (s, "%-16v%16Ld   %U pps", n, vtotal.packets, format_mbps_pps, packet_rate);
+	s = format (s, "%-16v%16Ld %U pps", n, vtotal.packets, format_mbps_pps, packet_rate);
 
 	if(verbose)
 		for (i = 0; i < vec_len (packets_rate); i++)
 	    {
 	    	if(packets_rate[i] > 0)
-					s = format (s, "\n%U Thread #%d   %U", format_white_space, indent + 22, i, format_mbps_pps, packets_rate[i]);	      
+					s = format (s, "\n%U Thread %u %-10v: %U", format_white_space, indent + 12, i, vlib_worker_threads[i].name, format_mbps_pps, packets_rate[i]);	      
 		  }
 
 	_vec_len (n) = 0;
 	n = format (n, "%s bytes", cm->name);
-	s = format (s, "\n%U%-16v%16Ld   %U bps",
+	s = format (s, "\n%U%-16v%16Ld %U bps",
 		    format_white_space, indent, n, vtotal.bytes, format_mbps_pps, byte_rate * 8);
 	
 	if(verbose)
 		for (i = 0; i < vec_len (packets_rate); i++)
       {
 				if(packets_rate[i] > 0)
-					s = format (s, "\n%U Thread #%d   %U", format_white_space, indent + 22, i, format_mbps_pps, bytes_rate[i] * 8);	      
+					s = format (s, "\n%U Thread %u %-10v: %U", format_white_space, indent + 12, i, vlib_worker_threads[i].name, format_mbps_pps, bytes_rate[i] * 8);	      
 		  }
     }
     vec_free (n);
@@ -377,12 +377,12 @@ format_vnet_sw_interface_cntrs (u8 * s, vnet_interface_main_t * im,
 	  s = format (s, "\n%U", format_white_space, indent);
 	n_printed += 1;
 
-	s = format (s, "%-16s%16Ld   %U", cm->name, vtotal, format_mbps_pps, rate);
+	s = format (s, "%-16s%16Ld %U", cm->name, vtotal, format_mbps_pps, rate);
 	if(verbose)
 		for (i = 0; i < vec_len (packets_rate); i++)
       {
 				if(packets_rate[i] > 0)
-					s = format (s, "\n%U Thread #%d   %U", format_white_space, indent + 22, i, format_mbps_pps, packets_rate[i]);	      
+					s = format (s, "\n%U Thread %u %-10v: %U", format_white_space, indent + 12, i, vlib_worker_threads[i].name, format_mbps_pps, packets_rate[i]);	      
 		  }
     }
   }

@@ -196,6 +196,34 @@ vlib_register_errors (vlib_main_t * vm,
   }
 }
 
+/* Unparse memory size e.g. 100, 100k, 100m, 100g. */
+static u8 *
+format_mbps_pps (u8 * s, va_list * va)
+{
+  f64 size = va_arg (*va, f64);
+  uword l, u, log_u;
+  uword usize = (uword) size;
+
+  l = usize > 0 ? min_log2 (usize) : 0;
+  if (l < 10)
+    log_u = 0;
+  else if (l < 20)
+    log_u = 10;
+  else if (l < 30)
+    log_u = 20;
+  else
+    log_u = 30;
+
+  u = (uword) 1 << log_u;
+  s = format (s, "%+10.3f", (f64) size / (f64) u);
+
+  if (log_u != 0)
+    s = format (s, "%c", " KMG"[log_u / 10]);
+
+  return s;
+}
+
+
 static clib_error_t *
 show_errors (vlib_main_t * vm,
 	     unformat_input_t * input, vlib_cli_command_t * cmd)
@@ -213,18 +241,34 @@ show_errors (vlib_main_t * vm,
   else if (unformat (input, "verbose"))
     verbose = 1;
 
-  vec_validate (sums, vec_len (em->counters));
+  /* kingwel make sure rate counters have enough space */
+  f64 duration;
+  u64 *tmp = 0;
+  u64 *tmp_sum = 0;
 
   if (verbose)
-    vlib_cli_output (vm, "%=10s%=40s%=20s%=6s", "Count", "Node", "Reason",
+    vlib_cli_output (vm, "%=10s%=15s%=40s%=20s%=10s", "Count", "Rate", "Node", "Reason",
 		     "Index");
   else
-    vlib_cli_output (vm, "%=10s%=40s%=6s", "Count", "Node", "Reason");
+    vlib_cli_output (vm, "%=10s%=15s%=40s%=6s", "Count", "Rate", "Node", "Reason");
 
 
   /* *INDENT-OFF* */
   foreach_vlib_main(({
+
     em = &this_vlib_main->error_main;
+
+		vec_validate (sums, vec_len (em->counters));
+
+		vec_validate (tmp, vec_len (em->counters));
+		vec_validate (tmp_sum, vec_len (em->counters));
+		
+		duration = vlib_time_now(vm) - em->last_show_time;  
+		em->last_show_time = vlib_time_now (vm);
+
+		vec_validate (em->rate_counters, vec_len (em->counters));
+		
+		//vec_validate (em->rate_counters, vec_len (em->counters));
 
     if (verbose)
       vlib_cli_output(vm, "Thread %u (%v):", index,
@@ -241,17 +285,25 @@ show_errors (vlib_main_t * vm,
 	      c -= em->counters_last_clear[i];
 	    sums[i] += c;
 
+		tmp[i] = c - em->rate_counters[i];
+		tmp_sum[i] += tmp[i];
+
 	    if (c == 0 && verbose < 2)
 	      continue;
 
             if (verbose)
-              vlib_cli_output (vm, "%10Ld%=40v%=20s%=6d", c, n->name,
+              vlib_cli_output (vm, "%10Ld %U   %=40v%=20s%=10d", c, format_mbps_pps, tmp[i]/duration, n->name,
                                em->error_strings_heap[i], i);
             else
-              vlib_cli_output (vm, "%10d%=40v%s", c, n->name,
+              vlib_cli_output (vm, "%10Ld %U   %=40v%s", c, format_mbps_pps, tmp[i]/duration, n->name,
                                em->error_strings_heap[i]);
 	  }
       }
+
+
+	/* remember what we got this time */
+	em->rate_counters = vec_dup (em->counters);
+	
     index++;
   }));
   /* *INDENT-ON* */
@@ -268,7 +320,7 @@ show_errors (vlib_main_t * vm,
 	  if (sums[i])
 	    {
 	      if (verbose)
-		vlib_cli_output (vm, "%10Ld%=40v%=20s%=10d", sums[i], n->name,
+		vlib_cli_output (vm, "%10Ld %U   %=40v%=20s%=10d", sums[i], format_mbps_pps, tmp_sum[i]/duration, n->name,
 				 em->error_strings_heap[i], i);
 	    }
 	}
@@ -276,6 +328,9 @@ show_errors (vlib_main_t * vm,
 
   vec_free (sums);
 
+  vec_free (tmp);
+  vec_free (tmp_sum);
+  
   return 0;
 }
 
