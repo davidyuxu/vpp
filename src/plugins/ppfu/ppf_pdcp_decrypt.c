@@ -715,18 +715,17 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           
           vlib_buffer_advance (b0, (word)(pdcp0->header_length));
 
-          if (c0->lbo_mode == PPF_LBO_MODE) 
+          if (c0->lbo_mode == PPF_LBO_MODE)
           	vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = ~0;
           
           if (c0->call_type == PPF_SRB_CALL) {
-            	next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
-          }
-          else if (c0->call_type == PPF_DRB_CALL) {
+            next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
+          } else if (c0->call_type == PPF_DRB_CALL) {
             if (c0->lbo_mode == PPF_LBO_MODE)
-			next0 = PPF_PDCP_DECRYPT_NEXT_IP4_LOOKUP;
+			  next0 = PPF_PDCP_DECRYPT_NEXT_IP4_LOOKUP;
           	else         	
-        		next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
-        	}
+        	  next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+       	  }
 
 	    trace00:
 	    	
@@ -782,10 +781,17 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         	to_next += 1;
         	n_left_to_next -= 1;
           		  			
-        	if (c0->call_type == PPF_SRB_CALL)
-        	  next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
-        	else if (c0->call_type == PPF_DRB_CALL)
-        	  next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+			if (c0->lbo_mode == PPF_LBO_MODE)
+			  vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = ~0;
+			
+			if (c0->call_type == PPF_SRB_CALL) {
+			  next0 = PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX;
+			} else if (c0->call_type == PPF_DRB_CALL) {
+			  if (c0->lbo_mode == PPF_LBO_MODE)
+				next0 = PPF_PDCP_DECRYPT_NEXT_IP4_LOOKUP;
+			  else			  
+				next0 = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+			}
                         
             /* verify speculative enqueue, maybe switch current next frame */
             vlib_validate_buffer_enqueue_x1 (vm, node, next_index,

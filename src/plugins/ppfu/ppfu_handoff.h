@@ -46,6 +46,45 @@ ppfu_gtpu_get_key (ppf_gtpu_header_t * gtph)
   return hash_key;
 }
 
+/*******************************3 layer handoff for PDCP Start****************************/
+
+typedef enum
+{
+  PPF_PDCP_HANDOFF_DISPATCH_NEXT_DROP,
+  PPF_PDCP_HANDOFF_DISPATCH_NEXT_PDCP_DECRYPT,
+  PPF_PDCP_HANDOFF_DISPATCH_NEXT_PDCP_ENCRYPT,
+  PPF_PDCP_HANDOFF_DISPATCH_N_NEXT,
+} ppf_pdcp_handoff_dispatch_next_t;
+
+#define foreach_ppf_pdcp_handoff_next    \
+_(DROP, "error-drop")                    \
+_(PDCP_DECRYPT, "ppf_pdcp_decrypt")      \
+_(PDCP_ENCRYPT, "ppf_pdcp_encrypt")
+
+
+typedef enum
+{
+  PPF_TX_HANDOFF_DISPATCH_NEXT_DROP,
+  PPF_TX_HANDOFF_DISPATCH_NEXT_GTPU4_ENCAP,
+  PPF_TX_HANDOFF_DISPATCH_NEXT_GTPU6_ENCAP,
+  PPF_TX_HANDOFF_DISPATCH_NEXT_SRB_NB_TX,
+  PPF_TX_HANDOFF_DISPATCH_NEXT_IP4_LOOKUP,
+  PPF_TX_HANDOFF_DISPATCH_NEXT_IP6_LOOKUP,
+  PPF_TX_HANDOFF_DISPATCH_N_NEXT,
+} ppf_tx_handoff_dispatch_next_t;
+
+#define foreach_ppf_tx_handoff_next      \
+_(DROP, "error-drop")                    \
+_(GTPU4_ENCAP, "ppf_gtpu4-encap")        \
+_(GTPU6_ENCAP, "ppf_gtpu6-encap")        \
+_(SRB_NB_TX, "ppf_srb_nb_tx")            \
+_(IP4_LOOKUP, "ip4-lookup")              \
+_(IP6_LOOKUP, "ip6-lookup")
+
+
+/*******************************3 layer handoff for PDCP End****************************/
+
+
 #endif /* included_ppfu_handoff_h */
 
 /*
