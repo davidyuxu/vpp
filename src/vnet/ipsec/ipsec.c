@@ -599,8 +599,8 @@ ipsec_init (vlib_main_t * vm)
 
   
   if (vm->max_capacity) {
-  	    pool_init_aligned (im->sad, vm->max_capacity * 2, CLIB_CACHE_LINE_BYTES);
-        pool_init_aligned (im->tunnel_interfaces, vm->max_capacity, CLIB_CACHE_LINE_BYTES);
+  	pool_init_aligned (im->sad, vm->max_capacity * 2, CLIB_CACHE_LINE_BYTES);
+    pool_init_aligned (im->tunnel_interfaces, vm->max_capacity, CLIB_CACHE_LINE_BYTES);
   }
 
 

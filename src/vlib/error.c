@@ -253,6 +253,9 @@ show_errors (vlib_main_t * vm,
     vlib_cli_output (vm, "%=10s%=15s%=40s%=6s", "Count", "Rate", "Node", "Reason");
 
 
+	duration = vlib_time_now(vm) - em->last_show_time;	
+	em->last_show_time = vlib_time_now (vm);
+	
   /* *INDENT-OFF* */
   foreach_vlib_main(({
 
@@ -263,9 +266,6 @@ show_errors (vlib_main_t * vm,
 		vec_validate (tmp, vec_len (em->counters));
 		vec_validate (tmp_sum, vec_len (em->counters));
 		
-		duration = vlib_time_now(vm) - em->last_show_time;  
-		em->last_show_time = vlib_time_now (vm);
-
 		vec_validate (em->rate_counters, vec_len (em->counters));
 		
 		//vec_validate (em->rate_counters, vec_len (em->counters));
@@ -285,7 +285,7 @@ show_errors (vlib_main_t * vm,
 	      c -= em->counters_last_clear[i];
 	    sums[i] += c;
 
-		tmp[i] = c - em->rate_counters[i];
+		tmp[i] = em->counters[i] - em->rate_counters[i];
 		tmp_sum[i] += tmp[i];
 
 	    if (c == 0 && verbose < 2)
