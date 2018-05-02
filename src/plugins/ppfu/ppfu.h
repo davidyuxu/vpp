@@ -40,24 +40,26 @@
 
 
 #define foreach_ppf_pdcp_input_next        \
-_(DROP, "error-drop")                  \
-_(PPF_PDCP_DECRYPT, "ppf_pdcp_decrypt")          
+_(DROP, "error-drop")                      \
+_(PPF_PDCP_DECRYPT, "ppf_pdcp_decrypt")    \
+_(PPF_PDCP_HANDOFF, "ppf_pdcp_handoff")
 
 
 typedef enum {
     PPF_PDCP_INPUT_NEXT_DROP,
     PPF_PDCP_INPUT_NEXT_PPF_PDCP_DECRYPT,
+    PPF_PDCP_INPUT_NEXT_PPF_PDCP_HANDOFF,
     PPF_PDCP_INPUT_N_NEXT,
 } ppf_pdcp_input_next_t;
 
 #define foreach_ppf_pdcp_decrypt_next        \
-_(DROP, "error-drop")                  \
-_(IP4_LOOKUP, "ip4-lookup") 		\
-_(IP4_LOOKUP, "ip4-lookup")		    \
-_(IP6_LOOKUP, "ip6-lookup")		    \
-_(PPF_GTPU4_ENCAP, "ppf_gtpu4-encap")    \
-_(PPF_GTPU6_ENCAP, "ppf_gtpu6-encap") 	\
-_(PPF_SRB_NB_TX, "ppf_srb_nb_tx")
+_(DROP, "error-drop")                        \
+_(IP4_LOOKUP, "ip4-lookup") 		         \
+_(IP6_LOOKUP, "ip6-lookup")		             \
+_(PPF_GTPU4_ENCAP, "ppf_gtpu4-encap")        \
+_(PPF_GTPU6_ENCAP, "ppf_gtpu6-encap") 	     \
+_(PPF_SRB_NB_TX, "ppf_srb_nb_tx")            \
+_(PPF_TX_HANDOFF, "ppf_tx_handoff")
 
 typedef enum {
     PPF_PDCP_DECRYPT_NEXT_DROP,
@@ -66,28 +68,34 @@ typedef enum {
     PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP,
     PPF_PDCP_DECRYPT_NEXT_PPF_GTPU6_ENCAP,
     PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX,
+    PPF_PDCP_DECRYPT_NEXT_PPF_TX_HANDOFF,
     PPF_PDCP_DECRYPT_N_NEXT,
 } ppf_pdcp_decrypt_next_t;
 
 #define foreach_ppf_pdcp_encrypt_next        \
-_(DROP, "error-drop")                  \
-_(PPF_GTPU4_ENCAP, "ppf_gtpu4-encap")    \
-_(PPF_GTPU6_ENCAP, "ppf_gtpu6-encap")    
+_(DROP, "error-drop")                        \
+_(PPF_GTPU4_ENCAP, "ppf_gtpu4-encap")        \
+_(PPF_GTPU6_ENCAP, "ppf_gtpu6-encap")        \
+_(PPF_TX_HANDOFF, "ppf_tx_handoff")
+
 
 typedef enum {
     PPF_PDCP_ENCRYPT_NEXT_DROP,
     PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU4_ENCAP,
     PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU6_ENCAP,
+    PPF_PDCP_ENCRYPT_NEXT_PPF_TX_HANDOFF,
     PPF_PDCP_ENCRYPT_N_NEXT,
 } ppf_pdcp_encrypt_next_t;
 
 #define foreach_ppf_sb_path_lb_next        \
-_(DROP, "error-drop")                  \
-_(PPF_PDCP_ENCRYPT, "ppf_pdcp_encrypt")          
+_(DROP, "error-drop")                      \
+_(PPF_PDCP_ENCRYPT, "ppf_pdcp_encrypt")    \
+_(PPF_PDCP_HANDOFF, "ppf_pdcp_handoff")
 
 typedef enum {
     PPF_SB_PATH_LB_NEXT_DROP,
     PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT,
+    PPF_SB_PATH_LB_NEXT_PPF_PDCP_HANDOFF,
     PPF_SB_PATH_LB_N_NEXT,
 } ppf_sb_path_lb_next_t;
 
