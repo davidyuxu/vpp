@@ -121,7 +121,7 @@ ppf_gtpu_input (vlib_main_t * vm,
           ppf_gtpu6_tunnel_key_t key6_0, key6_1;
           u32 error0 = 0, error1 = 0;
 	    u32 sw_if_index0, sw_if_index1, len0, len1;
-	    ppf_callline_t *callline0, *callline1;
+	    ppf_callline_t *callline0 = NULL, *callline1 = NULL;
 	    u32 next_tunne_id0 = ~0, next_tunne_id1= ~0 ;
 
 	  /* Prefetch next iteration. */
@@ -567,7 +567,7 @@ ppf_gtpu_input (vlib_main_t * vm,
           ppf_gtpu6_tunnel_key_t key6_0;
           u32 error0;
 	  u32 len0;
-	  ppf_callline_t *callline0;
+	  ppf_callline_t *callline0 = NULL;
 	  u32 next_tunne_id0 = ~0;
 
 	  bi0 = from[0];
