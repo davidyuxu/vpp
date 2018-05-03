@@ -192,7 +192,8 @@ ppf_pdcp_eia1 (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
 
 
-	SNOW3G_CTX *ctx = &(pdcp_sess->snow3g_ctx);	
+	SNOW3G_CTX *ctx = &(pdcp_sess->snow3g_ctx);
+        memset(ctx,0,sizeof(SNOW3G_CTX));	
 	//no need generate IV, snow algorithm will generate it.
 	//ppf_pdcp_gen_iv (PDCP_SNOW3G_CIPHERING, sec_para->count, sec_para->bearer, sec_para->dir, iv);
 	u8 mact[MAX_PDCP_KEY_LEN] = {0};
@@ -207,11 +208,14 @@ ppf_pdcp_eia1 (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 
 	if (PPF_PDCP_DIR_ENC == sec_para->dir) {
 		//append 4 octs at end of data for caculate MAC
-		snow3g_protect(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
+	        //TODO : use crypto key for intergity, align with wrong salt implemnt, need correct after salt FIX the bug
+                snow3g_protect(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
+	       //snow3g_protect(ctx,sec_para->pdcp_sess->integrity_key,sec_para->count,sec_para->bearer,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
 	} else {
 		//calculate mac exlucde 4 octs MAC-I
 		len -= EIA_MAC_LEN;	
-		snow3g_validate(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,mact);
+                 snow3g_validate(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,mact);
+		//snow3g_validate(ctx,sec_para->pdcp_sess->integrity_key,sec_para->count,sec_para->bearer,buf0,len,mact);
 		ret = (buf0[len+0]== mact[0] && buf0[len+1]== mact[1] && buf0[len+2]== mact[2] && buf0[len+3]== mact[3]);
 		//trim 4 octs of MAC 
 		b0->current_length -= EIA_MAC_LEN;
@@ -232,7 +236,7 @@ ppf_pdcp_eea1 (u8 * in, u8 * out, u32 size, void * security_parameters)
 	//ppf_pdcp_gen_iv (PDCP_SNOW3G_CIPHERING, sec_para->count, sec_para->bearer, sec_para->dir, iv);
 
 	SNOW3G_CTX *ctx = &(pdcp_sess->snow3g_ctx);
-
+        memset(ctx,0,sizeof(SNOW3G_CTX));
 	if (PPF_PDCP_DIR_ENC == sec_para->dir) {
 		snow3g_encrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,in,out,size);
 	} else {
@@ -281,6 +285,7 @@ ppf_pdcp_eia2 (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 
 	// 0 for uplink(DEC) and 1 for downlink(ENC)
 	if (PPF_PDCP_DIR_ENC == sec_para->dir) {
+                CMAC_Init(ctx, pdcp_sess->integrity_key, 16, EVP_aes_128_cbc(), NULL);
 		CMAC_Update(ctx, buf0, len);
 		CMAC_Final(ctx, mact, &mactlen);
 		//put mac to end of data
@@ -288,6 +293,9 @@ ppf_pdcp_eia2 (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 	} else {
 		//calculate mac exlucde 4 octs MAC-I
 		len -= EIA_MAC_LEN;
+                //TODO : use crypto key for intergity, align with wrong salt implemnt, need correct after salt FIX the bug
+                CMAC_Init(ctx, pdcp_sess->crypto_key, 16, EVP_aes_128_cbc(), NULL);
+		//CMAC_Init(ctx, pdcp_sess->integrity_key, 16, EVP_aes_128_cbc(), NULL);
 		CMAC_Update(ctx, buf0, len);
 		CMAC_Final(ctx, mact, &mactlen);
 		//verify mac
@@ -380,7 +388,7 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
   pdcp_sess->rx_next_expected_sn = PPF_PDCP_SN (rx_count, sn_length);
   pdcp_sess->rx_last_forwarded_sn = PPF_PDCP_SN_DEC (pdcp_sess->rx_next_expected_sn, sn_length - 1) & max_sn;
   pdcp_sess->rx_hfn = PPF_PDCP_HFN (rx_count, sn_length);
-  // why? pdcp_sess->rx_hfn = PPF_PDCP_COUNT_HFN_DEC (rx_count, sn_length);
+  pdcp_sess->rx_hfn = PPF_PDCP_COUNT_HFN_DEC (rx_count, sn_length);
 
   if (in_flight_limit == max_sn) // no value configured by upper layers
     pdcp_sess->in_flight_limit = 0x1 << (sn_length - 1); //use default value: SN-range/2 - 1
@@ -484,7 +492,6 @@ ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_co
         pdcp_sess->validate = &ppf_pdcp_eia2;
         pdcp_sess->mac_length = 4;
 	pdcp_sess->integrity_ctx = CMAC_CTX_new ();
-	CMAC_Init(pdcp_sess->integrity_ctx, pdcp_sess->integrity_key, 16, EVP_aes_128_cbc(), NULL);
         break;
 
       case PDCP_EIA3:
