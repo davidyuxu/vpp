@@ -25,7 +25,8 @@
 /* Statistics (not all errors) */
 
 #define foreach_ppf_sb_path_lb_error    \
-_(ENCAPSULATED, "good packets encapsulated")
+_(GOOD, "packets delivered")     \
+_(HANDOFF, "packets handoffed")
 
 static char * ppf_sb_path_lb_error_strings[] = {
 #define _(sym,string) string,
@@ -70,10 +71,13 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
   u32 pkts_processed = 0;
   ppf_main_t *pm = &ppf_main;
   ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
+  u32 *buffers_duplicated = NULL;
   
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
   next_index = ppf_sb_main.sb_lb_next_index;
+  if (pm->handoff_enable)
+    next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_HANDOFF;
 
   while (n_left_from > 0)
     {
@@ -82,7 +86,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	vlib_get_next_frame (vm, node, next_index,
 				   to_next, n_left_to_next);
 				   
-
+#if 0
 	while (n_left_from >= 8 && n_left_to_next >= 4)
 	  {
 	    ppf_sb_path_lb_next_t next0 = next_index;
@@ -288,6 +292,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 							   to_next, n_left_to_next,
 							   bi0, bi1, bi2, bi3, next0, next1, next2, next3);
 	  }
+#endif
 
 	while (n_left_from > 0 && n_left_to_next > 0)
 	  {
@@ -313,30 +318,99 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	    //ASSERT (b0->current_data == 0);
 
 	    tunnel_sw_if_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
-
 	    if (tunnel_sw_if_index0 == ~0) {
-	    	sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
-
-		call_id0 = gtm->calline_index_by_sw_if_index[sw_if_index0];
-
-		vnet_buffer(b0)->sw_if_index[VLIB_RX] = sw_if_index0;
-
-	    } else {
-	    
-		t0 = &(gtm->tunnels[tunnel_sw_if_index0]);
-		call_id0 = t0->call_id;	
+            call_id0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL]; // srb case
+            if (~0 == call_id0) {
+				sw_if_index0 = vnet_buffer(b0)->sw_if_index[VLIB_TX];
+				call_id0 = gtm->calline_index_by_sw_if_index[sw_if_index0];
+				vnet_buffer(b0)->sw_if_index[VLIB_RX] = sw_if_index0;
+            }
+	    } else {	    
+			t0 = &(gtm->tunnels[tunnel_sw_if_index0]);
+			call_id0 = t0->call_id;	
 	    }
 	    
 	    callline0 = &(pm->ppf_calline_table[call_id0]);
 
-	    if (callline0->call_type == PPF_SRB_CALL)
-	    	vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = 
-	    		callline0->rb.srb.sb_tunnel[DEFAULT_SB_INDEX].tunnel_id;
-	    else if (callline0->call_type == PPF_DRB_CALL)
-	    	vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] =
-	    		callline0->rb.drb.sb_tunnel[DEFAULT_SB_INDEX].tunnel_id;
+		if (PREDICT_TRUE(callline0->call_type == PPF_DRB_CALL)) {
+            u32 sb_id;
+			u32 tx_tunnel_id;
+			u32 duplicate = 0;
 
-	    if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
+            for (sb_id = 0; sb_id < MAX_SB_PER_CALL; sb_id++) {
+				tx_tunnel_id = callline0->rb.drb.sb_tunnel[sb_id].tunnel_id;
+				if (INVALID_TUNNEL_ID == tx_tunnel_id)
+					continue;
+				
+				duplicate++;
+				if (1 == duplicate)
+					vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
+				else if (duplicate > 1) {
+					vlib_buffer_t *c0 = vlib_buffer_copy (vm, b0);
+
+					clib_memcpy (c0->opaque2, b0->opaque2, sizeof (b0->opaque2));
+					vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
+
+					vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
+				}
+			}
+		}
+
+
+	    if (PREDICT_FALSE(callline0->call_type == PPF_SRB_CALL)) {
+			u8 sb_num = vnet_buffer2(b0)->ppf_du_metadata.path.sb_num;
+			u8 * sb_ids = vnet_buffer2(b0)->ppf_du_metadata.path.sb_id; 
+			if (1 == sb_num) {
+				u32 tx_tunnel_id = callline0->rb.srb.sb_tunnel[sb_ids[0]].tunnel_id; 					
+				vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;		
+			} else if ((sb_num > 1) && (sb_num <= MAX_SB_PER_CALL)) {
+	            u8  id;
+				u32 tx_tunnel_id;
+				u32 duplicate = 0;
+
+	            for (id = 0; id < sb_num; id++) {
+					tx_tunnel_id = callline0->rb.srb.sb_tunnel[sb_ids[id]].tunnel_id;
+					if (INVALID_TUNNEL_ID == tx_tunnel_id)
+						continue;
+					
+					duplicate++;
+					if (1 == duplicate)
+						vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
+					else if (duplicate > 1) {
+						vlib_buffer_t *c0 = vlib_buffer_copy (vm, b0);
+
+						clib_memcpy (c0->opaque2, b0->opaque2, sizeof (b0->opaque2));
+						vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
+
+						vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
+					}
+				}
+			} else {
+	            u8  sb_id;
+				u32 tx_tunnel_id;
+				u32 duplicate = 0;
+
+	            for (sb_id = 0; sb_id < MAX_SB_PER_CALL; sb_id++) {
+					tx_tunnel_id = callline0->rb.srb.sb_tunnel[sb_id].tunnel_id;
+					if (INVALID_TUNNEL_ID == tx_tunnel_id)
+						continue;
+					
+					duplicate++;
+					if (1 == duplicate)
+						vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
+					else if (duplicate > 1) {
+						vlib_buffer_t *c0 = vlib_buffer_copy (vm, b0);
+
+						clib_memcpy (c0->opaque2, b0->opaque2, sizeof (b0->opaque2));
+						vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
+
+						vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
+					}
+				}
+			}
+	    } 
+	    
+		if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
 	    {
 		  if (b0->flags & VLIB_BUFFER_IS_TRACED) 
 		  {
@@ -345,18 +419,50 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 			  t->sw_if_index = (tunnel_sw_if_index0 == ~0) ? sw_if_index0 : tunnel_sw_if_index0;
 			  t->next_index = next0;			  
 		   }
-	     }
+	    }
  
-		
+		pkts_processed += 1;
+
 	    /* verify speculative enqueue, maybe switch current next frame */
 	    vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
 							 to_next, n_left_to_next,
 							 bi0, next0);
 	  }
 
+	/* Duplicate send */
+	while (vec_len (buffers_duplicated) > 0) {
+		while (vec_len (buffers_duplicated) > 0 && n_left_to_next > 0) {
+			u32 bi = vec_pop (buffers_duplicated);
+			vlib_buffer_t *b = vlib_get_buffer (vm, bi);
+
+			to_next[0] = bi;
+			to_next += 1;
+			n_left_to_next -= 1;
+
+			if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
+			{
+			  if (b->flags & VLIB_BUFFER_IS_TRACED) 
+			  {
+				  ppf_sb_path_lb_trace_t *t = 
+					vlib_add_trace (vm, node, b, sizeof (*t));
+				  t->sw_if_index = vnet_buffer(b)->sw_if_index[VLIB_TX];
+				  t->next_index = next_index;			  
+			   }
+			}
+			
+			
+			/* verify speculative enqueue, maybe switch current next frame */
+			vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
+								 to_next, n_left_to_next,
+								 bi, next_index);
+		}
+		vlib_put_next_frame (vm, node, next_index, n_left_to_next); 		 
+		vlib_get_next_frame (vm, node, next_index, to_next, n_left_to_next);
+	}
 
 	vlib_put_next_frame (vm, node, next_index, n_left_to_next);
     }
+
 
   return frame->n_vectors;
 }

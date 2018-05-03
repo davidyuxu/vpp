@@ -97,9 +97,10 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
         {
           u32 bi0;
           vlib_buffer_t * b0;
-          u32 next0;
+          u32 next0 = next_index;
           ip4_header_t * ip4_0;
           ppf_srb_header_t * srb0;
+          u32 call_id0;
           ppf_callline_t * c0;
           ppf_pdcp_session_t * pdcp0;
           uword key0;
@@ -148,7 +149,19 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           /* Manipulate packet 0 */
 
           /* Find callline */
-          c0 = &(pm->ppf_calline_table[clib_net_to_host_u32(srb0->call_id)]);
+          call_id0 = clib_net_to_host_u32(srb0->call_id);
+		  if (PREDICT_FALSE(call_id0 >= pm->max_capacity)) {
+            error0 = PPF_SRB_NB_RX_ERROR_NO_SUCH_CALL;
+            next0 = PPF_SRB_NB_RX_NEXT_DROP;
+            goto trace0;
+		  }
+
+          c0 = &(pm->ppf_calline_table[call_id0]);
+          if (PREDICT_FALSE(c0 == NULL)) {
+            error0 = PPF_SRB_NB_RX_ERROR_NO_SUCH_CALL;
+            next0 = PPF_SRB_NB_RX_NEXT_DROP;
+            goto trace0;
+          }
 
           /* Save transaction-id and request-id in callline */
           /* Generate PDCP SN, map <PDCP SN> to <transaction-id + request-id> */
@@ -174,6 +187,7 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           vlib_buffer_advance (b0, sizeof(ppf_srb_header_t));
           
           /* Determine next node */
+#if 0
           if (PREDICT_TRUE(1 == srb0->msg.out.sb_num)) {
             tunnel_index0 = c0->rb.srb.sb_tunnel[srb0->msg.out.sb_id[0]].tunnel_id;	    
             
@@ -181,7 +195,9 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
             vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_index0;	    
             
             next0 = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
-          } else {
+          } else 
+#endif
+          {
             /* Set call-id in buffer */
             vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = srb0->call_id;
             
