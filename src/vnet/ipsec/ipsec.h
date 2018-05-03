@@ -18,6 +18,10 @@
 #include <vnet/ip/ip.h>
 #include <vnet/feature/feature.h>
 
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
+#include <openssl/evp.h>
+
 #define IPSEC_FLAG_IPSEC_GRE_TUNNEL (1 << 0)
 
 
@@ -110,11 +114,31 @@ typedef enum
 
 typedef struct
 {
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  EVP_CIPHER_CTX *encrypt_ctx;
+#else
+  EVP_CIPHER_CTX encrypt_ctx;
+#endif
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  HMAC_CTX *hmac_ctx;
+#else
+  HMAC_CTX hmac_ctx;
+#endif
+} ipsec_sa_per_thread_data_t;
+
+
+
+typedef struct
+{
   u32 id;
   u32 spi;
   ipsec_protocol_t protocol;
 
-  ipsec_crypto_alg_t crypto_alg;
+	ipsec_sa_per_thread_data_t *context;
+	
+	ipsec_crypto_alg_t crypto_alg;
   u8 crypto_key_len;
   u8 crypto_key[128];
 
@@ -345,6 +369,11 @@ int ipsec_set_interface_key (vnet_main_t * vnm, u32 hw_if_index,
 			     ipsec_if_set_key_type_t type, u8 alg, u8 * key);
 int ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
 			    u8 is_outbound);
+
+/* per sa context */
+void ipsec_set_sa_contexts_key (ipsec_sa_t *sa);
+void ipsec_create_sa_contexts (ipsec_sa_t *sa);
+void ipsec_delete_sa_contexts (ipsec_sa_t *sa);
 
 
 /*

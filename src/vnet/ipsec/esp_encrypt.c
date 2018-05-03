@@ -354,7 +354,8 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 	      u8 iv[em->
 		    ipsec_proto_main_crypto_algs[sa0->crypto_alg].iv_size];
-	      RAND_bytes (iv, sizeof (iv));
+	      //RAND_bytes (iv, sizeof (iv));
+	      //memset (iv, 0xfe, sizeof (iv)); 
 
 	      clib_memcpy ((u8 *) vlib_buffer_get_current (o_b0) +
 			   ip_udp_hdr_size + sizeof (esp_header_t), iv,
@@ -369,14 +370,27 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			       sa0->crypto_key, iv);
 	    }
 
-	  o_b0->current_length += hmac_calc (sa0->integ_alg, sa0->integ_key,
-					     sa0->integ_key_len,
+		if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
+	    {
+#if 1
+	  		o_b0->current_length += hmac_calc2 (sa0,
+					     (u8 *) o_esp0,
+					     o_b0->current_length -
+					     ip_hdr_size,
+					     vlib_buffer_get_current (o_b0) +
+					     o_b0->current_length,
+					     sa0->use_esn, sa0->seq_hi);
+#else
+	  		o_b0->current_length += hmac_calc (sa0->integ_alg, sa0->integ_key, sa0->integ_key_len,
 					     (u8 *) o_esp0,
 					     o_b0->current_length -
 					     ip_udp_hdr_size,
 					     vlib_buffer_get_current (o_b0) +
 					     o_b0->current_length,
 					     sa0->use_esn, sa0->seq_hi);
+#endif
+
+			}
 
 
 	  if (PREDICT_FALSE (is_ipv6))

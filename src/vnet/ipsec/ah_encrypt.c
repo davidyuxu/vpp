@@ -269,12 +269,14 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 	    memset (digest, 0, icv_size);
 	  }
 
-	  hmac_calc (sa0->integ_alg, sa0->integ_key,
-		     sa0->integ_key_len,
-		     (u8 *) vlib_buffer_get_current (i_b0),
+		if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
+	    {
+
+			  hmac_calc2 (sa0, (u8 *) vlib_buffer_get_current (i_b0),
 		     i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
 
-	  memcpy (digest, (char *) &sig[0], 12);
+	  		memcpy (digest, (char *) &sig[0], 12);
+			}
 
 	  if (PREDICT_FALSE (is_ipv6))
 	    {

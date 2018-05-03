@@ -262,6 +262,8 @@ ipsec_proto_init ()
   memset (em, 0, sizeof (em[0]));
 
   vec_validate (em->ipsec_proto_main_crypto_algs, IPSEC_CRYPTO_N_ALG - 1);
+  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_NONE].type =
+    EVP_aes_128_cbc ();
   em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128].type =
     EVP_aes_128_cbc ();
   em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].type =
@@ -288,6 +290,14 @@ ipsec_proto_init ()
 
   vec_validate (em->ipsec_proto_main_integ_algs, IPSEC_INTEG_N_ALG - 1);
   ipsec_proto_main_integ_alg_t *i;
+
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_NONE];
+  i->md = NULL;
+  i->trunc_size = 0;
+
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_MD5_96];
+  i->md = EVP_md5 ();
+  i->trunc_size = 12;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA1_96];
   i->md = EVP_sha1 ();
@@ -352,9 +362,9 @@ hmac_calc (ipsec_integ_alg_t alg,
     {
       md = em->ipsec_proto_main_integ_algs[alg].md;
       em->per_thread_data[thread_index].last_integ_alg = alg;
+			HMAC_Init_ex (ctx, key, key_len, md, NULL);
     }
 
-  HMAC_Init_ex (ctx, key, key_len, md, NULL);
 
   HMAC_Update (ctx, data, data_len);
 
@@ -363,6 +373,30 @@ hmac_calc (ipsec_integ_alg_t alg,
   HMAC_Final (ctx, signature, &len);
 
   return em->ipsec_proto_main_integ_algs[alg].trunc_size;
+}
+
+always_inline unsigned int
+hmac_calc2 (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi)
+{
+  ipsec_proto_main_t *em = &ipsec_proto_main;
+  u32 thread_index = vlib_get_thread_index ();
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  HMAC_CTX *ctx = sa->context[thread_index].hmac_ctx;
+#else
+  HMAC_CTX *ctx = &(sa->context[thread_index].hmac_ctx);
+#endif
+
+  unsigned int len;
+
+  ASSERT (sa->integ_alg < IPSEC_INTEG_N_ALG && sa->integ_alg > IPSEC_INTEG_ALG_NONE);
+
+  HMAC_Update (ctx, data, data_len);
+
+  if (PREDICT_TRUE (use_esn))
+    HMAC_Update (ctx, (u8 *) & seq_hi, sizeof (seq_hi));
+  HMAC_Final (ctx, signature, &len);
+
+  return em->ipsec_proto_main_integ_algs[sa->integ_alg].trunc_size;
 }
 
 #endif /* __ESP_H__ */
