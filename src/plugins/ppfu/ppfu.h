@@ -131,7 +131,7 @@ _(IP4_LOOKUP, "ip4-lookup")
 #define PDCP_MAX_REORDER_WINDOW_SIZE  1024
 #define INVALID_BUFFER_INDEX          ~0
 
-#define PPF_PDCP_COUNT(hfn, sn, len)   ((255 == (len)) ? (sn) : (((hfn) << (1 << (len))) | (sn)))
+#define PPF_PDCP_COUNT(hfn, sn, len)   ((255 == (len)) ? (sn) : ((hfn) << (len) | (sn)))
 #define PPF_PDCP_HFN(count, len)       ((255 == (len)) ? 0 : ((count) >> (len)))
 #define PPF_PDCP_SN(count, len)        ((255 == (len)) ? (count) : (count & pow2_mask((len))))
 #define PPF_PDCP_COUNT_INC(hfn, sn, len)   \
@@ -245,7 +245,7 @@ enum pdcp_integrity_alg_t
 
 enum pdcp_crypt_alg_t 
 {
-  PDCP_EEA_NONE, 
+  PDCP_EEA_NONE =0, 
   PDCP_EEA0,
   PDCP_EEA1,
   PDCP_EEA2,
