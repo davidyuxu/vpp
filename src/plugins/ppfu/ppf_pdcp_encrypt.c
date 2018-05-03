@@ -84,6 +84,8 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
   next_index = ppm->pdcp_encrypt_next_index;
+  if (pm->handoff_enable)
+    next_index = PPF_PDCP_ENCRYPT_NEXT_PPF_TX_HANDOFF;
 
   while (n_left_from > 0)
     {
@@ -226,6 +228,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp0);
 
         next0:
+          b0->error = error0 ? node->errors[error0] : 0;
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b0->flags & VLIB_BUFFER_IS_TRACED) 
@@ -270,6 +273,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp1);
 	  
         next1:
+          b1->error = error1 ? node->errors[error1] : 0;
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b1->flags & VLIB_BUFFER_IS_TRACED) 
@@ -314,6 +318,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp2);
 
         next2:
+          b2->error = error2 ? node->errors[error2] : 0;
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b2->flags & VLIB_BUFFER_IS_TRACED) 
@@ -358,6 +363,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp3);
 
         next3:
+          b3->error = error3 ? node->errors[error3] : 0;
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b3->flags & VLIB_BUFFER_IS_TRACED) 
@@ -452,7 +458,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp0);
 
         next00:
-			
+          b0->error = error0 ? node->errors[error0] : 0;
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b0->flags & VLIB_BUFFER_IS_TRACED) 

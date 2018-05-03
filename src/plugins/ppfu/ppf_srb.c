@@ -324,7 +324,7 @@ ppf_srb_init (vlib_main_t * vm)
   psm->vnet_main = vnet_get_main ();
   psm->vlib_main = vm;
 	
-  psm->srb_rx_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
+  psm->srb_rx_next_index = PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB;
   psm->sb_lb_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
 
   psm->want_feedback = 0;

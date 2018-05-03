@@ -69,6 +69,8 @@ ppf_pdcp_input_inline (vlib_main_t * vm,
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
   next_index = ppf_pdcp_main.pdcp_input_next_index;
+  if (ppf_main.handoff_enable)
+    next_index = PPF_PDCP_INPUT_NEXT_PPF_PDCP_HANDOFF;
 
   while (n_left_from > 0)
     {

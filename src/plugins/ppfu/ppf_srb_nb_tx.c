@@ -24,7 +24,7 @@
 /* Statistics (not all errors) */
 
 #define foreach_ppf_srb_nb_tx_error    \
-_(ENCAPSULATED, "good packets encapsulated")
+_(GOOD, "good srb packets sent to CP")
 
 static char * ppf_srb_nb_tx_error_strings[] = {
 #define _(sym,string) string,
@@ -186,7 +186,8 @@ ppf_srb_nb_tx_inline (vlib_main_t * vm,
           len0 = vlib_buffer_length_in_chain (vm, b0);
           stats_n_packets += 1;
           stats_n_bytes += len0;
-                      
+          
+          b0->error = 0;
           if (PREDICT_FALSE(b0->flags & VLIB_BUFFER_IS_TRACED))
           {
             ppf_srb_nb_tx_trace_t *tr
