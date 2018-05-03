@@ -347,11 +347,12 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 					vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
 				else if (duplicate > 1) {
 					vlib_buffer_t *c0 = vlib_buffer_copy (vm, b0);
+					if (c0) {
+						clib_memcpy (c0->opaque2, b0->opaque2, sizeof (b0->opaque2));
+						vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
 
-					clib_memcpy (c0->opaque2, b0->opaque2, sizeof (b0->opaque2));
-					vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
-
-					vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
+						vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
+					}
 				}
 			}
 		}
@@ -378,11 +379,12 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 						vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
 					else if (duplicate > 1) {
 						vlib_buffer_t *c0 = vlib_buffer_copy (vm, b0);
+						if (c0) {
+							clib_memcpy (c0->opaque2, b0->opaque2, sizeof (b0->opaque2));
+							vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
 
-						clib_memcpy (c0->opaque2, b0->opaque2, sizeof (b0->opaque2));
-						vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
-
-						vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
+							vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
+						}
 					}
 				}
 			} else {
@@ -400,11 +402,12 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 						vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
 					else if (duplicate > 1) {
 						vlib_buffer_t *c0 = vlib_buffer_copy (vm, b0);
+						if (c0) {
+							clib_memcpy (c0->opaque2, b0->opaque2, sizeof (b0->opaque2));
+							vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
 
-						clib_memcpy (c0->opaque2, b0->opaque2, sizeof (b0->opaque2));
-						vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
-
-						vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
+							vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
+						}
 					}
 				}
 			}
