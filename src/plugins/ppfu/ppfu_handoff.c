@@ -33,7 +33,12 @@ typedef struct
   /* Worker ppfu_handoff index */
   u32 frame_queue_index;
 
+  u32 num_pdcp_workers;
+  u32 first_pdcp_worker_index;
   u32 pdcp_frame_queue_index;
+
+  u32 num_tx_workers;
+  u32 first_tx_worker_index;
   u32 tx_frame_queue_index;
 
   /* convenience variables */
@@ -509,7 +514,7 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
 
       b0 = vlib_get_buffer (vm, bi0);
 
-      next_worker_index = hm->first_worker_index;
+      next_worker_index = hm->first_pdcp_worker_index;
 
       /* fetch rx tunnel */
       rx_tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
@@ -571,12 +576,12 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       else
         vnet_buffer (b0)->handoff.next_index = PPF_PDCP_HANDOFF_DISPATCH_NEXT_PDCP_ENCRYPT;
 
-      if (PREDICT_TRUE (is_pow2 (hm->num_workers)))
-        index0 = hash & (hm->num_workers - 1);
+      if (PREDICT_TRUE (is_pow2 (hm->num_pdcp_workers)))
+        index0 = hash & (hm->num_pdcp_workers - 1);
       else
-        index0 = hash % (hm->num_workers);
+        index0 = hash % (hm->num_pdcp_workers);
 
-      next_worker_index += hm->workers[index0];
+      next_worker_index += index0;
 
       if (next_worker_index != current_worker_index) {
         fq = is_vlib_frame_queue_congested (hm->pdcp_frame_queue_index, next_worker_index,
@@ -900,8 +905,8 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
   u32 n_left_to_next_worker = 0, *to_next_worker = 0, *to_next_drop = 0;
   u32 next_worker_index = 0;
   u32 current_worker_index = ~0;
-  vlib_frame_queue_t *fq;
-  vlib_frame_t *d = 0;
+  CLIB_UNUSED(vlib_frame_queue_t *fq) = NULL;
+  CLIB_UNUSED(vlib_frame_t *d) = 0;
 
   if (PREDICT_FALSE (ppf_tx_handoff_queue_elt_by_wi == 0))
     {
@@ -932,7 +937,7 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
 
       b0 = vlib_get_buffer (vm, bi0);
 
-      next_worker_index = hm->first_worker_index;
+      next_worker_index = hm->first_tx_worker_index;
 
       /* fetch rx tunnel */
       rx_tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
@@ -1013,14 +1018,15 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
           vnet_buffer (b0)->handoff.next_index = PPF_TX_HANDOFF_DISPATCH_NEXT_IP4_LOOKUP;
       }
       
-      if (PREDICT_TRUE (is_pow2 (hm->num_workers)))
-        index0 = hash & (hm->num_workers - 1);
+      if (PREDICT_TRUE (is_pow2 (hm->num_tx_workers)))
+        index0 = hash & (hm->num_tx_workers - 1);
       else
-        index0 = hash % (hm->num_workers);
+        index0 = hash % (hm->num_tx_workers);
 
-      next_worker_index += hm->workers[index0];
+      next_worker_index += index0;
 
       if (next_worker_index != current_worker_index) {
+        #if 0 /* Always send when handoff pdcp to tx */
         fq = is_vlib_frame_queue_congested (hm->tx_frame_queue_index, next_worker_index,
                                             PPFU_HANDOFF_QUEUE_HI_THRESHOLD,
                                             congested_ppf_tx_handoff_queue_by_wi);
@@ -1039,6 +1045,7 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
           d->n_vectors++;
           goto trace0;
         }
+        #endif
         
         if (hf)
           hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_worker;
@@ -1342,8 +1349,21 @@ ppfu_handoff_init (vlib_main_t * vm)
   hm->vlib_main = vm;
   hm->vnet_main = &vnet_main;
 
+  if (hm->num_workers < 2) {
+    ppf_main.handoff_enable = 0;
+  } else {
+    ppf_main.handoff_enable = 1;
+    
+    hm->num_tx_workers = (hm->num_workers < 4) ? 1 : 2;
+    hm->first_tx_worker_index = hm->first_worker_index;
+    
+    hm->num_pdcp_workers = hm->num_workers - hm->num_tx_workers;
+    hm->first_pdcp_worker_index = hm->first_tx_worker_index + hm->num_tx_workers;
+  }
+
   vlib_node_t *error_drop_node =
 	  vlib_get_node_by_name (vm, (u8 *) "error-drop");
+  hm->error_node_index = error_drop_node->index;
 
   hm->frame_queue_index =
 	vlib_frame_queue_main_init (ppfu_handoff_dispatch_node.index, 0);
@@ -1354,7 +1374,6 @@ ppfu_handoff_init (vlib_main_t * vm)
   hm->tx_frame_queue_index =
 	vlib_frame_queue_main_init (ppf_tx_handoff_dispatch_node.index, 0);
 
-  hm->error_node_index = error_drop_node->index;
 
   /* *INDENT-ON* */
   return 0;
