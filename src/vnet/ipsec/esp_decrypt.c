@@ -200,17 +200,12 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 	  if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
 	    {
 	      u8 sig[64];
-	      int icv_size =
-		em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
+	      int icv_size = em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
 	      memset (sig, 0, sizeof (sig));
-	      u8 *icv =
-		vlib_buffer_get_current (i_b0) + i_b0->current_length -
-		icv_size;
+	      u8 *icv = vlib_buffer_get_current (i_b0) + i_b0->current_length - icv_size;
 	      i_b0->current_length -= icv_size;
 
-	      hmac_calc (sa0->integ_alg, sa0->integ_key, sa0->integ_key_len,
-			 (u8 *) esp0, i_b0->current_length, sig, sa0->use_esn,
-			 sa0->seq_hi);
+	      hmac_calc2 (sa0, (u8 *) esp0, i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
 
 	      if (PREDICT_FALSE (memcmp (icv, sig, icv_size)))
 		{
