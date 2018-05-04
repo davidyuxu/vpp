@@ -168,6 +168,7 @@ ipsec_create_sa_contexts (ipsec_sa_t *sa, u8 is_encrypt)
 			HMAC_CTX_init (&(sa->context[thread_id].hmac_ctx));
 			EVP_CIPHER_CTX_init (&(sa->context[thread_id].cipher_ctx));
 #endif
+			sa->context[thread_id].cmac_ctx = CMAC_CTX_new ();
 		}
 
 	ipsec_set_sa_contexts_integ_key (sa);
@@ -206,6 +207,7 @@ ipsec_set_sa_contexts_integ_key (ipsec_sa_t *sa)
 #else
 			HMAC_Init_ex (&sa->context[thread_id].hmac_ctx, sa->integ_key, sa->integ_key_len, md, NULL);
 #endif
+			CMAC_Init (sa->context[thread_id].cmac_ctx, sa->integ_key, 16, EVP_aes_128_cbc(), NULL);
 		}
 }
 

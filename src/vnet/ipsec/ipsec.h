@@ -21,6 +21,8 @@
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
 #include <openssl/evp.h>
+#include <openssl/cmac.h>
+
 
 #define IPSEC_FLAG_IPSEC_GRE_TUNNEL (1 << 0)
 
@@ -127,6 +129,7 @@ typedef struct
 #else
   HMAC_CTX hmac_ctx;
 #endif
+	CMAC_CTX *cmac_ctx;
 } ipsec_sa_per_thread_data_t;
 
 
