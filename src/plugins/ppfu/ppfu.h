@@ -506,9 +506,11 @@ typedef struct
 
 typedef struct
 {
+  ppf_callline_t * ppf_calline_table;
+  
   u32 handoff_enable;
   u32 max_capacity;
-  ppf_callline_t * ppf_calline_table;
+  u32 **buffers_duplicated_per_thread;
   
   u16 msg_id_base;
 } ppf_main_t;

@@ -492,8 +492,9 @@ ppf_init (vlib_main_t * vm)
 {
   ppf_main_t *pm = &ppf_main;
   ppf_callline_t * callline;
-
+  vlib_thread_main_t *tm = vlib_get_thread_main ();
   u32 i;
+  u32 **buffers;
   
   if (pm->max_capacity == 0)
     pm->max_capacity = DEF_MAX_PPF_SESSION;
@@ -507,7 +508,13 @@ ppf_init (vlib_main_t * vm)
 
   }
 
-  
+  vec_validate_init_empty (pm->buffers_duplicated_per_thread, tm->n_vlib_mains - 1, NULL);  
+  vec_foreach (buffers, pm->buffers_duplicated_per_thread)
+  {
+    vec_validate (*buffers, ((MAX_SB_PER_CALL + 1) * VLIB_FRAME_SIZE) - 1);
+    _vec_len (*buffers) = 0;
+  }
+
   return 0;
 }
 
