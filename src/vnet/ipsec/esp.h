@@ -359,6 +359,11 @@ ipsec_proto_init ()
   i->mac_size = 64;
   i->trunc_size = 32;
 
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_CMAC];
+  i->md = NULL;
+  i->mac_size = 16;
+  i->trunc_size = 16;
+
   vec_validate_aligned (em->per_thread_data, tm->n_vlib_mains - 1,
 			CLIB_CACHE_LINE_BYTES);
   int thread_id;
@@ -430,7 +435,7 @@ hmac_calc2 (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn,
 
   unsigned int len;
 
-  ASSERT (sa->integ_alg < IPSEC_INTEG_N_ALG && sa->integ_alg > IPSEC_INTEG_ALG_NONE);
+  ASSERT (sa->integ_alg < IPSEC_INTEG_N_ALG && sa->integ_alg > IPSEC_INTEG_ALG_NONE && sa->integ_alg != IPSEC_INTEG_ALG_CMAC );
 
 	HMAC_Init_ex (ctx, NULL, 0, NULL, NULL);
 
@@ -440,6 +445,33 @@ hmac_calc2 (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn,
     HMAC_Update (ctx, (u8 *) & seq_hi, sizeof (seq_hi));
 	
   HMAC_Final (ctx, signature, &len);
+
+	//fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
+
+  return em->ipsec_proto_main_integ_algs[sa->integ_alg].trunc_size;
+}
+
+always_inline unsigned int
+cmac_calc (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi)
+{
+  ipsec_proto_main_t *em = &ipsec_proto_main;
+  u32 thread_index = vlib_get_thread_index ();
+
+  CMAC_CTX *ctx = sa->context[thread_index].cmac_ctx;
+
+  size_t len;
+
+  ASSERT (sa->integ_alg == IPSEC_INTEG_ALG_CMAC);
+
+	CMAC_Init (ctx, NULL, 0, NULL, NULL);
+	//CMAC_Init(ctx, "1234567890", 16, EVP_aes_128_cbc(), NULL);
+
+  CMAC_Update (ctx, data, data_len);
+
+  if (PREDICT_TRUE (use_esn))
+    CMAC_Update (ctx, (u8 *) & seq_hi, sizeof (seq_hi));
+	
+  CMAC_Final (ctx, signature, &len);
 
 	//fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
 
