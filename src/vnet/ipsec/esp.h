@@ -263,31 +263,71 @@ ipsec_proto_init ()
   memset (em, 0, sizeof (em[0]));
 
   vec_validate (em->ipsec_proto_main_crypto_algs, IPSEC_CRYPTO_N_ALG - 1);
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_NONE].type =
-    EVP_aes_128_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128].type =
-    EVP_aes_128_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].type =
-    EVP_aes_192_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].type =
-    EVP_aes_256_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128].iv_size = 16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].iv_size = 24;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].iv_size = 32;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128].block_size =
-    16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].block_size =
-    24;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].block_size =
-    32;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC].type =
-    EVP_des_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC].type =
-    EVP_des_ede3_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC].block_size = 8;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC].block_size = 8;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC].iv_size = 8;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC].iv_size = 8;
+
+	ipsec_proto_main_crypto_alg_t *c;
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_NONE];
+  c->type = NULL;
+  c->iv_size = 0;
+  c->block_size = 0;
+
+	/* CBC */
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128];
+  c->type = EVP_aes_128_cbc ();
+  c->iv_size = 16;
+  c->block_size = 16;
+
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192];
+  c->type = EVP_aes_192_cbc ();
+  c->iv_size = 24;
+  c->block_size = 24;
+    
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256];
+	c->type = EVP_aes_256_cbc ();
+	c->iv_size = 32;
+	c->block_size = 32;
+
+	/* CTR */
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_128];
+  c->type = EVP_aes_128_ctr ();
+  c->iv_size = 16;
+  c->block_size = 16;
+
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_192];
+  c->type = EVP_aes_192_ctr ();
+  c->iv_size = 24;
+  c->block_size = 24;
+    
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_256];
+	c->type = EVP_aes_256_ctr ();
+	c->iv_size = 32;
+	c->block_size = 32;
+
+	/* GCM */
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_128];
+  c->type = EVP_aes_128_ctr ();
+  c->iv_size = 16;
+  c->block_size = 16;
+
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_192];
+  c->type = EVP_aes_192_ctr ();
+  c->iv_size = 24;
+  c->block_size = 24;
+    
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_256];
+	c->type = EVP_aes_256_ctr ();
+	c->iv_size = 32;
+	c->block_size = 32;
+
+	/* DES 3DES */
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC];
+	c->type = EVP_des_cbc ();
+	c->iv_size = 8;
+	c->block_size = 8;
+
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC];
+	c->type = EVP_des_ede3_cbc ();
+	c->iv_size = 8;
+	c->block_size = 8;
 
   vec_validate (em->ipsec_proto_main_integ_algs, IPSEC_INTEG_N_ALG - 1);
   ipsec_proto_main_integ_alg_t *i;
