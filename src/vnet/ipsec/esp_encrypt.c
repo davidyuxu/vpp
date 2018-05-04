@@ -126,7 +126,6 @@ esp_encrypt_cbc2 (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8
   u32 thread_index = vlib_get_thread_index ();
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
   EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
-
 #else
   EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
 #endif
