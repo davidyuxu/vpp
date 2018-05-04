@@ -112,6 +112,26 @@ esp_decrypt_cbc (ipsec_crypto_alg_t alg,
   EVP_DecryptFinal_ex (ctx, out + out_len, &out_len);
 }
 
+always_inline void
+esp_decrypt_cbc2 (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv)
+{
+  u32 thread_index = vlib_get_thread_index ();
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+		EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
+#else
+		EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
+#endif
+
+  int out_len;
+
+	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
+
+  EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
+
+  EVP_CipherUpdate (ctx, out, &out_len, in, in_len);
+  EVP_CipherFinal_ex (ctx, out + out_len, &out_len);
+}
+
 static uword
 esp_decrypt_node_fn (vlib_main_t * vm,
 		     vlib_node_runtime_t * node, vlib_frame_t * from_frame)
@@ -201,8 +221,9 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 	    {
 	      u8 sig[64];
 	      int icv_size = em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
-	      memset (sig, 0, sizeof (sig));
-	      u8 *icv = vlib_buffer_get_current (i_b0) + i_b0->current_length - icv_size;
+	      //memset (sig, 0, sizeof (sig));
+
+				u8 *icv = vlib_buffer_get_current (i_b0) + i_b0->current_length - icv_size;
 	      i_b0->current_length -= icv_size;
 
 	      hmac_calc2 (sa0, (u8 *) esp0, i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
@@ -299,13 +320,19 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 		      ip_hdr_size = sizeof (ip4_header_t);
 		    }
 		}
-
+#if 1
+	      esp_decrypt_cbc2 (sa0,
+			       esp0->data + IV_SIZE,
+			       (u8 *) vlib_buffer_get_current (o_b0) +
+			       ip_hdr_size, BLOCK_SIZE * blocks,
+			       sa0->crypto_key, esp0->data);
+#else
 	      esp_decrypt_cbc (sa0->crypto_alg,
 			       esp0->data + IV_SIZE,
 			       (u8 *) vlib_buffer_get_current (o_b0) +
 			       ip_hdr_size, BLOCK_SIZE * blocks,
 			       sa0->crypto_key, esp0->data);
-
+#endif
 	      o_b0->current_length = (blocks * BLOCK_SIZE) - 2 + ip_hdr_size;
 	      o_b0->flags = VLIB_BUFFER_TOTAL_LENGTH_VALID;
 	      f0 =

@@ -67,7 +67,8 @@ typedef struct
 typedef struct
 {
   const EVP_MD *md;
-  u8 trunc_size;
+  u32 mac_size;
+	u32 trunc_size;
 } ipsec_proto_main_integ_alg_t;
 
 typedef struct
@@ -293,30 +294,37 @@ ipsec_proto_init ()
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_NONE];
   i->md = NULL;
+  i->mac_size = 0;
   i->trunc_size = 0;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_MD5_96];
   i->md = EVP_md5 ();
+  i->mac_size = 12;
   i->trunc_size = 12;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA1_96];
   i->md = EVP_sha1 ();
+  i->mac_size = 12;
   i->trunc_size = 12;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_256_96];
   i->md = EVP_sha256 ();
+  i->mac_size = 32;
   i->trunc_size = 12;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_256_128];
   i->md = EVP_sha256 ();
+  i->mac_size = 32;
   i->trunc_size = 16;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_384_192];
   i->md = EVP_sha384 ();
+  i->mac_size = 48;
   i->trunc_size = 24;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_512_256];
   i->md = EVP_sha512 ();
+  i->mac_size = 64;
   i->trunc_size = 32;
 
   vec_validate_aligned (em->per_thread_data, tm->n_vlib_mains - 1,
