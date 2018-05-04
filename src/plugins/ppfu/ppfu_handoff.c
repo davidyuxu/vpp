@@ -444,6 +444,25 @@ VLIB_NODE_FUNCTION_MULTIARCH (ppfu_handoff_dispatch_node, ppfu_handoff_dispatch_
 
 /*******************************3 layer handoff for PDCP Start****************************/
 
+#define foreach_ppf_pdcp_handoff_error \
+_(GOOD, "handoffed packets")           \
+_(BAD, "dropped packets")
+
+typedef enum
+{
+#define _(sym,str) PPF_PDCP_HANDOFF_ERROR_##sym,
+  foreach_ppf_pdcp_handoff_error
+#undef _
+    PPF_PDCP_HANDOFF_N_ERROR,
+} ppf_pdcp_handoff_error_t;
+
+static char *ppf_pdcp_handoff_error_strings[] = {
+#define _(sym,string) string,
+  foreach_ppf_pdcp_handoff_error
+#undef _
+};
+
+
 typedef struct
 {
   u32 hash;
@@ -485,6 +504,7 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
   u32 current_worker_index = ~0;
   vlib_frame_queue_t *fq;
   vlib_frame_t *d = 0;
+  u32 pkts_processed = 0;
 
   if (PREDICT_FALSE (ppf_pdcp_handoff_queue_elt_by_wi == 0))
     {
@@ -620,6 +640,8 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       to_next_worker++;
       n_left_to_next_worker--;
 
+      pkts_processed++;
+
       if (n_left_to_next_worker == 0) {
         hf->n_vectors = VLIB_FRAME_SIZE;
         vlib_put_frame_queue_elt (hf);
@@ -641,8 +663,10 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       }
     }
 
-  if (d)
+  if (d) {
+    vlib_node_increment_counter (vm, node->node_index, PPF_PDCP_HANDOFF_ERROR_BAD, d->n_vectors);
     vlib_put_frame_to_node (vm, hm->error_node_index, d);
+  }
  
   if (hf)
     hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_worker;
@@ -669,6 +693,8 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       congested_ppf_pdcp_handoff_queue_by_wi[i] =	(vlib_frame_queue_t *) (~0);
     }
 
+  vlib_node_increment_counter (vm, node->node_index, PPF_PDCP_HANDOFF_ERROR_GOOD, pkts_processed);
+
   hf = 0;
   current_worker_index = ~0;
   return frame->n_vectors;
@@ -681,6 +707,8 @@ VLIB_REGISTER_NODE (ppf_pdcp_handoff_node) = {
   .vector_size = sizeof (u32),
   .format_trace = format_ppf_pdcp_handoff_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = ARRAY_LEN(ppf_pdcp_handoff_error_strings),
+  .error_strings = ppf_pdcp_handoff_error_strings,
   .n_next_nodes = 1,
   .next_nodes = {
     [0] = "error-drop",
@@ -710,7 +738,7 @@ format_ppf_pdcp_handoff_dispatch_trace (u8 * s, va_list * args)
 }
 
 #define foreach_ppf_pdcp_handoff_dispatch_error \
-_(EXAMPLE, "example packets")
+_(GOOD, "dispatched packets")
 
 typedef enum
 {
@@ -732,6 +760,7 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
 {
   u32 n_left_from, *from, *to_next;
   ppf_pdcp_handoff_dispatch_next_t next_index;
+  u32 pkts_processed = 0;
 
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
@@ -794,6 +823,8 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
           }
         }
       
+        pkts_processed += 2;
+
         /* verify speculative enqueues, maybe switch current next frame */
         vlib_validate_buffer_enqueue_x2 (vm, node, next_index,
       				   to_next, n_left_to_next,
@@ -830,6 +861,8 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
           }
         }
       
+        pkts_processed += 1;
+
         /* verify speculative enqueue, maybe switch current next frame */
         vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
       				   to_next, n_left_to_next,
@@ -838,6 +871,8 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
 
       vlib_put_next_frame (vm, node, next_index, n_left_to_next);
     }
+
+  vlib_node_increment_counter (vm, node->node_index, PPF_PDCP_HANDOFF_DISPATCH_ERROR_GOOD, pkts_processed);
 
   return frame->n_vectors;
 }
@@ -1087,6 +1122,7 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
 
   if (d)
     vlib_put_frame_to_node (vm, hm->error_node_index, d);
+
  
   if (hf)
     hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_worker;
@@ -1154,7 +1190,7 @@ format_ppf_tx_handoff_dispatch_trace (u8 * s, va_list * args)
 }
 
 #define foreach_ppf_tx_handoff_dispatch_error \
-_(EXAMPLE, "example packets")
+_(GOOD, "dispatched packets")
 
 typedef enum
 {
@@ -1176,6 +1212,7 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
 {
   u32 n_left_from, *from, *to_next;
   ppf_tx_handoff_dispatch_next_t next_index;
+  u32 pkts_processed = 0;
 
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
@@ -1238,6 +1275,8 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
           }
         }
       
+        pkts_processed += 2;
+
         /* verify speculative enqueues, maybe switch current next frame */
         vlib_validate_buffer_enqueue_x2 (vm, node, next_index,
       				   to_next, n_left_to_next,
@@ -1274,6 +1313,8 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
           }
         }
       
+        pkts_processed += 1;
+
         /* verify speculative enqueue, maybe switch current next frame */
         vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
       				   to_next, n_left_to_next,
@@ -1282,6 +1323,8 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
 
       vlib_put_next_frame (vm, node, next_index, n_left_to_next);
     }
+
+  vlib_node_increment_counter (vm, node->node_index, PPF_TX_HANDOFF_DISPATCH_ERROR_GOOD, pkts_processed);
 
   return frame->n_vectors;
 }

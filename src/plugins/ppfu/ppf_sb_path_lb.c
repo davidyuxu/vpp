@@ -71,7 +71,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
   u32 pkts_processed = 0;
   ppf_main_t *pm = &ppf_main;
   ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
-  static u32 *buffers_duplicated = NULL;
+  u32 *buffers_duplicated = pm->buffers_duplicated_per_thread[vlib_get_thread_index ()];
   
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
