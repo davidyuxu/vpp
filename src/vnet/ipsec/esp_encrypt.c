@@ -114,7 +114,49 @@ esp_encrypt_cbc (ipsec_crypto_alg_t alg,
   EVP_EncryptInit_ex (ctx, cipher, NULL, key, iv);
 
   EVP_EncryptUpdate (ctx, out, &out_len, in, in_len);
+
+	fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
+	
   EVP_EncryptFinal_ex (ctx, out + out_len, &out_len);
+}
+
+always_inline void
+esp_encrypt_cbc2 (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv)
+{
+  u32 thread_index = vlib_get_thread_index ();
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
+
+#else
+  EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
+#endif
+
+#if 0
+		ipsec_proto_main_t *em = &ipsec_proto_main;
+
+		const EVP_CIPHER *cipher = cipher = em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
+			EVP_CipherInit_ex (ctx, cipher, NULL, sa->crypto_key, iv, 1);
+#endif
+
+
+  int out_len;
+
+	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
+
+	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
+
+  EVP_CipherUpdate (ctx, out, &out_len, in, in_len);
+
+	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
+
+  EVP_CipherFinal_ex (ctx, out + out_len, &out_len);
+	//EVP_EncryptInit_ex (ctx, NULL, NULL, NULL, iv);
+
+  //EVP_EncryptUpdate (ctx, out, &out_len, in, in_len);
+
+	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
+
+  //EVP_EncryptFinal_ex (ctx, out + out_len, &out_len);
 }
 
 static uword
@@ -336,20 +378,35 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 	      u8 iv[em->
 		    ipsec_proto_main_crypto_algs[sa0->crypto_alg].iv_size];
 	      //RAND_bytes (iv, sizeof (iv));
-	      //memset (iv, 0xfe, sizeof (iv)); 
+	      memset (iv, 0xfe, sizeof (iv)); 
 
 	      clib_memcpy ((u8 *) vlib_buffer_get_current (o_b0) +
 			   ip_hdr_size + sizeof (esp_header_t), iv,
 			   em->ipsec_proto_main_crypto_algs[sa0->
 							    crypto_alg].iv_size);
-
-	      esp_encrypt_cbc (sa0->crypto_alg,
+#if 1
+	      esp_encrypt_cbc2 (sa0,
 			       (u8 *) vlib_buffer_get_current (i_b0),
 			       (u8 *) vlib_buffer_get_current (o_b0) +
 			       ip_hdr_size + sizeof (esp_header_t) +
 			       IV_SIZE, BLOCK_SIZE * blocks,
 			       sa0->crypto_key, iv);
+#else
+			esp_encrypt_cbc (sa0->crypto_alg,
+					 (u8 *) vlib_buffer_get_current (i_b0),
+					 (u8 *) vlib_buffer_get_current (o_b0) +
+					 ip_hdr_size + sizeof (esp_header_t) +
+					 IV_SIZE, BLOCK_SIZE * blocks,
+					 sa0->crypto_key, iv);
+#endif
 	    }
+		else
+			{
+				o_b0->current_length = ip_hdr_size + sizeof (esp_header_t) + i_b0->current_length;
+
+	      vnet_buffer (o_b0)->sw_if_index[VLIB_RX] =
+		vnet_buffer (i_b0)->sw_if_index[VLIB_RX];
+			}
 
 		if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
 	    {
