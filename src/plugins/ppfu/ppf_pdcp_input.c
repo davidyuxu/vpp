@@ -22,7 +22,7 @@
 
 /* Statistics (not all errors) */
 #define foreach_ppf_pdcp_input_error    \
-_(ENCAPSULATED, "good packets encapsulated")
+_(GOOD, "packets delivered")
 
 
 static char * ppf_pdcp_input_error_strings[] = {
@@ -228,6 +228,7 @@ ppf_pdcp_input_inline (vlib_main_t * vm,
 	         }
 	     }
  
+		pkts_processed += 1;
 		
 	    /* verify speculative enqueue, maybe switch current next frame */
 	    vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
@@ -238,6 +239,11 @@ ppf_pdcp_input_inline (vlib_main_t * vm,
 
 	vlib_put_next_frame (vm, node, next_index, n_left_to_next);
     }
+
+  vlib_node_increment_counter (vm, node->node_index,
+                               PPF_PDCP_INPUT_ERROR_GOOD,
+                               pkts_processed);
+
 
   return frame->n_vectors;
 }

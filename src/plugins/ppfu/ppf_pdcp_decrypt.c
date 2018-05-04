@@ -30,8 +30,7 @@ _(VALIDATE_FAIL, "validation failed packets") \
 _(REORDER_WINDOW_FULL, "reorder window full packets") \
 _(REORDER_DUPLICATE, "reorder duplicate packets") \
 _(REORDERED, "reordered packets") \
-_(BYPASSED, "bypassed packets")  \
-_(HANDOFF, "handoffed packets")
+_(BYPASSED, "bypassed packets")
 
 
 
@@ -717,7 +716,6 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           vlib_buffer_advance (b0, (word)(pdcp0->header_length));
 
           if (pm->handoff_enable) {
-            error0 = PPF_PDCP_DECRYPT_ERROR_HANDOFF;
             next0 = PPF_PDCP_DECRYPT_NEXT_PPF_TX_HANDOFF;
           } else {
             /* why need do this? */
@@ -734,7 +732,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           }
 
 	    trace00:
-          b0->error = error0 ? node->errors[error0] : 0;
+          vlib_node_increment_counter (vm, node->node_index, error0, 1);
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b0->flags & VLIB_BUFFER_IS_TRACED) 
@@ -753,13 +751,13 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
             }
           }
 
-        pkts_processed += 1;
-
-        if (reorder0) {
+        if (error0 == PPF_PDCP_DECRYPT_ERROR_REORDERED) {
 		  to_next -= 1;
           n_left_to_next += 1;
           continue;
         }
+
+        pkts_processed += 1;
 		
         /* verify speculative enqueue, maybe switch current next frame */
         vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
@@ -790,9 +788,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         	to_next += 1;
         	n_left_to_next -= 1;
           	
-            b0->error = 0;
             if (pm->handoff_enable) {
-              b0->error = node->errors[PPF_PDCP_DECRYPT_ERROR_HANDOFF];
               next0 = PPF_PDCP_DECRYPT_NEXT_PPF_TX_HANDOFF;
             } else {
               /* why need do this? */
@@ -807,6 +803,9 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
               if (PREDICT_FALSE((c0->lbo_mode == PPF_LBO_MODE) && (c0->call_type == PPF_DRB_CALL)))
                 next0 = PPF_PDCP_DECRYPT_NEXT_IP4_LOOKUP;
             }
+
+			pkts_processed += 1;
+			vlib_node_increment_counter (vm, node->node_index, 0, 1);
                         
             /* verify speculative enqueue, maybe switch current next frame */
             vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
