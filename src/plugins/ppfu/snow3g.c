@@ -295,7 +295,7 @@ u32 S2(u32 w)
 * See section 3.4.4.
 */
 
-void ClockLFSRInitializationMode(SNOW3G_CTX* ctx,u32 F)
+void ClockLFSRInitializationMode(snow3g_ctx_t* ctx,u32 F)
 {
     u32 v = ( ( (ctx->LFSR_S0 << 8) & 0xffffff00 ) ^
         //( MULalpha( (u8)((ctx->LFSR_S0>>24) & 0xff) ) ) ^
@@ -328,7 +328,7 @@ void ClockLFSRInitializationMode(SNOW3G_CTX* ctx,u32 F)
    * See section 3.4.5.
    */
 
-void ClockLFSRKeyStreamMode(SNOW3G_CTX* ctx)
+void ClockLFSRKeyStreamMode(snow3g_ctx_t* ctx)
 {
     u32 v = ( ( (ctx->LFSR_S0 << 8) & 0xffffff00 ) ^
         ( MULa[ (u8)((ctx->LFSR_S0>>24) & 0xff) ] ) ^
@@ -360,7 +360,7 @@ void ClockLFSRKeyStreamMode(SNOW3G_CTX* ctx)
 * See Section 3.4.6.
 */
 
-u32 ClockFSM(SNOW3G_CTX* ctx)
+u32 ClockFSM(snow3g_ctx_t* ctx)
 {
     u32 F = ( ( ctx->LFSR_S15 + ctx->FSM_R1 ) & 0xffffffff ) ^ ctx->FSM_R2 ;
     u32 r = ( ctx->FSM_R2 + ( ctx->FSM_R3 ^ ctx->LFSR_S5 ) ) & 0xffffffff ;
@@ -377,7 +377,7 @@ u32 ClockFSM(SNOW3G_CTX* ctx)
 * See Section 4.1.
 */
 
-void Initialize(SNOW3G_CTX* ctx, u32 k[4], u32 IV[4])
+void Initialize(snow3g_ctx_t* ctx, u32 k[4], u32 IV[4])
 {
     u8 i=0;
     u32 F = 0x0;
@@ -415,7 +415,7 @@ void Initialize(SNOW3G_CTX* ctx, u32 k[4], u32 IV[4])
 * See section 4.2.
 */
 
-void GenerateKeystream(SNOW3G_CTX* ctx, u32 n, u32 *ks)
+void GenerateKeystream(snow3g_ctx_t* ctx, u32 n, u32 *ks)
 {
     u32 t = 0;
     u32 F = 0x0;
@@ -461,7 +461,7 @@ void GenerateKeystream(SNOW3G_CTX* ctx, u32 n, u32 *ks)
 * defined in Section 3.
 */
 
-void f8(SNOW3G_CTX* ctx, u8 *key, u32 count, u32 bearer, u32 dir, u8 *data, u8 *output, u32 length)
+void f8(snow3g_ctx_t* ctx, u8 *key, u32 count, u32 bearer, u32 dir, u8 *data, u8 *output, u32 length)
 {
     u32 K[4],IV[4];
     int n = ( length + 31 ) / 32;
@@ -595,7 +595,7 @@ u8 mask8bit(int n)
 * Output  : 32 bit block used as MAC 
 * Generates 32-bit MAC using UIA2 algorithm as defined in Section 4.
 */
-u8* f9(SNOW3G_CTX* ctx, u8* key, u32 count, u32 fresh, u32 dir, u8 *data, u64 length,
+u8* f9(snow3g_ctx_t* ctx, u8* key, u32 count, u32 fresh, u32 dir, u8 *data, u64 length,
   u8* MAC_I)
 {
     u32 K[4],IV[4], z[5];
@@ -687,25 +687,25 @@ u8* f9(SNOW3G_CTX* ctx, u8* key, u32 count, u32 fresh, u32 dir, u8 *data, u64 le
 
 
 
-void snow3g_encrypt(SNOW3G_CTX* ctx, u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length)
+void snow3g_encrypt(snow3g_ctx_t* ctx, u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length)
 {
 	f8(ctx,key,count,bearer,1,data,output,length<<3);
 
 }
 
-void snow3g_decrypt(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length)
+void snow3g_decrypt(snow3g_ctx_t* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length)
 {
 	f8(ctx,key,count,bearer,0,data,output,length<<3);
 
 }
 //@length exclude 4-bytes MAC 
-void snow3g_protect(SNOW3G_CTX* ctx, u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I)
+void snow3g_protect(snow3g_ctx_t* ctx, u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I)
 {
 	f9(ctx,key,count,bearer<<27,1,data,(length)<<3,MAC_I);
 
 }
 
-void snow3g_validate(SNOW3G_CTX* ctx, u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I)
+void snow3g_validate(snow3g_ctx_t* ctx, u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I)
 { 
 	f9(ctx,key,count,bearer<<27,0,data,(length)<<3,MAC_I);
 
