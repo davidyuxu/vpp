@@ -271,14 +271,14 @@ ipsec_proto_init ()
   em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].type =
     EVP_aes_256_cbc ();
   em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128].iv_size = 16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].iv_size = 16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].iv_size = 16;
+  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].iv_size = 24;
+  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].iv_size = 32;
   em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128].block_size =
     16;
   em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].block_size =
-    16;
+    24;
   em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].block_size =
-    16;
+    32;
   em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC].type =
     EVP_des_cbc ();
   em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC].type =
@@ -362,15 +362,17 @@ hmac_calc (ipsec_integ_alg_t alg,
     {
       md = em->ipsec_proto_main_integ_algs[alg].md;
       em->per_thread_data[thread_index].last_integ_alg = alg;
-			HMAC_Init_ex (ctx, key, key_len, md, NULL);
     }
 
+	HMAC_Init_ex (ctx, key, key_len, md, NULL);
 
   HMAC_Update (ctx, data, data_len);
 
   if (PREDICT_TRUE (use_esn))
     HMAC_Update (ctx, (u8 *) & seq_hi, sizeof (seq_hi));
   HMAC_Final (ctx, signature, &len);
+
+	fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
 
   return em->ipsec_proto_main_integ_algs[alg].trunc_size;
 }
@@ -390,11 +392,16 @@ hmac_calc2 (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn,
 
   ASSERT (sa->integ_alg < IPSEC_INTEG_N_ALG && sa->integ_alg > IPSEC_INTEG_ALG_NONE);
 
+	HMAC_Init_ex (ctx, NULL, 0, NULL, NULL);
+
   HMAC_Update (ctx, data, data_len);
 
   if (PREDICT_TRUE (use_esn))
     HMAC_Update (ctx, (u8 *) & seq_hi, sizeof (seq_hi));
+	
   HMAC_Final (ctx, signature, &len);
+
+	//fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
 
   return em->ipsec_proto_main_integ_algs[sa->integ_alg].trunc_size;
 }

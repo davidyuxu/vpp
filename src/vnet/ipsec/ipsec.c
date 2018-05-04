@@ -453,7 +453,7 @@ ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add,
     {
       pool_get (im->sad, sa);
       clib_memcpy (sa, new_sa, sizeof (*sa));
-			ipsec_create_sa_contexts (sa);
+			ipsec_create_sa_contexts (sa, 1);
 			
       sa_index = sa - im->sad;
       sa->udp_encap = udp_encap ? 1 : 0;
@@ -500,7 +500,8 @@ ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update)
       sa->integ_key_len = sa_update->integ_key_len;
     }
 
-	ipsec_set_sa_contexts_key (sa);
+	ipsec_set_sa_contexts_integ_key (sa);
+	ipsec_set_sa_contexts_crypto_key (sa, 1);
 
   if (0 < sa_update->crypto_key_len || 0 < sa_update->integ_key_len)
     {
@@ -537,9 +538,10 @@ ipsec_check_support (ipsec_sa_t * sa)
 {
   if (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_128)
     return clib_error_return (0, "unsupported aes-gcm-128 crypto-alg");
+#if 0 // kingwel
   if (sa->integ_alg == IPSEC_INTEG_ALG_NONE)
     return clib_error_return (0, "unsupported none integ-alg");
-
+#endif
   return 0;
 }
 
@@ -550,6 +552,8 @@ ipsec_init (vlib_main_t * vm)
   ipsec_main_t *im = &ipsec_main;
   vlib_thread_main_t *tm = vlib_get_thread_main ();
   vlib_node_t *node;
+
+	//CRYPTO_set_mem_functions (clib_mem_alloc, clib_mem_realloc2, clib_mem_free);
 
   ipsec_rand_seed ();
 

@@ -116,9 +116,9 @@ typedef struct
 {
   CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  EVP_CIPHER_CTX *encrypt_ctx;
+  EVP_CIPHER_CTX *cipher_ctx;
 #else
-  EVP_CIPHER_CTX encrypt_ctx;
+  EVP_CIPHER_CTX cipher_ctx;
 #endif
   CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
@@ -371,8 +371,9 @@ int ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
 			    u8 is_outbound);
 
 /* per sa context */
-void ipsec_set_sa_contexts_key (ipsec_sa_t *sa);
-void ipsec_create_sa_contexts (ipsec_sa_t *sa);
+void ipsec_set_sa_contexts_integ_key (ipsec_sa_t *sa);
+void ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa, u8 is_encrypt);
+void ipsec_create_sa_contexts (ipsec_sa_t *sa, u8 is_encrypt);
 void ipsec_delete_sa_contexts (ipsec_sa_t *sa);
 
 
