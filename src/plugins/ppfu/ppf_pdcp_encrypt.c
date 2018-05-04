@@ -228,7 +228,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp0);
 
         next0:
-          b0->error = error0 ? node->errors[error0] : 0;
+          vlib_node_increment_counter (vm, node->node_index, error0, 1);
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b0->flags & VLIB_BUFFER_IS_TRACED) 
@@ -273,7 +273,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp1);
 	  
         next1:
-          b1->error = error1 ? node->errors[error1] : 0;
+          vlib_node_increment_counter (vm, node->node_index, error1, 1);
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b1->flags & VLIB_BUFFER_IS_TRACED) 
@@ -318,7 +318,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp2);
 
         next2:
-          b2->error = error2 ? node->errors[error2] : 0;
+          vlib_node_increment_counter (vm, node->node_index, error2, 1);
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b2->flags & VLIB_BUFFER_IS_TRACED) 
@@ -363,7 +363,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp3);
 
         next3:
-          b3->error = error3 ? node->errors[error3] : 0;
+          vlib_node_increment_counter (vm, node->node_index, error3, 1);
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b3->flags & VLIB_BUFFER_IS_TRACED) 
@@ -381,12 +381,12 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
             }
           }
   
-            pkts_processed += 4;
-		 
-            /* verify speculative enqueues, maybe switch current next frame */
-            vlib_validate_buffer_enqueue_x4 (vm, node, next_index,
-            				   to_next, n_left_to_next,
-            				   bi0, bi1, bi2, bi3, next0, next1, next2, next3);
+        pkts_processed += 4;
+	 
+        /* verify speculative enqueues, maybe switch current next frame */
+        vlib_validate_buffer_enqueue_x4 (vm, node, next_index,
+        				   to_next, n_left_to_next,
+        				   bi0, bi1, bi2, bi3, next0, next1, next2, next3);
 	  }
 
 	while (n_left_from > 0 && n_left_to_next > 0)
@@ -458,7 +458,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    	            &sp0);
 
         next00:
-          b0->error = error0 ? node->errors[error0] : 0;
+          vlib_node_increment_counter (vm, node->node_index, error0, 1);
           if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE)))
           {
             if (b0->flags & VLIB_BUFFER_IS_TRACED) 

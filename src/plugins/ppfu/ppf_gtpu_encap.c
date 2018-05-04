@@ -103,27 +103,27 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 
       while (n_left_from >= 8 && n_left_to_next >= 4)
 	{
-          u32 bi0, bi1, bi2, bi3;
-	  vlib_buffer_t * b0, * b1, * b2, * b3;
-         u32 flow_hash0, flow_hash1, flow_hash2, flow_hash3;
-	  u32 len0, len1, len2, len3;
-          ip4_header_t * ip4_0, * ip4_1, * ip4_2, * ip4_3;
-          ip6_header_t * ip6_0, * ip6_1, * ip6_2, * ip6_3;
-          udp_header_t * udp0, * udp1, * udp2, * udp3;
-          ppf_gtpu_header_t * ppf_gtpu0, * ppf_gtpu1, * ppf_gtpu2, * ppf_gtpu3;
-          u64 * copy_src0, * copy_dst0;
-          u64 * copy_src1, * copy_dst1;
-          u64 * copy_src2, * copy_dst2;
-          u64 * copy_src3, * copy_dst3;
-          u32 * copy_src_last0, * copy_dst_last0;
-          u32 * copy_src_last1, * copy_dst_last1;
-          u32 * copy_src_last2, * copy_dst_last2;
-          u32 * copy_src_last3, * copy_dst_last3;
-          u16 new_l0, new_l1, new_l2, new_l3;
-          CLIB_UNUSED(ip_csum_t sum0);
-          CLIB_UNUSED(ip_csum_t sum1);
-          CLIB_UNUSED(ip_csum_t sum2);
-          CLIB_UNUSED(ip_csum_t sum3);
+		u32 bi0, bi1, bi2, bi3;
+		vlib_buffer_t * b0, * b1, * b2, * b3;
+		u32 flow_hash0, flow_hash1, flow_hash2, flow_hash3;
+		u32 len0, len1, len2, len3;
+		ip4_header_t * ip4_0, * ip4_1, * ip4_2, * ip4_3;
+		ip6_header_t * ip6_0, * ip6_1, * ip6_2, * ip6_3;
+		udp_header_t * udp0, * udp1, * udp2, * udp3;
+		ppf_gtpu_header_t * ppf_gtpu0, * ppf_gtpu1, * ppf_gtpu2, * ppf_gtpu3;
+		u64 * copy_src0, * copy_dst0;
+		u64 * copy_src1, * copy_dst1;
+		u64 * copy_src2, * copy_dst2;
+		u64 * copy_src3, * copy_dst3;
+		u32 * copy_src_last0, * copy_dst_last0;
+		u32 * copy_src_last1, * copy_dst_last1;
+		u32 * copy_src_last2, * copy_dst_last2;
+		u32 * copy_src_last3, * copy_dst_last3;
+		u16 new_l0, new_l1, new_l2, new_l3;
+		CLIB_UNUSED(ip_csum_t sum0);
+		CLIB_UNUSED(ip_csum_t sum1);
+		CLIB_UNUSED(ip_csum_t sum2);
+		CLIB_UNUSED(ip_csum_t sum3);
 
 	  /* Prefetch next iteration. */
 	  {
@@ -165,9 +165,9 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 
 
 	  flow_hash0 = vnet_l2_compute_flow_hash (b0);
-        flow_hash1 = vnet_l2_compute_flow_hash (b1);
-        flow_hash2 = vnet_l2_compute_flow_hash (b2);
-        flow_hash3 = vnet_l2_compute_flow_hash (b3);
+	  flow_hash1 = vnet_l2_compute_flow_hash (b1);
+	  flow_hash2 = vnet_l2_compute_flow_hash (b2);
+	  flow_hash3 = vnet_l2_compute_flow_hash (b3);
 
 	  tid0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
 	  tid1 = vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
@@ -176,30 +176,30 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  
 	  t0 = &gtm->tunnels[tid0];
    	  t1 = &gtm->tunnels[tid1];
-        t2 = &gtm->tunnels[tid2];
-        t3 = &gtm->tunnels[tid3];
+      t2 = &gtm->tunnels[tid2];
+      t3 = &gtm->tunnels[tid3];
 
 	  vnet_buffer (b0)->sw_if_index[VLIB_TX] = t0->encap_fib_index;
 	  vnet_buffer (b1)->sw_if_index[VLIB_TX] = t1->encap_fib_index;
 	  vnet_buffer (b2)->sw_if_index[VLIB_TX] = t2->encap_fib_index;
 	  vnet_buffer (b3)->sw_if_index[VLIB_TX] = t3->encap_fib_index;
 
-          /* Apply the rewrite string. $$$$ vnet_rewrite? */
-          vlib_buffer_advance (b0, -(word)_vec_len(t0->rewrite));
-          vlib_buffer_advance (b1, -(word)_vec_len(t1->rewrite));
-          vlib_buffer_advance (b2, -(word)_vec_len(t2->rewrite));
-          vlib_buffer_advance (b3, -(word)_vec_len(t3->rewrite));
+      /* Apply the rewrite string. $$$$ vnet_rewrite? */
+      vlib_buffer_advance (b0, -(word)_vec_len(t0->rewrite));
+      vlib_buffer_advance (b1, -(word)_vec_len(t1->rewrite));
+      vlib_buffer_advance (b2, -(word)_vec_len(t2->rewrite));
+      vlib_buffer_advance (b3, -(word)_vec_len(t3->rewrite));
 
 	  if (is_ip4)
 	    {
-		next0 = (t0->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
-	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
-	  	next1 = (t1->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
-	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
-	 	next2 = (t2->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
-	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
-	 	next3 = (t3->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
-	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+		  next0 = (t0->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
+					  PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+		  next1 = (t1->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
+					  PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+		  next2 = (t2->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
+					  PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+		  next3 = (t3->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
+					  PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
 	    
 	      ip4_0 = vlib_buffer_get_current(b0);
 	      ip4_1 = vlib_buffer_get_current(b1);
@@ -230,26 +230,25 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      foreach_fixed_header4_offset;
 #undef _
 	      /* Last 4 octets. Hopefully gcc will be our friend */
-              copy_dst_last0 = (u32 *)(&copy_dst0[4]);
-              copy_src_last0 = (u32 *)(&copy_src0[4]);
-              copy_dst_last0[0] = copy_src_last0[0];
-              copy_dst_last1 = (u32 *)(&copy_dst1[4]);
-              copy_src_last1 = (u32 *)(&copy_src1[4]);
-              copy_dst_last1[0] = copy_src_last1[0];
-              copy_dst_last2 = (u32 *)(&copy_dst2[4]);
-              copy_src_last2 = (u32 *)(&copy_src2[4]);
-              copy_dst_last2[0] = copy_src_last2[0];
-              copy_dst_last3 = (u32 *)(&copy_dst3[4]);
-              copy_src_last3 = (u32 *)(&copy_src3[4]);
-              copy_dst_last3[0] = copy_src_last3[0];
+          copy_dst_last0 = (u32 *)(&copy_dst0[4]);
+          copy_src_last0 = (u32 *)(&copy_src0[4]);
+          copy_dst_last0[0] = copy_src_last0[0];
+          copy_dst_last1 = (u32 *)(&copy_dst1[4]);
+          copy_src_last1 = (u32 *)(&copy_src1[4]);
+          copy_dst_last1[0] = copy_src_last1[0];
+          copy_dst_last2 = (u32 *)(&copy_dst2[4]);
+          copy_src_last2 = (u32 *)(&copy_src2[4]);
+          copy_dst_last2[0] = copy_src_last2[0];
+          copy_dst_last3 = (u32 *)(&copy_dst3[4]);
+          copy_src_last3 = (u32 *)(&copy_src3[4]);
+          copy_dst_last3[0] = copy_src_last3[0];
 
-		b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
-		b1->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
-		b2->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
-		b3->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+		  b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+		  b1->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+		  b2->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+		  b3->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
 		
 	      /* Fix the IP4 checksum and length */
-		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum0 = ip4_0->checksum;
 	      new_l0 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
@@ -257,14 +256,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_0->checksum = ip_csum_fold (sum0);
 	      ip4_0->length = new_l0;
-		  #else
-	      new_l0 = /* old_l0 always 0, see the rewrite setup */
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
-	      ip4_0->length = new_l0;
-	      ip4_0->checksum = ip4_header_checksum (ip4_0);
-		  #endif
 		  
-		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum1 = ip4_1->checksum;
 	      new_l1 = /* old_l1 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b1));
@@ -272,14 +264,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_1->checksum = ip_csum_fold (sum1);
 	      ip4_1->length = new_l1;
-		  #else
-	      new_l1 = /* old_l1 always 0, see the rewrite setup */
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b1));
-	      ip4_1->length = new_l1;
-	      ip4_1->checksum = ip4_header_checksum (ip4_1);
-		  #endif
 
-		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum2 = ip4_2->checksum;
 	      new_l2 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b2));
@@ -287,14 +272,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_2->checksum = ip_csum_fold (sum2);
 	      ip4_2->length = new_l2;
-		  #else
-	      new_l2 = /* old_l2 always 0, see the rewrite setup */
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b2));
-	      ip4_2->length = new_l2;
-	      ip4_2->checksum = ip4_header_checksum (ip4_2);
-		  #endif
 		  
-		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum3 = ip4_3->checksum;
 	      new_l3 = /* old_l1 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b3));
@@ -302,12 +280,6 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_3->checksum = ip_csum_fold (sum3);
 	      ip4_3->length = new_l3;
-		  #else
-	      new_l3 = /* old_l3 always 0, see the rewrite setup */
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b3));
-	      ip4_3->length = new_l3;
-	      ip4_3->checksum = ip4_header_checksum (ip4_3);
-		  #endif
 
 	      /* Fix UDP length and set source port */
 	      udp0 = (udp_header_t *)(ip4_0+1);
@@ -449,7 +421,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      ppf_gtpu3->length = new_l3;
 	    }
 
-          pkts_encapsulated += 4;
+      pkts_encapsulated += 4;
  	  len0 = vlib_buffer_length_in_chain (vm, b0);
  	  len1 = vlib_buffer_length_in_chain (vm, b1);
  	  len2 = vlib_buffer_length_in_chain (vm, b2);
@@ -501,20 +473,36 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  #endif 
 	  
 	  if (PREDICT_FALSE(b0->flags & VLIB_BUFFER_IS_TRACED))
-            {
-              ppf_gtpu_encap_trace_t *tr =
-                vlib_add_trace (vm, node, b0, sizeof (*tr));
-              tr->tunnel_index = t0 - gtm->tunnels;
-              tr->teid = t0->out_teid;
-           }
+	  {
+		  ppf_gtpu_encap_trace_t *tr =
+			  vlib_add_trace (vm, node, b0, sizeof (*tr));
+		  tr->tunnel_index = t0 - gtm->tunnels;
+		  tr->teid = t0->out_teid;
+	  }
+	  
+	  if (PREDICT_FALSE(b1->flags & VLIB_BUFFER_IS_TRACED))
+	  {
+		  ppf_gtpu_encap_trace_t *tr =
+			  vlib_add_trace (vm, node, b1, sizeof (*tr));
+		  tr->tunnel_index = t1 - gtm->tunnels;
+		  tr->teid = t1->out_teid;
+	  }
 
-          if (PREDICT_FALSE(b1->flags & VLIB_BUFFER_IS_TRACED))
-            {
-              ppf_gtpu_encap_trace_t *tr =
-                vlib_add_trace (vm, node, b1, sizeof (*tr));
-              tr->tunnel_index = t1 - gtm->tunnels;
-              tr->teid = t1->out_teid;
-            }
+	  if (PREDICT_FALSE(b2->flags & VLIB_BUFFER_IS_TRACED))
+	  {
+		  ppf_gtpu_encap_trace_t *tr =
+			  vlib_add_trace (vm, node, b2, sizeof (*tr));
+		  tr->tunnel_index = t2 - gtm->tunnels;
+		  tr->teid = t2->out_teid;
+	  }
+
+	  if (PREDICT_FALSE(b3->flags & VLIB_BUFFER_IS_TRACED))
+	  {
+		  ppf_gtpu_encap_trace_t *tr =
+			  vlib_add_trace (vm, node, b3, sizeof (*tr));
+		  tr->tunnel_index = t3 - gtm->tunnels;
+		  tr->teid = t3->out_teid;
+	  }
 
 	  vlib_validate_buffer_enqueue_x4 (vm, node, next_index,
 					   to_next, n_left_to_next,
@@ -526,16 +514,16 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	{
 	  u32 bi0;
 	  vlib_buffer_t * b0;
-          u32 flow_hash0;
+	  u32 flow_hash0;
 	  u32 len0;
-          ip4_header_t * ip4_0;
-          ip6_header_t * ip6_0;
-          udp_header_t * udp0;
-          ppf_gtpu_header_t * ppf_gtpu0;
-          u64 * copy_src0, * copy_dst0;
-          u32 * copy_src_last0, * copy_dst_last0;
-          u16 new_l0;
-          CLIB_UNUSED(ip_csum_t sum0);
+	  ip4_header_t * ip4_0;
+	  ip6_header_t * ip6_0;
+	  udp_header_t * udp0;
+	  ppf_gtpu_header_t * ppf_gtpu0;
+	  u64 * copy_src0, * copy_dst0;
+	  u32 * copy_src_last0, * copy_dst_last0;
+	  u16 new_l0;
+	  CLIB_UNUSED(ip_csum_t sum0);
 
 	  bi0 = from[0];
 	  to_next[0] = bi0;
@@ -546,7 +534,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 
 	  b0 = vlib_get_buffer (vm, bi0);
 
-        flow_hash0 = vnet_l2_compute_flow_hash(b0);
+	  flow_hash0 = vnet_l2_compute_flow_hash(b0);
 
 	  tid0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
 
@@ -557,8 +545,8 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  		PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
 	  vnet_buffer (b0)->sw_if_index[VLIB_TX] = t0->encap_fib_index;
 
-          /* Apply the rewrite string. $$$$ vnet_rewrite? */
-          vlib_buffer_advance (b0, -(word)_vec_len(t0->rewrite));
+	  /* Apply the rewrite string. $$$$ vnet_rewrite? */
+	  vlib_buffer_advance (b0, -(word)_vec_len(t0->rewrite));
 
 	  if (is_ip4)
 	    {
@@ -572,14 +560,13 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      foreach_fixed_header4_offset;
 #undef _
 	      /* Last 4 octets. Hopefully gcc will be our friend */
-              copy_dst_last0 = (u32 *)(&copy_dst0[4]);
-              copy_src_last0 = (u32 *)(&copy_src0[4]);
-              copy_dst_last0[0] = copy_src_last0[0];
+          copy_dst_last0 = (u32 *)(&copy_dst0[4]);
+          copy_src_last0 = (u32 *)(&copy_src0[4]);
+          copy_dst_last0[0] = copy_src_last0[0];
 
-             b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+          b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
 
 	      /* Fix the IP4 checksum and length */
-		  #if 1 /* Fix odd length packets chechsum issue */
 	      sum0 = ip4_0->checksum;
 	      new_l0 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
@@ -587,12 +574,6 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 				     length /* changed member */);
 	      ip4_0->checksum = ip_csum_fold (sum0);
 	      ip4_0->length = new_l0;
-		  #else
-	      new_l0 = /* old_l0 always 0, see the rewrite setup */
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
-	      ip4_0->length = new_l0;
-	      ip4_0->checksum = ip4_header_checksum (ip4_0);
-		  #endif
 
 	      /* Fix UDP length and set source port */
 	      udp0 = (udp_header_t *)(ip4_0+1);
@@ -644,7 +625,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      ppf_gtpu0->length = new_l0;
 	    }
 
-          pkts_encapsulated ++;
+	  pkts_encapsulated ++;
 	  len0 = vlib_buffer_length_in_chain (vm, b0);
 	  stats_n_packets += 1;
 	  stats_n_bytes += len0;
@@ -669,13 +650,14 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	    }
 	   #endif 
 
-          if (PREDICT_FALSE(b0->flags & VLIB_BUFFER_IS_TRACED))
-            {
-              ppf_gtpu_encap_trace_t *tr =
-                vlib_add_trace (vm, node, b0, sizeof (*tr));
-              tr->tunnel_index = t0 - gtm->tunnels;
-              tr->teid = t0->out_teid;
-            }
+      if (PREDICT_FALSE(b0->flags & VLIB_BUFFER_IS_TRACED))
+        {
+          ppf_gtpu_encap_trace_t *tr =
+            vlib_add_trace (vm, node, b0, sizeof (*tr));
+          tr->tunnel_index = t0 - gtm->tunnels;
+          tr->teid = t0->out_teid;
+        }
+
 	  vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
 					   to_next, n_left_to_next,
 					   bi0, next0);

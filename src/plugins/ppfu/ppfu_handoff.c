@@ -569,7 +569,7 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       }
 
       /* Compute hash, fix later!!! will use call-id + count */
-      hash = (u32) clib_xxhash (call_id0);
+      hash = call_id0; //(u32) clib_xxhash (call_id0);
 
       if ((rx_tunnel_index0 != INVALID_TUNNEL_ID) && ((t0->tunnel_type == PPF_GTPU_SB) || (t0->tunnel_type == PPF_GTPU_SRB)))
         vnet_buffer (b0)->handoff.next_index = PPF_PDCP_HANDOFF_DISPATCH_NEXT_PDCP_DECRYPT;
@@ -992,7 +992,7 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
       }
 
       /* Compute hash, fix later!!! will use call-id + count */
-      hash = (u32) clib_xxhash (call_id0);
+      hash = call_id0; //(u32) clib_xxhash (call_id0);
 
 	  vnet_buffer (b0)->handoff.next_index = PPF_TX_HANDOFF_DISPATCH_NEXT_GTPU4_ENCAP;
       if (PREDICT_FALSE((INVALID_TUNNEL_ID != rx_tunnel_index0) && (t0->tunnel_type == PPF_GTPU_SRB)))

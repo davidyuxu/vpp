@@ -26,7 +26,7 @@
 
 #define foreach_ppf_sb_path_lb_error    \
 _(GOOD, "packets delivered")     \
-_(HANDOFF, "packets handoffed")
+_(NO_BUF, "duplicate buffer errors")
 
 static char * ppf_sb_path_lb_error_strings[] = {
 #define _(sym,string) string,
@@ -71,7 +71,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
   u32 pkts_processed = 0;
   ppf_main_t *pm = &ppf_main;
   ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
-  u32 *buffers_duplicated = NULL;
+  static u32 *buffers_duplicated = NULL;
   
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
@@ -352,7 +352,11 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 						vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
 
 						vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
-					}
+					} else
+						vlib_node_increment_counter (vm, node->node_index,
+													 PPF_SB_PATH_LB_ERROR_NO_BUF,
+													 1);
+
 				}
 			}
 		}
@@ -384,7 +388,10 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 							vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
 
 							vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
-						}
+						} else
+							vlib_node_increment_counter (vm, node->node_index,
+														 PPF_SB_PATH_LB_ERROR_NO_BUF,
+														 1);
 					}
 				}
 			} else {
@@ -407,7 +414,10 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 							vnet_buffer2(c0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
 
 							vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
-						}
+						} else
+							vlib_node_increment_counter (vm, node->node_index,
+														 PPF_SB_PATH_LB_ERROR_NO_BUF,
+														 1);
 					}
 				}
 			}
@@ -453,7 +463,8 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 			   }
 			}
 			
-			
+			pkts_processed += 1;
+
 			/* verify speculative enqueue, maybe switch current next frame */
 			vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
 								 to_next, n_left_to_next,
@@ -465,6 +476,10 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 
 	vlib_put_next_frame (vm, node, next_index, n_left_to_next);
     }
+
+  vlib_node_increment_counter (vm, node->node_index,
+                               PPF_SB_PATH_LB_ERROR_GOOD,
+                               pkts_processed);
 
 
   return frame->n_vectors;
