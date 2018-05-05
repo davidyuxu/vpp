@@ -302,6 +302,12 @@ u8 *format_c_identifier (u8 * s, va_list * va);
 /* Format hexdump with both hex and printable chars - compatible with text2pcap */
 u8 *format_hexdump (u8 * s, va_list * va);
 
+/* Format throughput e.g. 100, 100k, 100m, 100g. */
+u8 *format_mbps_pps (u8 * s, va_list * va);
+u8 *format_mbps_pps_1000 (u8 * s, va_list * va);
+
+
+
 /* Unix specific formats. */
 #ifdef CLIB_UNIX
 /* Setup input from Unix file. */

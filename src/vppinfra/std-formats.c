@@ -321,6 +321,70 @@ format_hexdump (u8 * s, va_list * args)
   return s;
 }
 
+/* Unparse throughtput 100, 100k, 100m, 100g. */
+u8 *
+format_mbps_pps (u8 * s, va_list * va)
+{
+  f64 size = va_arg (*va, f64);
+  uword l, u, log_u;
+  uword usize = (uword) size;
+
+  l = usize > 0 ? min_log2 (usize) : 0;
+  if (l < 10)
+    log_u = 0;
+  else if (l < 20)
+    log_u = 10;
+  else if (l < 30)
+    log_u = 20;
+  else
+    log_u = 30;
+
+  u = (uword) 1 << log_u;
+  s = format (s, "%+10.3f", (f64) size / (f64) u);
+
+  if (log_u != 0)
+    s = format (s, "%c", " KMG"[log_u / 10]);
+
+  return s;
+}
+
+u8 *
+format_mbps_pps_1000 (u8 * s, va_list * va)
+{
+  f64 size = va_arg (*va, f64);
+  uword u, log_u;
+  uword usize = (uword) size;
+
+  if (usize < 1000)
+  	{
+    	log_u = 0;
+			u = 1;
+  	}
+  else if (usize < 1000000)
+  	{
+    	log_u = 10;
+			u = 1000;
+  	}
+  else if (usize < 1000000000)
+  	{
+    	log_u = 20;
+			u = 1000000;
+  	}
+  else
+  	{
+    	log_u = 30;
+			u = 1000000000;
+  	}
+
+  s = format (s, "%+10.3f", (f64) size / (f64) u);
+
+  if (log_u != 0)
+    s = format (s, "%c", " KMG"[log_u / 10]);
+
+  return s;
+}
+
+
 /*
  * fd.io coding-style-patch-verification: ON
  *

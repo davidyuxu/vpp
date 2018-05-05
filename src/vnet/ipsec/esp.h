@@ -295,19 +295,19 @@ ipsec_proto_init ()
 	c->block_size = 32;
 
 	/* GCM */
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_128];
-  c->type = EVP_aes_128_ctr ();
-  c->iv_size = 16;
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_128];
+  c->type = EVP_aes_128_gcm ();
+  c->iv_size = 8;
   c->block_size = 16;
 
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_192];
-  c->type = EVP_aes_192_ctr ();
-  c->iv_size = 24;
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_192];
+  c->type = EVP_aes_192_gcm ();
+  c->iv_size = 8;
   c->block_size = 24;
     
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_256];
-	c->type = EVP_aes_256_ctr ();
-	c->iv_size = 32;
+	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_256];
+	c->type = EVP_aes_256_gcm ();
+	c->iv_size = 8;
 	c->block_size = 32;
 
 	/* DES 3DES */
