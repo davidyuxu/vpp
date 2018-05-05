@@ -160,6 +160,59 @@ esp_encrypt_cbc2 (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8
   //EVP_EncryptFinal_ex (ctx, out + out_len, &out_len);
 }
 
+always_inline int
+esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv, u8 * tag)
+{
+  u32 thread_index = vlib_get_thread_index ();
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
+#else
+  EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
+#endif
+
+	//fformat (stdout, "CLEAR: %U \n", format_hexdump, in, in_len);
+
+
+#if 0
+		ipsec_proto_main_t *em = &ipsec_proto_main;
+
+		const EVP_CIPHER *cipher = cipher = em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
+			EVP_CipherInit_ex (ctx, cipher, NULL, sa->crypto_key, NULL, 1);
+			EVP_CIPHER_CTX_ctrl (ctx, EVP_CTRL_GCM_SET_IVLEN, 8, NULL);
+#endif
+
+  int out_len = 0;
+
+	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
+
+	/* Zero or more calls to specify any AAD */
+	EVP_CipherUpdate (ctx, NULL, &out_len, (u8 *)&sa->seq, 4);
+
+	/* Encrypt plaintext */
+	EVP_CipherUpdate(ctx, out, &out_len, in, in_len);
+
+#if 0 // kingwel, i guess we can save this
+	int ret;
+
+	/* Finalise: note get no output for GCM */
+	EVP_EncryptFinal_ex(ctx, out, &ret);
+#endif
+
+	/* Get tag */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, 16, tag);
+#else
+  EVP_CIPHER_CTX_ctrl (ctx, EVP_CTRL_GCM_GET_TAG, 16, tag);
+#endif
+
+	/* Output encrypted block */
+	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
+	//fformat (stdout, "TAG: %U \n", format_hexdump, tag, 16);
+
+	return out_len;
+}
+
+
 static uword
 esp_encrypt_node_fn (vlib_main_t * vm,
 		     vlib_node_runtime_t * node, vlib_frame_t * from_frame)
@@ -374,6 +427,14 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			case IPSEC_CRYPTO_ALG_AES_GCM_128:
 			case IPSEC_CRYPTO_ALG_AES_GCM_192:
 			case IPSEC_CRYPTO_ALG_AES_GCM_256:
+				//u8 tag[16];
+				esp_encrypt_gcm (sa0,
+						 (u8 *) vlib_buffer_get_current (i_b0),
+						 (u8 *) vlib_buffer_get_current (o_b0) +
+						 ip_hdr_size + sizeof (esp_header_t) +
+						 IV_SIZE, BLOCK_SIZE * blocks,
+						 sa0->crypto_key, iv, (u8 *) vlib_buffer_get_current (o_b0) + o_b0->current_length);
+				
 
 				break;
 		}

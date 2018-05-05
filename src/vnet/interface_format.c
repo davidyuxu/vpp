@@ -176,34 +176,6 @@ format_vnet_sw_if_index_name (u8 * s, va_list * args)
   return format (s, "%U", format_vnet_sw_interface_name, vnm, si);
 }
 
-/* Unparse memory size e.g. 100, 100k, 100m, 100g. */
-static u8 *
-format_mbps_pps (u8 * s, va_list * va)
-{
-  f64 size = va_arg (*va, f64);
-  uword l, u, log_u;
-  uword usize = (uword) size;
-
-  l = usize > 0 ? min_log2 (usize) : 0;
-  if (l < 10)
-    log_u = 0;
-  else if (l < 20)
-    log_u = 10;
-  else if (l < 30)
-    log_u = 20;
-  else
-    log_u = 30;
-
-  u = (uword) 1 << log_u;
-  s = format (s, "%+10.3f", (f64) size / (f64) u);
-
-  if (log_u != 0)
-    s = format (s, "%c", " KMG"[log_u / 10]);
-
-  return s;
-}
-
-
 u8 *
 format_vnet_hw_if_index_name (u8 * s, va_list * args)
 {
@@ -320,25 +292,25 @@ format_vnet_sw_interface_cntrs (u8 * s, vnet_interface_main_t * im,
 	if (n)
 	  _vec_len (n) = 0;
 	n = format (n, "%s packets", cm->name);
-	s = format (s, "%-16v%16Ld %U pps", n, vtotal.packets, format_mbps_pps, packet_rate);
+	s = format (s, "%-16v%16Ld %U pps", n, vtotal.packets, format_mbps_pps_1000, packet_rate);
 
 	if(verbose)
 		for (i = 0; i < vec_len (packets_rate); i++)
 	    {
 	    	if(packets_rate[i] > 0)
-					s = format (s, "\n%U Thread %u %-10v: %U", format_white_space, indent + 12, i, vlib_worker_threads[i].name, format_mbps_pps, packets_rate[i]);	      
+					s = format (s, "\n%U Thread %u %-10v: %U", format_white_space, indent + 12, i, vlib_worker_threads[i].name, format_mbps_pps_1000, packets_rate[i]);	      
 		  }
 
 	_vec_len (n) = 0;
 	n = format (n, "%s bytes", cm->name);
 	s = format (s, "\n%U%-16v%16Ld %U bps",
-		    format_white_space, indent, n, vtotal.bytes, format_mbps_pps, byte_rate * 8);
+		    format_white_space, indent, n, vtotal.bytes, format_mbps_pps_1000, byte_rate * 8);
 	
 	if(verbose)
 		for (i = 0; i < vec_len (packets_rate); i++)
       {
 				if(packets_rate[i] > 0)
-					s = format (s, "\n%U Thread %u %-10v: %U", format_white_space, indent + 12, i, vlib_worker_threads[i].name, format_mbps_pps, bytes_rate[i] * 8);	      
+					s = format (s, "\n%U Thread %u %-10v: %U", format_white_space, indent + 12, i, vlib_worker_threads[i].name, format_mbps_pps_1000, bytes_rate[i] * 8);	      
 		  }
     }
     vec_free (n);
@@ -392,12 +364,12 @@ format_vnet_sw_interface_cntrs (u8 * s, vnet_interface_main_t * im,
 	  s = format (s, "\n%U", format_white_space, indent);
 	n_printed += 1;
 
-	s = format (s, "%-16s%16Ld %U", cm->name, vtotal, format_mbps_pps, rate);
+	s = format (s, "%-16s%16Ld %U", cm->name, vtotal, format_mbps_pps_1000, rate);
 	if(verbose)
 		for (i = 0; i < vec_len (packets_rate); i++)
       {
 				if(packets_rate[i] > 0)
-					s = format (s, "\n%U Thread %u %-10v: %U", format_white_space, indent + 12, i, vlib_worker_threads[i].name, format_mbps_pps, packets_rate[i]);	      
+					s = format (s, "\n%U Thread %u %-10v: %U", format_white_space, indent + 12, i, vlib_worker_threads[i].name, format_mbps_pps_1000, packets_rate[i]);	      
 		  }
     }
   }

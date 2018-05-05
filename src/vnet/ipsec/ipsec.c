@@ -536,9 +536,9 @@ ipsec_rand_seed (void)
 static clib_error_t *
 ipsec_check_support (ipsec_sa_t * sa)
 {
+#if 0 // kingwel
   if (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_128)
     return clib_error_return (0, "unsupported aes-gcm-128 crypto-alg");
-#if 0 // kingwel
   if (sa->integ_alg == IPSEC_INTEG_ALG_NONE)
     return clib_error_return (0, "unsupported none integ-alg");
 #endif
