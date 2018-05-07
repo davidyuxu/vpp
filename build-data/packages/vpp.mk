@@ -21,7 +21,8 @@ else
 vpp_configure_depend += dpdk-install
 vpp_CPPFLAGS += $(call installed_includes_fn, dpdk)/dpdk
 vpp_LDFLAGS += $(call installed_libs_fn, dpdk) -L$(BR)/../3rd-party/libbacktrace/.libs
-vpp_CPPFLAGS += -I/usr/include/dpdk -I$(BR)/../3rd-party/libbacktrace
+vpp_LDFLAGS += -L$(BR)/../../../3rd-party/openssl/build/lib -Wl,-rpath -Wl,$(BR)/../../../3rd-party/openssl/build/lib
+vpp_CPPFLAGS += -I/usr/include/dpdk -I$(BR)/../3rd-party/libbacktrace -I$(BR)/../../../3rd-party/openssl/build/include
 endif
 ifeq ($($(PLATFORM)_uses_dpdk_mlx5_pmd),yes)
 vpp_configure_args += --with-dpdk-mlx5-pmd
