@@ -272,7 +272,7 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 		if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
 	    {
 
-			  hmac_calc2 (sa0, (u8 *) vlib_buffer_get_current (i_b0),
+			  hmac_calc (sa0, (u8 *) vlib_buffer_get_current (i_b0),
 		     i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
 
 	  		memcpy (digest, (char *) &sig[0], 12);

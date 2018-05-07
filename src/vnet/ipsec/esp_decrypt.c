@@ -81,39 +81,7 @@ format_esp_decrypt_trace (u8 * s, va_list * args)
 }
 
 always_inline void
-esp_decrypt_cbc (ipsec_crypto_alg_t alg,
-		 u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv)
-{
-  ipsec_proto_main_t *em = &ipsec_proto_main;
-  u32 thread_index = vlib_get_thread_index ();
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  EVP_CIPHER_CTX *ctx = em->per_thread_data[thread_index].decrypt_ctx;
-#else
-  EVP_CIPHER_CTX *ctx = &(em->per_thread_data[thread_index].decrypt_ctx);
-#endif
-  const EVP_CIPHER *cipher = NULL;
-  int out_len;
-
-  ASSERT (alg < IPSEC_CRYPTO_N_ALG);
-
-  if (PREDICT_FALSE (em->ipsec_proto_main_crypto_algs[alg].type == 0))
-    return;
-
-  if (PREDICT_FALSE
-      (alg != em->per_thread_data[thread_index].last_decrypt_alg))
-    {
-      cipher = em->ipsec_proto_main_crypto_algs[alg].type;
-      em->per_thread_data[thread_index].last_decrypt_alg = alg;
-    }
-
-  EVP_DecryptInit_ex (ctx, cipher, NULL, key, iv);
-
-  EVP_DecryptUpdate (ctx, out, &out_len, in, in_len);
-  EVP_DecryptFinal_ex (ctx, out + out_len, &out_len);
-}
-
-always_inline void
-esp_decrypt_cbc2 (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv)
+esp_decrypt_cbc (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv)
 {
   u32 thread_index = vlib_get_thread_index ();
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
@@ -240,7 +208,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 					u8 *icv = vlib_buffer_get_tail (i_b0) - icv_size;
 					i_b0->current_length -= icv_size;
 				
-					hmac_calc2 (sa0, (u8 *) esp0, i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
+					hmac_calc (sa0, (u8 *) esp0, i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
 				
 					if (PREDICT_FALSE (memcmp (icv, sig, icv_size)))
 					{
@@ -297,7 +265,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 				case IPSEC_CRYPTO_ALG_AES_CTR_256:
 				case IPSEC_CRYPTO_ALG_DES_CBC:
 				case IPSEC_CRYPTO_ALG_3DES_CBC:
-					esp_decrypt_cbc2 (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), BLOCK_SIZE * blocks, sa0->crypto_key, esp0->data);
+					esp_decrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), BLOCK_SIZE * blocks, sa0->crypto_key, esp0->data);
 					break;
 				case IPSEC_CRYPTO_ALG_AES_GCM_128:
 				case IPSEC_CRYPTO_ALG_AES_GCM_192:

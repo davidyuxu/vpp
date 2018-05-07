@@ -73,34 +73,8 @@ typedef struct
 
 typedef struct
 {
-  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  EVP_CIPHER_CTX *encrypt_ctx;
-#else
-  EVP_CIPHER_CTX encrypt_ctx;
-#endif
-    CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  EVP_CIPHER_CTX *decrypt_ctx;
-#else
-  EVP_CIPHER_CTX decrypt_ctx;
-#endif
-    CLIB_CACHE_LINE_ALIGN_MARK (cacheline2);
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  HMAC_CTX *hmac_ctx;
-#else
-  HMAC_CTX hmac_ctx;
-#endif
-  ipsec_crypto_alg_t last_encrypt_alg;
-  ipsec_crypto_alg_t last_decrypt_alg;
-  ipsec_integ_alg_t last_integ_alg;
-} ipsec_proto_main_per_thread_data_t;
-
-typedef struct
-{
   ipsec_proto_main_crypto_alg_t *ipsec_proto_main_crypto_algs;
   ipsec_proto_main_integ_alg_t *ipsec_proto_main_integ_algs;
-  ipsec_proto_main_per_thread_data_t *per_thread_data;
 } ipsec_proto_main_t;
 
 extern ipsec_proto_main_t ipsec_proto_main;
@@ -258,8 +232,6 @@ always_inline void
 ipsec_proto_init ()
 {
   ipsec_proto_main_t *em = &ipsec_proto_main;
-  vlib_thread_main_t *tm = vlib_get_thread_main ();
-
   memset (em, 0, sizeof (em[0]));
 
   vec_validate (em->ipsec_proto_main_crypto_algs, IPSEC_CRYPTO_N_ALG - 1);
@@ -268,7 +240,7 @@ ipsec_proto_init ()
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_NONE];
   c->type = NULL;
   c->iv_size = 0;
-  c->block_size = 0;
+  c->block_size = 1;
 
 	/* CBC */
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128];
@@ -278,45 +250,45 @@ ipsec_proto_init ()
 
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192];
   c->type = EVP_aes_192_cbc ();
-  c->iv_size = 24;
-  c->block_size = 24;
+  c->iv_size = 16;
+  c->block_size = 16;
     
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256];
 	c->type = EVP_aes_256_cbc ();
-	c->iv_size = 32;
-	c->block_size = 32;
+	c->iv_size = 16;
+	c->block_size = 16;
 
 	/* CTR */
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_128];
   c->type = EVP_aes_128_ctr ();
   c->iv_size = 16;
-  c->block_size = 16;
+  c->block_size = 1;
 
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_192];
   c->type = EVP_aes_192_ctr ();
-  c->iv_size = 24;
-  c->block_size = 24;
+  c->iv_size = 16;
+  c->block_size = 1;
     
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_256];
 	c->type = EVP_aes_256_ctr ();
-	c->iv_size = 32;
-	c->block_size = 32;
+	c->iv_size = 16;
+	c->block_size = 1;
 
 	/* GCM */
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_128];
   c->type = EVP_aes_128_gcm ();
   c->iv_size = 8;
-  c->block_size = 16;
+  c->block_size = 1;
 
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_192];
   c->type = EVP_aes_192_gcm ();
   c->iv_size = 8;
-  c->block_size = 24;
+  c->block_size = 1;
     
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_256];
 	c->type = EVP_aes_256_gcm ();
 	c->iv_size = 8;
-	c->block_size = 32;
+	c->block_size = 1;
 
 	/* DES 3DES */
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC];
@@ -371,67 +343,10 @@ ipsec_proto_init ()
   i->md = NULL;
   i->mac_size = 16;
   i->trunc_size = 16;
-
-  vec_validate_aligned (em->per_thread_data, tm->n_vlib_mains - 1,
-			CLIB_CACHE_LINE_BYTES);
-  int thread_id;
-
-  for (thread_id = 0; thread_id < tm->n_vlib_mains; thread_id++)
-    {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-      em->per_thread_data[thread_id].encrypt_ctx = EVP_CIPHER_CTX_new ();
-      em->per_thread_data[thread_id].decrypt_ctx = EVP_CIPHER_CTX_new ();
-      em->per_thread_data[thread_id].hmac_ctx = HMAC_CTX_new ();
-#else
-      EVP_CIPHER_CTX_init (&(em->per_thread_data[thread_id].encrypt_ctx));
-      EVP_CIPHER_CTX_init (&(em->per_thread_data[thread_id].decrypt_ctx));
-      HMAC_CTX_init (&(em->per_thread_data[thread_id].hmac_ctx));
-#endif
-    }
 }
 
 always_inline unsigned int
-hmac_calc (ipsec_integ_alg_t alg,
-	   u8 * key,
-	   int key_len,
-	   u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi)
-{
-  ipsec_proto_main_t *em = &ipsec_proto_main;
-  u32 thread_index = vlib_get_thread_index ();
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  HMAC_CTX *ctx = em->per_thread_data[thread_index].hmac_ctx;
-#else
-  HMAC_CTX *ctx = &(em->per_thread_data[thread_index].hmac_ctx);
-#endif
-  const EVP_MD *md = NULL;
-  unsigned int len;
-
-  ASSERT (alg < IPSEC_INTEG_N_ALG);
-
-  if (PREDICT_FALSE (em->ipsec_proto_main_integ_algs[alg].md == 0))
-    return 0;
-
-  if (PREDICT_FALSE (alg != em->per_thread_data[thread_index].last_integ_alg))
-    {
-      md = em->ipsec_proto_main_integ_algs[alg].md;
-      em->per_thread_data[thread_index].last_integ_alg = alg;
-    }
-
-	HMAC_Init_ex (ctx, key, key_len, md, NULL);
-
-  HMAC_Update (ctx, data, data_len);
-
-  if (PREDICT_TRUE (use_esn))
-    HMAC_Update (ctx, (u8 *) & seq_hi, sizeof (seq_hi));
-  HMAC_Final (ctx, signature, &len);
-
-	fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
-
-  return em->ipsec_proto_main_integ_algs[alg].trunc_size;
-}
-
-always_inline unsigned int
-hmac_calc2 (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi)
+hmac_calc (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi)
 {
   ipsec_proto_main_t *em = &ipsec_proto_main;
   u32 thread_index = vlib_get_thread_index ();
