@@ -311,29 +311,31 @@ typedef struct
 	u32 FSM_R2;
 	u32 FSM_R3;
 
-}SNOW3G_CTX;
+}snow3g_ctx_t;
 
 
+typedef struct _ppf_pdcp_sa_t_
+{
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  EVP_CIPHER_CTX *cypher_ctx;
+#else
+  EVP_CIPHER_CTX cypher_ctx;
+#endif
+  CMAC_CTX *integrity_ctx;
+
+} ppf_pdcp_aes_sa_t;
 
 
 
 typedef struct
 {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  EVP_CIPHER_CTX *crypto_ctx;
-#else
-  EVP_CIPHER_CTX crypto_ctx;
-#endif
 
-//CMAC context
-//#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  CMAC_CTX *integrity_ctx;
-//#else
-//  CMAC_CTX integrity_ctx;
-//#endif
+
+  ppf_pdcp_aes_sa_t up_sa;
+  ppf_pdcp_aes_sa_t down_sa;
 
   //snow 3g ctx
-  SNOW3G_CTX  snow3g_ctx;
+  snow3g_ctx_t  snow3g_ctx;
 
 
   u8  integrity_key[MAX_PDCP_KEY_LEN];
