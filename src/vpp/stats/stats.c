@@ -368,8 +368,8 @@ throughput_over_interval_get (u32 interval, u32 * mbps, u32 * pps)
 	for (i = starting_bin; i < ending_bin; i++) {
         vec_foreach(sm, throughput_stats_main.if_stats_by_bin[i % SYSTEM_THROUGHPUT_MAX_BINS]) {
             vec_foreach (c, sm->counters) {
-                inbytes += c->rx.bytes;
-                inpkts += c->rx.packets;
+                inbytes += c->rx.bytes + c->tx.bytes;
+                inpkts += c->rx.packets + c->rx.packets;
             }
         }
 	}
