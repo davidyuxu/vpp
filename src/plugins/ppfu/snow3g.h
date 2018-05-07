@@ -21,7 +21,7 @@
  * See Section 4.1.
  */
 
-void Initialize(SNOW3G_CTX* ctx,u32 k[4], u32 IV[4]);
+void Initialize(snow3g_ctx_t* ctx,u32 k[4], u32 IV[4]);
 
 /* Generation of Keystream.
  * input n: number of 32-bit words of keystream.
@@ -31,7 +31,7 @@ void Initialize(SNOW3G_CTX* ctx,u32 k[4], u32 IV[4]);
  * See section 4.2.
  */
 
-void GenerateKeystream(SNOW3G_CTX* ctx,u32 n, u32 *z);
+void GenerateKeystream(snow3g_ctx_t* ctx,u32 n, u32 *z);
 
 /* f8.
  * Input key: 128 bit Confidentiality Key.
@@ -47,7 +47,7 @@ void GenerateKeystream(SNOW3G_CTX* ctx,u32 n, u32 *z);
  * defined in Section 3.
  */
 
-void f8(SNOW3G_CTX* ctx, u8 *key, u32 count, u32 bearer, u32 dir, \
+void f8(snow3g_ctx_t* ctx, u8 *key, u32 count, u32 bearer, u32 dir, \
 	u8 *data, u8 *output,  u32 length );
 
 /* f9.
@@ -61,15 +61,15 @@ void f8(SNOW3G_CTX* ctx, u8 *key, u32 count, u32 bearer, u32 dir, \
  * Generates 32-bit MAC using UIA2 algorithm as defined in Section 4.
  */
 
-u8* f9(SNOW3G_CTX* ctx, u8* key, u32 count, u32 fresh, u32 dir, \
+u8* f9(snow3g_ctx_t* ctx, u8* key, u32 count, u32 fresh, u32 dir, \
 	u8 *data, u64 length, u8* MAC_I);
 
 
-void snow3g_encrypt(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length);
-void snow3g_decrypt(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length);
+void snow3g_encrypt(snow3g_ctx_t* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length);
+void snow3g_decrypt(snow3g_ctx_t* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length);
 	
-void snow3g_protect(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I);
-void snow3g_validate(SNOW3G_CTX* ctx,u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I);
+void snow3g_protect(snow3g_ctx_t* ctx,u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I);
+void snow3g_validate(snow3g_ctx_t* ctx,u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I);
 
 #endif /*included_snow3g_h*/
 /*
