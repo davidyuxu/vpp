@@ -92,12 +92,19 @@ esp_decrypt_cbc (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 
   int out_len;
 
+	//fformat (stdout, "Before DE: %U\n", format_hexdump, in, in_len);
+
 	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
 
   EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
 
   EVP_CipherUpdate (ctx, out, &out_len, in, in_len);
-  EVP_CipherFinal_ex (ctx, out + out_len, &out_len);
+
+	//fformat (stdout, "After DE: %U\n", format_hexdump, out, in_len);
+
+  //EVP_CipherFinal_ex (ctx, out + out_len, &out_len);
+
+	//fformat (stdout, "After DE: rv=%d outlen=%d\n", rv, out_len);
 }
 
 static uword
@@ -308,7 +315,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 	      f0 = (esp_footer_t *) ((u8 *) vlib_buffer_get_current (i_b0) + i_b0->current_length);
 	      i_b0->current_length -= f0->pad_length;
 
-				fformat (stdout, "DE: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
+				//fformat (stdout, "DE: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
 
 	      /* tunnel mode */
 	      if (PREDICT_TRUE (tunnel_mode))

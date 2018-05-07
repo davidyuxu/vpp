@@ -96,17 +96,11 @@ esp_encrypt_cbc (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
   EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
 #endif
 
-#if 0
-		ipsec_proto_main_t *em = &ipsec_proto_main;
-
-		const EVP_CIPHER *cipher = cipher = em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
-			EVP_CipherInit_ex (ctx, cipher, NULL, sa->crypto_key, iv, 1);
-#endif
-
-
   int out_len;
 
 	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
+
+	//fformat (stdout, "Before EN: %U\n", format_hexdump, in, in_len);
 
 	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
 
@@ -114,14 +108,9 @@ esp_encrypt_cbc (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 
 	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
 
-  EVP_CipherFinal_ex (ctx, out + out_len, &out_len);
-	//EVP_EncryptInit_ex (ctx, NULL, NULL, NULL, iv);
+  //EVP_CipherFinal_ex (ctx, out + out_len, &out_len);
 
-  //EVP_EncryptUpdate (ctx, out, &out_len, in, in_len);
-
-	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
-
-  //EVP_EncryptFinal_ex (ctx, out + out_len, &out_len);
+	//fformat (stdout, "After EN: %U\n Outlen=%u\n", format_hexdump, out, in_len, out_len);	
 }
 
 always_inline void
