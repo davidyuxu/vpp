@@ -177,7 +177,7 @@ ah_decrypt_node_fn (vlib_main_t * vm,
 		  ih4->flags_and_fragment_offset = 0;
 		}		//TODO else part for IPv6
 
-		hmac_calc2 (sa0, (u8 *) ih4, i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
+		hmac_calc (sa0, (u8 *) ih4, i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
 
 	  if (PREDICT_FALSE (memcmp (digest, sig, icv_size)))
 		{

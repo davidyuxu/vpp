@@ -546,7 +546,6 @@ ipsec_init (vlib_main_t * vm)
 {
   clib_error_t *error;
   ipsec_main_t *im = &ipsec_main;
-  vlib_thread_main_t *tm = vlib_get_thread_main ();
   vlib_node_t *node;
 
 	//CRYPTO_set_mem_functions (clib_mem_alloc, clib_mem_realloc2, clib_mem_free);
@@ -561,9 +560,6 @@ ipsec_init (vlib_main_t * vm)
   im->spd_index_by_spd_id = hash_create (0, sizeof (uword));
   im->sa_index_by_sa_id = hash_create (0, sizeof (uword));
   im->spd_index_by_sw_if_index = hash_create (0, sizeof (uword));
-
-  vec_validate_aligned (im->empty_buffers, tm->n_vlib_mains - 1,
-			CLIB_CACHE_LINE_BYTES);
 
   node = vlib_get_node_by_name (vm, (u8 *) "error-drop");
   ASSERT (node);
