@@ -160,7 +160,7 @@ esp_encrypt_cbc2 (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8
   //EVP_EncryptFinal_ex (ctx, out + out_len, &out_len);
 }
 
-always_inline int
+always_inline void
 esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv, u8 * tag)
 {
   u32 thread_index = vlib_get_thread_index ();
@@ -191,25 +191,17 @@ esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 	/* Encrypt plaintext */
 	EVP_CipherUpdate(ctx, out, &out_len, in, in_len);
 
-#if 0 // kingwel, i guess we can save this
-	int ret;
-
 	/* Finalise: note get no output for GCM */
-	EVP_EncryptFinal_ex(ctx, out, &ret);
-#endif
+	EVP_EncryptFinal_ex(ctx, out, &out_len);
 
 	/* Get tag */
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, 16, tag);
-#else
   EVP_CIPHER_CTX_ctrl (ctx, EVP_CTRL_GCM_GET_TAG, 16, tag);
-#endif
 
 	/* Output encrypted block */
 	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
 	//fformat (stdout, "TAG: %U \n", format_hexdump, tag, 16);
 
-	return out_len;
+	return;
 }
 
 
@@ -269,7 +261,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 		const int BLOCK_SIZE = em->ipsec_proto_main_crypto_algs[sa0->crypto_alg].block_size;
 		const int IV_SIZE = em->ipsec_proto_main_crypto_algs[sa0->crypto_alg].iv_size;
 
-		fformat (stdout, "IN: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
+		//fformat (stdout, "IN: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
 
 	  if (PREDICT_FALSE (esp_seq_advance (sa0)))
 	    {
@@ -430,10 +422,9 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 				//u8 tag[16];
 				esp_encrypt_gcm (sa0,
 						 (u8 *) vlib_buffer_get_current (i_b0),
-						 (u8 *) vlib_buffer_get_current (o_b0) +
-						 ip_hdr_size + sizeof (esp_header_t) +
-						 IV_SIZE, BLOCK_SIZE * blocks,
-						 sa0->crypto_key, iv, (u8 *) vlib_buffer_get_current (o_b0) + o_b0->current_length);
+						 (u8 *) vlib_buffer_get_current (i_b0),
+						 BLOCK_SIZE * blocks,
+						 sa0->crypto_key, iv, (u8 *) vlib_buffer_get_current (i_b0) + i_b0->current_length);
 				
 
 				break;
@@ -472,7 +463,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			n_ih0->ip4.checksum = ip4_header_checksum (&n_ih0->ip4);
     }
 
-		fformat (stdout, "IN2: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
+		//fformat (stdout, "IN2: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
 
 	  if (transport_mode)
 	    vlib_buffer_reset (i_b0);

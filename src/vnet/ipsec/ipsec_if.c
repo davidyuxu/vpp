@@ -230,13 +230,11 @@ ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa, u8 is_encrypt)
 		{
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 			EVP_CipherInit_ex (sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, is_encrypt ? 1 : 0);
-			if (set_iv_len)
-				EVP_CIPHER_CTX_ctrl (sa->context[thread_id].cipher_ctx, EVP_CTRL_AEAD_SET_IVLEN, 8, NULL);
 #else
 			EVP_CipherInit_ex (&sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, is_encrypt ? 1 : 0);
-			if (set_iv_len)
-				EVP_CIPHER_CTX_ctrl (&sa->context[thread_id].cipher_ctx, EVP_CTRL_GCM_SET_IVLEN, 8, NULL);
 #endif
+		if (set_iv_len)
+			EVP_CIPHER_CTX_ctrl (&sa->context[thread_id].cipher_ctx, EVP_CTRL_GCM_SET_IVLEN, 8, NULL);
 		}
 }
 
