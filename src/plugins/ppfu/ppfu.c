@@ -187,7 +187,7 @@ void ppf_init_callline_intf (u32 call_id)
 			    hi = vnet_get_hw_interface (vnm, hw_if_index);
 			  }
 	
-			  u32 encap_index = ppf_sb_path_lb_node.index;
+			  u32 encap_index = ppf_lbo_input_node.index;
 			  vnet_set_interface_output_node (vnm, hw_if_index, encap_index);
 	
 			  call_line->hw_if_index = hw_if_index;
@@ -514,6 +514,8 @@ ppf_init (vlib_main_t * vm)
     vec_validate (*buffers, ((MAX_SB_PER_CALL + 1) * VLIB_FRAME_SIZE) - 1);
     _vec_len (*buffers) = 0;
   }
+
+  pm->io_mode = PPF_IO_MODE_SHARED;
 
   return 0;
 }

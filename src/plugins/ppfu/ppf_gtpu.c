@@ -295,7 +295,7 @@ ppf_gtpu_decap_next_is_valid (ppf_gtpu_main_t * gtm, u32 is_ip6, u32 decap_next_
   return decap_next_index < r->n_next_nodes;
 }
 
-#if 0
+#if 1
 static uword
 vtep_addr_ref (ip46_address_t * ip)
 {
@@ -845,6 +845,9 @@ int vnet_ppf_gtpu_add_tunnel
 		return VNET_API_ERROR_NEXT_HOP_NOT_FOUND_MP;
 	}
 
+	/* For gtpu bypass */
+	vtep_addr_ref (&t->src);
+
 	t->sw_if_index = sw_if_index;
 
     }
@@ -944,9 +947,12 @@ int vnet_ppf_gtpu_del_tunnel
           hash_unset_mem_free (&gtm->ppf_gtpu6_tunnel_by_key, &key6);
       }
 
+	/* for gtpu bypass */
+	vtep_addr_unref (&t->src);
+
 	vec_free (t->rewrite);
-     
-      pool_put (gtm->tunnels, t);
+
+	pool_put (gtm->tunnels, t);
 
   return 0;
 }
@@ -2118,8 +2124,6 @@ ppf_gtpu_config (vlib_main_t * vm, unformat_input_t * input)
 VLIB_CONFIG_FUNCTION (ppf_gtpu_config, "ppf_gtpu");
 
 
-#define PPF_JTS_GTPU_PORT     54321
-
 clib_error_t *
 ppf_gtpu_init (vlib_main_t * vm)
 {
@@ -2161,14 +2165,6 @@ ppf_gtpu_init (vlib_main_t * vm)
     pi->unformat_pg_edit = unformat_pg_ppf_gtpu_header;
 
   pi = udp_get_dst_port_info (&udp_main, UDP_DST_PORT_GTPU6, 0);
-  if (pi)
-    pi->unformat_pg_edit = unformat_pg_ppf_gtpu_header;
-
-  /* Register RX node from JTS, by Jordy */
-  udp_register_dst_port (vm, PPF_JTS_GTPU_PORT,
-			 ppf_gtpu4_input_node.index, /* is_ip4 */ 1);
-
-  pi = udp_get_dst_port_info (&udp_main, PPF_JTS_GTPU_PORT, 1);
   if (pi)
     pi->unformat_pg_edit = unformat_pg_ppf_gtpu_header;
 

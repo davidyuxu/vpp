@@ -99,6 +99,18 @@ typedef enum {
     PPF_SB_PATH_LB_N_NEXT,
 } ppf_sb_path_lb_next_t;
 
+
+#define foreach_ppf_lbo_input_next        \
+_(DROP, "error-drop")                      \
+_(SB_PATH_LB, "ppf_sb_path_lb")
+
+typedef enum {
+    PPF_LBO_INPUT_NEXT_DROP,
+    PPF_LBO_INPUT_NEXT_SB_PATH_LB,
+    PPF_LBO_INPUT_N_NEXT,
+} ppf_lbo_input_next_t;
+
+
 #define foreach_ppf_srb_nb_rx_next        \
 _(DROP, "error-drop")   		  \
 _(PPF_PDCP_ENCRYPT, "ppf_pdcp_encrypt")   \
@@ -506,11 +518,17 @@ typedef struct
   u32 lbo_mode;
 } vnet_ppf_add_callline_args_t;
 
+enum {
+  PPF_IO_MODE_SHARED = 0,
+  PPF_IO_MODE_DEDICATED
+};
+
 typedef struct
 {
   ppf_callline_t * ppf_calline_table;
   
   u32 handoff_enable;
+  u32 io_mode;
   u32 max_capacity;
   u32 **buffers_duplicated_per_thread;
   
@@ -525,6 +543,7 @@ extern vlib_node_registration_t ppf_pdcp_decrypt_node;
 extern vlib_node_registration_t ppf_pdcp_encrypt_node;
 extern vlib_node_registration_t ppf_pdcp_input_node;
 extern vlib_node_registration_t ppf_sb_path_lb_node;
+extern vlib_node_registration_t ppf_lbo_input_node;
 extern vlib_node_registration_t ppf_srb_nb_rx_node;
 extern vlib_node_registration_t ppf_srb_nb_tx_node;
 
