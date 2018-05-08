@@ -1392,6 +1392,9 @@ ppfu_handoff_init (vlib_main_t * vm)
   hm->vlib_main = vm;
   hm->vnet_main = &vnet_main;
 
+  if ((error = vlib_call_init_function (vm, ppf_init)))
+    return error;
+
   if (hm->num_workers < 2) {
     ppf_main.handoff_enable = 0;
   } else {
@@ -1402,6 +1405,11 @@ ppfu_handoff_init (vlib_main_t * vm)
     
     hm->num_pdcp_workers = hm->num_workers - hm->num_tx_workers;
     hm->first_pdcp_worker_index = hm->first_tx_worker_index + hm->num_tx_workers;
+
+    if ((ppf_main.io_mode == PPF_IO_MODE_DEDICATED) && (0 == (hm->num_tx_workers % 2))) {
+      hm->num_tx_workers >>= 1;
+      hm->first_tx_worker_index += hm->num_tx_workers;
+    }
   }
 
   vlib_node_t *error_drop_node =
@@ -1423,6 +1431,69 @@ ppfu_handoff_init (vlib_main_t * vm)
 }
 
 VLIB_INIT_FUNCTION (ppfu_handoff_init);
+
+
+static clib_error_t *
+ppfu_handoff_set_command_fn (vlib_main_t * vm,
+					unformat_input_t * input,
+					vlib_cli_command_t * cmd)
+{
+  clib_error_t *error = NULL;
+  int handoff_enable = ~0;
+  u32 io_mode = ~0;
+  
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat_user (input, unformat_vlib_enable_disable, &handoff_enable))
+        ;
+      else if (unformat (input, "io-mode")) {
+        if (unformat (input, "shared"))
+          io_mode = PPF_IO_MODE_SHARED;
+        else if (unformat (input, "dedicated"))
+          io_mode = PPF_IO_MODE_DEDICATED;
+      }
+      else
+      {
+        error = clib_error_return (0, "parse error: '%U'", format_unformat_error, input);
+        return error;
+      }
+    }
+
+  if ((handoff_enable != ~0) && (handoff_enable != ppf_main.handoff_enable))
+    ppf_main.handoff_enable = handoff_enable;
+
+  if ((io_mode != ~0) && (io_mode != ppf_main.io_mode)) {
+    ppfu_handoff_main_t *hm = &ppfu_handoff_main;
+
+    ppf_main.io_mode = io_mode;
+
+    hm->num_tx_workers = (hm->num_workers < 4) ? 1 : 2;
+    hm->first_tx_worker_index = hm->first_worker_index;
+    
+    hm->num_pdcp_workers = hm->num_workers - hm->num_tx_workers;
+    hm->first_pdcp_worker_index = hm->first_tx_worker_index + hm->num_tx_workers;
+    
+    if ((ppf_main.io_mode == PPF_IO_MODE_DEDICATED) && (0 == (hm->num_tx_workers % 2))) {
+      hm->num_tx_workers >>= 1;
+      hm->first_tx_worker_index += hm->num_tx_workers;
+    }
+  }
+
+  vlib_cli_output (vm, "PPF handoff %s, io-mode %s\n",
+                   (ppf_main.handoff_enable ? "enable" : "disable"),
+                   ((ppf_main.io_mode == PPF_IO_MODE_DEDICATED) ? "dedicated" : "shared"));
+
+  return error;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (set_ppf_handoff_command, static) = {
+  .path = "set ppf_handoff",
+  .short_help =	"set ppf_handoff [<enable|disable>] [io-mode <shared|dedicated>]",
+  .function = ppfu_handoff_set_command_fn,
+};
+/* *INDENT-ON* */
+
 
 /*
  * fd.io coding-style-patch-verification: ON

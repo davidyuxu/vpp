@@ -319,7 +319,6 @@ ppf_gtpu_input (vlib_main_t * vm,
 
       vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_index0;
       vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = next_tunne_id0;
-
 		
 	  if (callline0->lbo_mode == PPF_LBO_MODE)
 		vnet_buffer(b0)->sw_if_index [VLIB_TX] = vec_elt (ip4m->fib_index_by_sw_if_index, callline0->sw_if_index);
