@@ -604,10 +604,13 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       next_worker_index += index0;
 
       if (next_worker_index != current_worker_index) {
+#if 0
         fq = is_vlib_frame_queue_congested (hm->pdcp_frame_queue_index, next_worker_index,
                                             PPFU_HANDOFF_QUEUE_HI_THRESHOLD,
                                             congested_ppf_pdcp_handoff_queue_by_wi);
-        
+#else
+        fq = NULL;
+#endif        
         if (fq)
         {
           /* if this is 1st frame */
