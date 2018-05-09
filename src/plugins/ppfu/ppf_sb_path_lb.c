@@ -189,11 +189,15 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   u8 id;
 		   u32 tx_tunnel_id;
 		   u32 duplicate = 0;
+		   ppf_gtpu_tunnel_t * t;
 		   
 		   for (id = 0; id < sb_num0; id++) {
 			   tx_tunnel_id = sb_tunnels0[sb_ids0[id]].tunnel_id;
 			   if (INVALID_TUNNEL_ID == tx_tunnel_id)
 				   continue;
+			   t = pool_elt_at_index (gtm->tunnels, tx_tunnel_id);
+			   if (t && (t->out_teid == 0))
+			       continue;
 			   
 			   duplicate++;
 			   if (PREDICT_TRUE(1 == duplicate))
@@ -266,10 +270,15 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 			u8 id;
 			u32 tx_tunnel_id;
 			u32 duplicate = 0;
+			ppf_gtpu_tunnel_t * t;
 			
 			for (id = 0; id < sb_num1; id++) {
 				tx_tunnel_id = sb_tunnels1[sb_ids1[id]].tunnel_id;
 				if (INVALID_TUNNEL_ID == tx_tunnel_id)
+					continue;
+
+				t = pool_elt_at_index (gtm->tunnels, tx_tunnel_id);
+				if (t && (t->out_teid == 0))
 					continue;
 				
 				duplicate++;
@@ -343,12 +352,17 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 			u8 id;
 			u32 tx_tunnel_id;
 			u32 duplicate = 0;
+			ppf_gtpu_tunnel_t * t;
 			
 			for (id = 0; id < sb_num2; id++) {
 				tx_tunnel_id = sb_tunnels2[sb_ids2[id]].tunnel_id;
 				if (INVALID_TUNNEL_ID == tx_tunnel_id)
 					continue;
 				
+				t = pool_elt_at_index (gtm->tunnels, tx_tunnel_id);
+				if (t && (t->out_teid == 0))
+					continue;
+
 				duplicate++;
 				if (PREDICT_TRUE(1 == duplicate))
 					vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
@@ -419,12 +433,17 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   u8 id;
 		   u32 tx_tunnel_id;
 		   u32 duplicate = 0;
+		   ppf_gtpu_tunnel_t * t;
 		   
 		   for (id = 0; id < sb_num3; id++) {
 			   tx_tunnel_id = sb_tunnels3[sb_ids3[id]].tunnel_id;
 			   if (INVALID_TUNNEL_ID == tx_tunnel_id)
 				   continue;
 			   
+			   t = pool_elt_at_index (gtm->tunnels, tx_tunnel_id);
+			   if (t && (t->out_teid == 0))
+			       continue;
+
 			   duplicate++;
 			   if (PREDICT_TRUE(1 == duplicate))
 				   vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
@@ -529,12 +548,17 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 			u8 id;
 			u32 tx_tunnel_id;
 			u32 duplicate = 0;
+			ppf_gtpu_tunnel_t * t;
 			
 			for (id = 0; id < sb_num; id++) {
 				tx_tunnel_id = sb_tunnels[sb_ids[id]].tunnel_id;
 				if (INVALID_TUNNEL_ID == tx_tunnel_id)
 					continue;
 				
+				t = pool_elt_at_index (gtm->tunnels, tx_tunnel_id);
+				if (t && (t->out_teid == 0))
+					continue;
+
 				duplicate++;
 				if (PREDICT_TRUE(1 == duplicate))
 					vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tx_tunnel_id;
