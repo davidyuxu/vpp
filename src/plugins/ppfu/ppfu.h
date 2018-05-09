@@ -459,10 +459,14 @@ typedef enum
    PPF_LBO_MODE
  }ppf_calline_mode_t;
 
+#define PPF_GTPU_TUNNEL_STATUS_RX  (1 << 1)
+#define PPF_GTPU_TUNNEL_STATUS_TX  (1 << 2)
+
 typedef struct
 {
   ppf_gtpu_tunnel_type_t tunnel_type;
   u32 tunnel_id;
+  u32 rx_tx_status;
 } ppf_gtpu_tunnel_id_type_t;
 
 typedef union {
@@ -502,6 +506,7 @@ typedef struct
   u32 sb_policy;
   u32 ue_bearer_id;
   u32 lbo_mode;
+  u32 ue_mode;
   u32 inner_vrf_id;
   u32 hw_if_index;
   u32 sw_if_index;
@@ -516,6 +521,7 @@ typedef struct
   u32 sb_policy;
   u32 ue_bearer_id;
   u32 lbo_mode;
+  u32 ue_mode;
 } vnet_ppf_add_callline_args_t;
 
 enum {

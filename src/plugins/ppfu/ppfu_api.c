@@ -150,6 +150,12 @@ vl_api_ppfu_plugin_bearer_install_t_handler
   call_line_inited = 1;
 
   callline->lbo_mode = clib_net_to_host_u32(mp->mode);
+  callline->ue_mode = 0;
+  if (clib_net_to_host_u32(nb->type) == 2 /* NB_TYPE_DEV */) {
+    callline->lbo_mode = PPF_LBO_MODE;
+    callline->ue_mode = 1;
+  }
+
   callline->inner_vrf_id = clib_net_to_host_u32(mp->inner_vrf_id);
 
   ppf_init_callline_intf (callline->call_index);

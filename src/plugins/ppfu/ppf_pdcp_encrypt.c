@@ -217,6 +217,8 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp0.count = count0;
 		sp0.bearer = PPF_BEARER(c0->ue_bearer_id);
 		sp0.dir = PPF_PDCP_DIR_ENC;
+        if (PREDICT_FALSE(c0->ue_mode == 1))
+          sp0.dir = PPF_PDCP_DIR_DEC;
 
         /* Integrity */
 	    pdcp0->protect (vm, b0, &sp0);
@@ -262,6 +264,8 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp1.count = count1;
 		sp1.bearer = PPF_BEARER(c1->ue_bearer_id);
 		sp1.dir = PPF_PDCP_DIR_ENC;
+        if (PREDICT_FALSE(c1->ue_mode == 1))
+          sp1.dir = PPF_PDCP_DIR_DEC;
 
         /* Integrity */
 	    pdcp0->protect (vm, b1, &sp1);
@@ -307,6 +311,8 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp2.count = count2;
 		sp2.bearer = PPF_BEARER(c2->ue_bearer_id);
 		sp2.dir = PPF_PDCP_DIR_ENC;
+        if (PREDICT_FALSE(c2->ue_mode == 1))
+          sp2.dir = PPF_PDCP_DIR_DEC;
 
         /* Integrity */
 	    pdcp2->protect (vm, b2, &sp2);
@@ -352,6 +358,8 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp3.count = count3;
 		sp3.bearer = PPF_BEARER(c3->ue_bearer_id);
 		sp3.dir = PPF_PDCP_DIR_ENC;
+        if (PREDICT_FALSE(c3->ue_mode == 1))
+          sp3.dir = PPF_PDCP_DIR_DEC;
 
         /* Integrity */
 	    pdcp3->protect (vm, b3, &sp3);
@@ -444,6 +452,8 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 		sp0.count = count0;
 		sp0.bearer = PPF_BEARER(c0->ue_bearer_id);
 		sp0.dir = PPF_PDCP_DIR_ENC;
+        if (PREDICT_FALSE(c0->ue_mode == 1))
+          sp0.dir = PPF_PDCP_DIR_DEC;
 
         /* Integrity */
 	    //len0 = vlib_buffer_length_in_chain(vm, b0);

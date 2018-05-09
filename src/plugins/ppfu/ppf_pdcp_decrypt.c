@@ -658,6 +658,8 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         sp0.count = count0;
         sp0.bearer = PPF_BEARER(c0->ue_bearer_id);
         sp0.dir = PPF_PDCP_DIR_DEC;
+        if (PREDICT_FALSE(c0->ue_mode == 1))
+          sp0.dir = PPF_PDCP_DIR_ENC;
 
         /* Decrypt */
         pdcp0->decrypt (buf0 + pdcp0->header_length,

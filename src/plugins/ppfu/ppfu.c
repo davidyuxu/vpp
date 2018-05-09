@@ -366,6 +366,9 @@ int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c)
 	call_line->sb_policy = c->sb_policy;
 	call_line->ue_bearer_id = c->ue_bearer_id;
 	call_line->lbo_mode = c->lbo_mode;
+    call_line->ue_mode = c->ue_mode;
+    if (call_line->ue_mode == 1)
+		call_line->lbo_mode = PPF_LBO_MODE;
 
 	ppf_init_callline_intf (call_line->call_index);
 	
@@ -381,6 +384,7 @@ ppf_add_del_calline_command_fn (vlib_main_t * vm,
   unformat_input_t _line_input, *line_input = &_line_input;
   u8 is_add = 1;
   u32 call_id = ~0, sb_policy = ~0, ue_bearer_id = ~0, lbo_mode = 0;
+  u32 ue_mode = 0;
   ppf_calline_type_t call_type = INVALID_CALL_TYPE;
   int rv;
   clib_error_t *error = NULL;
@@ -405,6 +409,8 @@ ppf_add_del_calline_command_fn (vlib_main_t * vm,
 	;
 	else if (unformat (line_input, "mode %U", unformat_ppf_call_mode, &lbo_mode))
 	;
+	else if (unformat (line_input, "ue"))
+	  ue_mode = 1;
       else
 	{
 	  error = clib_error_return (0, "parse error: '%U'",
@@ -440,6 +446,7 @@ ppf_add_del_calline_command_fn (vlib_main_t * vm,
   	.sb_policy = sb_policy,
   	.ue_bearer_id = ue_bearer_id,
   	.lbo_mode = lbo_mode,
+    .ue_mode = ue_mode,
   };
 
   if (is_add == 1) {
