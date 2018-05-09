@@ -81,7 +81,7 @@ _(SW_INTERFACE_SET_GTPU_BYPASS, sw_interface_set_gtpu_bypass)   \
 _(GTPU_ADD_DEL_TUNNEL, gtpu_add_del_tunnel)                     \
 _(GTPU_ADD_DEL_TUNNEL_V2, gtpu_add_del_tunnel_v2)		\
 _(GTPU_TUNNEL_DUMP, gtpu_tunnel_dump)                   \
-_(GTPU_CLIENT_REGISTRATION, gtpu_client_registration)
+_(WANT_GTPU_EVENT, want_gtpu_event)
 
 static void
   vl_api_sw_interface_set_gtpu_bypass_t_handler
@@ -358,7 +358,7 @@ static int clear_gtpu_client (u32 client_index)
     gtpu_client_registration_t *registrations;
     vpe_client_registration_t *client;
     uword *p;
-    int elts;
+    int elts = 0;
     
     /* If there is, is our client_index one of them */
     registrations = &gtm->registrations;
@@ -372,7 +372,6 @@ static int clear_gtpu_client (u32 client_index)
     pool_put (registrations->clients, client);
 
 exit:
-    elts = 0;
     /* Now check if that was the last item in any of the listened to gtpu */
     elts += pool_elts (registrations->clients);
     return elts;
@@ -402,12 +401,12 @@ static int set_gtpu_client (vpe_client_registration_t * client)
 }
 
 static void
-vl_api_gtpu_client_registration_t_handler (vl_api_gtpu_client_registration_t *mp)
+vl_api_want_gtpu_event_t_handler (vl_api_want_gtpu_event_t *mp)
 {
     gtpu_main_t *gtm = &gtpu_main;
     vpe_client_registration_t *rp, _rp;
     vl_api_registration_t *reg;
-    vl_api_gtpu_client_registration_reply_t *rmp;
+    vl_api_want_gtpu_event_reply_t *rmp;
     i32 retval = 0;
     
     rp = get_gtpu_client(mp->client_index);
@@ -418,10 +417,10 @@ vl_api_gtpu_client_registration_t_handler (vl_api_gtpu_client_registration_t *mp
         if (!rp)			/* No client to disable */
         {
             clib_warning ("pid %d: already disabled for stats...", mp->client_pid);
-            return;
+            goto out;
         }
         gtm->enable_poller = clear_gtpu_client(mp->client_index);
-        return;
+        goto out;
     }
     
     /* Enable case */
@@ -433,7 +432,7 @@ vl_api_gtpu_client_registration_t_handler (vl_api_gtpu_client_registration_t *mp
         gtm->enable_poller = set_gtpu_client(rp);
     }
 
-    /*reply */
+out:
     reg = vl_api_client_index_to_registration (mp->client_index);
     if (!reg)
     {
@@ -442,7 +441,7 @@ vl_api_gtpu_client_registration_t_handler (vl_api_gtpu_client_registration_t *mp
     }
 
     rmp = vl_msg_api_alloc (sizeof (*rmp));
-    rmp->_vl_msg_id = ntohs (VL_API_GTPU_CLIENT_REGISTRATION_REPLY);
+    rmp->_vl_msg_id = htons((VL_API_WANT_GTPU_EVENT_REPLY)+(REPLY_MSG_ID_BASE)); 
     rmp->context = mp->context;
     rmp->retval = retval;
 
