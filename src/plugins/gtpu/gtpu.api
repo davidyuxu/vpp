@@ -65,30 +65,19 @@ define gtpu_tunnel_dump
   u32 sw_if_index;
 };
 
-/** \brief Want gtpu path management info, register a client
+/** \brief Want gtpu path management event info, register a client
     @param client_index - opaque cookie to identify the sender
     @param context - sender context, to match reply w/ request
     @param enable_disable - 1 = enable stats, 0 = disable
     @param client_pid - pid of process requesting stats updates
 	--- add by anhua
 */
-define gtpu_client_registration
+autoreply define want_gtpu_event
 {
   u32 client_index;
   u32 context;
   u32 enable_disable;
   u32 client_pid;
-};
-
-/** \brief reply for set or delete an GTPU tunnel
-    @param context - sender context, to match reply w/ request
-    @param retval - return code
-	--- add by anhua
-*/
-define gtpu_client_registration_reply
-{
-  u32 context;
-  i32 retval;
 };
 
 /** \brief GTPU path info data type for vl_api_gtpu_path_error_t
