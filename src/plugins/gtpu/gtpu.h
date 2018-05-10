@@ -73,6 +73,8 @@ typedef struct
 
 #define GTPU_PT_GTP    (1<<4)
 #define GTPU_HEADER_MIN   (8)
+#define GTPU_UDP_DST_PORT    (2153)
+#define GTPU6_UDP_DST_PORT   (2153)
 
 
 #define	GTPU_TYPE_ECHO_REQUEST			        1
