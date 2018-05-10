@@ -358,7 +358,7 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
   u32 session_id = ~0;
   u32 max_sn = ~0;
 
-  pool_get (ppm->sessions, pdcp_sess);
+  pool_get_aligned (ppm->sessions, pdcp_sess, CLIB_CACHE_LINE_BYTES);
   memset (pdcp_sess, 0, sizeof (*pdcp_sess));
 
   pdcp_sess->sn_length = sn_length;
@@ -1130,7 +1130,7 @@ ppf_pdcp_init (vlib_main_t * vm)
   ppm->rx_max_reorder_window = (1 << max_log2(PDCP_DEF_REORDER_WINDOW_SIZE));
 
   if (ppf_main.max_capacity) {
-    pool_init_fixed (ppm->sessions, ppf_main.max_capacity);
+    pool_init_aligned (ppm->sessions, ppf_main.max_capacity, CLIB_CACHE_LINE_BYTES);
   }
 
   return 0;

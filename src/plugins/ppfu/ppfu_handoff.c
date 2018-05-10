@@ -555,9 +555,9 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
           goto trace0;
         }
 
-        t0 = pool_elt_at_index (gtm->tunnels, tx_tunnel_index0);   
+        t0 = pool_is_free_index(gtm->tunnels, tx_tunnel_index0) ? NULL : pool_elt_at_index (gtm->tunnels, tx_tunnel_index0);   
       } else
-        t0 = pool_elt_at_index (gtm->tunnels, rx_tunnel_index0);
+        t0 = pool_is_free_index(gtm->tunnels, rx_tunnel_index0) ? NULL : pool_elt_at_index (gtm->tunnels, rx_tunnel_index0);
 
       if (PREDICT_FALSE(t0 == NULL)) {
         /* if this is 1st frame */
@@ -996,9 +996,9 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
           goto trace0;
         }
 
-        t0 = pool_elt_at_index (gtm->tunnels, tx_tunnel_index0);   
+        t0 = pool_is_free_index(gtm->tunnels, tx_tunnel_index0) ? NULL : pool_elt_at_index (gtm->tunnels, tx_tunnel_index0);   
       } else
-        t0 = pool_elt_at_index (gtm->tunnels, rx_tunnel_index0);
+        t0 = pool_is_free_index(gtm->tunnels, rx_tunnel_index0) ? NULL : pool_elt_at_index (gtm->tunnels, rx_tunnel_index0);
 
       if (PREDICT_FALSE(t0 == NULL)) {
         /* if this is 1st frame */

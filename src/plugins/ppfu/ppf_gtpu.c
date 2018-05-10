@@ -782,12 +782,6 @@ int vnet_ppf_gtpu_add_tunnel
         case PPF_GTPU_NB:
           callline->rb.drb.nb_tunnel.tunnel_id = tunnel_id;
           callline->rb.drb.nb_tunnel.tunnel_type = t->tunnel_type;
-          callline->rb.drb.nb_tunnel.rx_tx_status = 0;
-          if (t->in_teid)
-			  callline->rb.drb.nb_tunnel.rx_tx_status |= PPF_GTPU_TUNNEL_STATUS_RX;
-          if (t->out_teid)
-			  callline->rb.drb.nb_tunnel.rx_tx_status |= PPF_GTPU_TUNNEL_STATUS_TX;
-
           break;
 
         case PPF_GTPU_SB:
@@ -801,11 +795,12 @@ int vnet_ppf_gtpu_add_tunnel
             
             it->tunnel_id = tunnel_id;
             it->tunnel_type = t->tunnel_type;
-            it->rx_tx_status = 0;
-			if (t->in_teid)
-				it->rx_tx_status |= PPF_GTPU_TUNNEL_STATUS_RX;
-			if (t->out_teid)
-				it->rx_tx_status |= PPF_GTPU_TUNNEL_STATUS_TX;
+
+			if (t->in_teid && t->out_teid) {
+				callline->sb_multi_path ++;
+				callline->sb_multi_path &= PPF_SB_COUNT_MASK;
+				PPF_SB_PATH_SET_VALID (callline->sb_multi_path, t->sb_id);
+			}
           }
           break;
 
@@ -821,12 +816,11 @@ int vnet_ppf_gtpu_add_tunnel
             it->tunnel_id = tunnel_id;
             it->tunnel_type = t->tunnel_type;
 
-            it->rx_tx_status = 0;
-            if (t->in_teid)
-              it->rx_tx_status |= PPF_GTPU_TUNNEL_STATUS_RX;
-            if (t->out_teid)
-              it->rx_tx_status |= PPF_GTPU_TUNNEL_STATUS_TX;
-
+			if (t->in_teid && t->out_teid) {
+				callline->sb_multi_path ++;
+				callline->sb_multi_path &= PPF_SB_COUNT_MASK;
+				PPF_SB_PATH_SET_VALID (callline->sb_multi_path, t->sb_id);
+			}
           }
           break;
 
@@ -883,9 +877,10 @@ int vnet_ppf_gtpu_update_tunnel
 {
   ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
   ppf_gtpu_tunnel_t *t = 0;
-  ppf_gtpu_tunnel_id_type_t *it = 0;
+  ppf_callline_t *callline = 0;
 
   t = &(gtm->tunnels[tunnel_id]);
+  callline = &(ppf_main.ppf_calline_table[t->call_id]);
    
   {
 
@@ -914,28 +909,23 @@ int vnet_ppf_gtpu_update_tunnel
 		ip_copy (&(t->dst), &(a->dst), t->is_ip6);
 
 	switch (t->tunnel_type) {
-	  case PPF_GTPU_NB:
-        {
-          it = &(ppf_main.ppf_calline_table[t->call_id].rb.drb.nb_tunnel);
-          if (t->out_teid)
-          	it->rx_tx_status |= PPF_GTPU_TUNNEL_STATUS_TX;
-	    }
-		break;
-	
 	  case PPF_GTPU_SB:
 		{
-		  it = &(ppf_main.ppf_calline_table[t->call_id].rb.drb.sb_tunnel[t->sb_id]); 		  
-		  if (t->out_teid)
-			  it->rx_tx_status |= PPF_GTPU_TUNNEL_STATUS_TX;
+		  if (t->in_teid & t->out_teid) {
+			  callline->sb_multi_path ++;
+			  callline->sb_multi_path &= PPF_SB_COUNT_MASK;
+			  PPF_SB_PATH_SET_VALID (callline->sb_multi_path, t->sb_id);
+		  }
 		}
 		break;
 	
 	  case PPF_GTPU_SRB:
 		{
-		  it = &(ppf_main.ppf_calline_table[t->call_id].rb.srb.sb_tunnel[t->sb_id]);		  
-		  if (t->out_teid)
-			it->rx_tx_status |= PPF_GTPU_TUNNEL_STATUS_TX;
-	
+		  if (t->in_teid & t->out_teid) {
+			  callline->sb_multi_path ++;
+			  callline->sb_multi_path &= PPF_SB_COUNT_MASK;
+			  PPF_SB_PATH_SET_VALID (callline->sb_multi_path, t->sb_id);
+		  }	
 		}
 		break;
 	

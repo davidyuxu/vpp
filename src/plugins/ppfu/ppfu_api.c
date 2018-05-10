@@ -160,6 +160,26 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   ppf_init_callline_intf (callline->call_index);
 
+  /* Create pdcp session */
+  pdcp = &mp->entity;
+  callline->pdcp.session_id = ppf_pdcp_create_session (clib_net_to_host_u32(pdcp->sn_length),
+                                                       clib_net_to_host_u32(pdcp->initial_uplink_count),
+                                                       clib_net_to_host_u32(pdcp->initial_downlink_count),
+                                                       clib_net_to_host_u32(pdcp->fc_in_flight_limit));
+  if (~0 != callline->pdcp.session_id) {
+      pdcp_sec_para = &mp->secparam;
+	  if (pdcp_sec_para->valid_parameters > 0) {
+        ppf_pdcp_config_t pdcp_config;
+
+        pdcp_config.flags = clib_net_to_host_u16(pdcp_sec_para->valid_parameters);
+        pdcp_config.integrity_algorithm = pdcp_sec_para->integrity_algorithm;
+        pdcp_config.crypto_algorithm = pdcp_sec_para->confidentiality_algorithm;
+        clib_memcpy (pdcp_config.integrity_key, pdcp_sec_para->integrity_key, sizeof(pdcp_config.integrity_key));
+        clib_memcpy (pdcp_config.crypto_key, pdcp_sec_para->confidentiality_key, sizeof(pdcp_config.crypto_key));
+        ppf_pdcp_session_update_as_security (pool_elt_at_index(ppf_pdcp_main.sessions, callline->pdcp.session_id), &pdcp_config);
+      }
+  }
+
   if (callline->lbo_mode == PPF_LBO_MODE) 
   {
 
@@ -278,26 +298,6 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  	goto out;
 	  }
 	  
-  }
-
-  /* Create pdcp session */
-  pdcp = &mp->entity;
-  callline->pdcp.session_id = ppf_pdcp_create_session (clib_net_to_host_u32(pdcp->sn_length),
-                                                       clib_net_to_host_u32(pdcp->initial_uplink_count),
-                                                       clib_net_to_host_u32(pdcp->initial_downlink_count),
-                                                       clib_net_to_host_u32(pdcp->fc_in_flight_limit));
-  if (~0 != callline->pdcp.session_id) {
-      pdcp_sec_para = &mp->secparam;
-	  if (pdcp_sec_para->valid_parameters > 0) {
-        ppf_pdcp_config_t pdcp_config;
-
-        pdcp_config.flags = clib_net_to_host_u16(pdcp_sec_para->valid_parameters);
-        pdcp_config.integrity_algorithm = pdcp_sec_para->integrity_algorithm;
-        pdcp_config.crypto_algorithm = pdcp_sec_para->confidentiality_algorithm;
-        clib_memcpy (pdcp_config.integrity_key, pdcp_sec_para->integrity_key, sizeof(pdcp_config.integrity_key));
-        clib_memcpy (pdcp_config.crypto_key, pdcp_sec_para->confidentiality_key, sizeof(pdcp_config.crypto_key));
-        ppf_pdcp_session_update_as_security (pool_elt_at_index(ppf_pdcp_main.sessions, callline->pdcp.session_id), &pdcp_config);
-      }
   }
 
   callline->sb_policy = clib_net_to_host_u32(mp->sb_policy);
