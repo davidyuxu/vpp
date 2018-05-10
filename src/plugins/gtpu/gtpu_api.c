@@ -81,7 +81,7 @@ _(SW_INTERFACE_SET_GTPU_BYPASS, sw_interface_set_gtpu_bypass)   \
 _(GTPU_ADD_DEL_TUNNEL, gtpu_add_del_tunnel)                     \
 _(GTPU_ADD_DEL_TUNNEL_V2, gtpu_add_del_tunnel_v2)		\
 _(GTPU_TUNNEL_DUMP, gtpu_tunnel_dump)                   \
-_(WANT_GTPU_EVENT, want_gtpu_event)
+_(WANT_GTPU_EVENTS, want_gtpu_events)
 
 static void
   vl_api_sw_interface_set_gtpu_bypass_t_handler
@@ -401,12 +401,12 @@ static int set_gtpu_client (vpe_client_registration_t * client)
 }
 
 static void
-vl_api_want_gtpu_event_t_handler (vl_api_want_gtpu_event_t *mp)
+vl_api_want_gtpu_events_t_handler (vl_api_want_gtpu_events_t *mp)
 {
     gtpu_main_t *gtm = &gtpu_main;
     vpe_client_registration_t *rp, _rp;
     vl_api_registration_t *reg;
-    vl_api_want_gtpu_event_reply_t *rmp;
+    vl_api_want_gtpu_events_reply_t *rmp;
     i32 retval = 0;
     
     rp = get_gtpu_client(mp->client_index);
@@ -441,9 +441,9 @@ out:
     }
 
     rmp = vl_msg_api_alloc (sizeof (*rmp));
-    rmp->_vl_msg_id = htons((VL_API_WANT_GTPU_EVENT_REPLY)+(REPLY_MSG_ID_BASE)); 
+    rmp->_vl_msg_id = htons((VL_API_WANT_GTPU_EVENTS_REPLY)+(REPLY_MSG_ID_BASE)); 
     rmp->context = mp->context;
-    rmp->retval = retval;
+    rmp->retval = htonl(retval);
 
     vl_api_send_msg (reg, (u8 *) rmp);
 }

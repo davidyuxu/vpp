@@ -72,7 +72,7 @@ define gtpu_tunnel_dump
     @param client_pid - pid of process requesting stats updates
 	--- add by anhua
 */
-autoreply define want_gtpu_event
+autoreply define want_gtpu_events
 {
   u32 client_index;
   u32 context;
@@ -80,25 +80,46 @@ autoreply define want_gtpu_event
   u32 client_pid;
 };
 
-/** \brief GTPU path info data type for vl_api_gtpu_path_error_t
+
+/** \brief dump gtpu path error
     @param dst_address - GTPU tunnel's destination address.
 	--- add by anhua
 */
-manual_print manual_endian define gtpu_path_error
+
+define gtpu_path_error_dump
 {
-  u8 dst_address[16];
+  u32 client_index;
+  u32 context;
+  u32 dst_address[16];
 };
 
-/** \brief GTPU path info data type for vl_api_gtpu_tunnel_error_t
+define gtpu_path_error_details
+{
+  u32 context;
+  u32 dst_address[16];
+};
+
+
+/** \brief dump tunnel error
     @param dst_address - GTPU tunnel's destination address.
     @param teid - Local Tunnel Endpoint Identifier
 	--- add by anhua
 */
-manual_print manual_endian define gtpu_tunnel_error
+
+define gtpu_tunnel_error_dump
+{ 
+  u32 client_index;
+  u32 context;
+  u32 tunnel_index;
+};
+
+define gtpu_tunnel_error_details
 {
+  u32 context;
   u8 dst_address[16];
   u32 teid;
 };
+
 
 /** \brief dump details of an GTPU tunnel
     @param context - sender context, to match reply w/ request

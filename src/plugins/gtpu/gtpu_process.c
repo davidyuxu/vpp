@@ -31,8 +31,8 @@ gtpu_path_info_notify(u32 teid, ip46_address_t *src, ip46_address_t *dst)
 {
     gtpu_main_t *gtm = &gtpu_main;
     vl_api_registration_t *vl_reg;
-    vl_api_gtpu_path_error_t *mp_path;
-    vl_api_gtpu_tunnel_error_t *mp_tunnel;
+    vl_api_gtpu_path_error_details_t *mp_path;
+    vl_api_gtpu_tunnel_error_details_t *mp_tunnel;
     vpe_client_registration_t *client;
     gtpu_client_registration_t *registrations = &gtm->registrations;
     u8 *mp;
@@ -43,7 +43,7 @@ gtpu_path_info_notify(u32 teid, ip46_address_t *src, ip46_address_t *dst)
         mp_path = vl_msg_api_alloc_as_if_client (sizeof (*mp_path));
         memset (mp_path, 0, sizeof (*mp_path));
 
-        mp_path->_vl_msg_id = ntohs (VL_API_GTPU_PATH_ERROR);
+        mp_path->_vl_msg_id = ntohs (VL_API_GTPU_PATH_ERROR_DETAILS);
         
 #define _(offs) mp_path->dst_address[offs] = dst->as_u8[offs];
         if (ip46_address_is_ip4 (dst))
@@ -64,7 +64,7 @@ gtpu_path_info_notify(u32 teid, ip46_address_t *src, ip46_address_t *dst)
         mp_tunnel = vl_msg_api_alloc_as_if_client (sizeof (*mp_tunnel));
         memset (mp_tunnel, 0, sizeof (*mp_tunnel));
 
-        mp_tunnel->_vl_msg_id = ntohs (VL_API_GTPU_TUNNEL_ERROR);
+        mp_tunnel->_vl_msg_id = ntohs (VL_API_GTPU_TUNNEL_ERROR_DETAILS);
         mp_tunnel->teid = teid;
             
 #define _(offs) mp_tunnel->dst_address[offs] = dst->as_u8[offs];
