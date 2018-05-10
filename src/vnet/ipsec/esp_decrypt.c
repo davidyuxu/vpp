@@ -314,7 +314,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 				case IPSEC_CRYPTO_ALG_AES_CTR_192:
 				case IPSEC_CRYPTO_ALG_AES_CTR_256:
 					{
-						u32 ctr_iv[4];
+						u32 ctr_iv[IV_SIZE+2];
 						ctr_iv[0] = sa0->salt;
 						clib_memcpy (&ctr_iv[1], esp0->data, IV_SIZE);
 						ctr_iv[3] = clib_host_to_net_u32 (1);
@@ -326,13 +326,13 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 				case IPSEC_CRYPTO_ALG_AES_GCM_192:
 				case IPSEC_CRYPTO_ALG_AES_GCM_256:
 					{
-						u32 gcm_iv[3];
+						u32 gcm_iv[IV_SIZE+1];
 						gcm_iv[0] = sa0->salt;
 						clib_memcpy (&gcm_iv[1], esp0->data, IV_SIZE);
 						
 						u32 aad[3];
 						size_t aad_len = 8;
-						aad[0] = clib_host_to_net_u32 (sa0->spi);
+						aad[0] = esp0->spi;
 						aad[1] = esp0->seq;
 
 						/* esn enabled? */
