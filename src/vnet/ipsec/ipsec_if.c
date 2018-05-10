@@ -220,21 +220,20 @@ ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa, u8 is_encrypt)
 	
 	const EVP_CIPHER *cipher = em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
 
-  int set_iv_len = 0;
-	if (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_128 
-		|| sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_192 
-		|| sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_256)
-		set_iv_len = 1;
-	
 	for (int thread_id = 0; thread_id < tm->n_vlib_mains; thread_id++)
 		{
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 			EVP_CipherInit_ex (sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, is_encrypt ? 1 : 0);
+
+			EVP_CIPHER_CTX_set_padding(sa->context[thread_id].cipher_ctx, 0);
+
+			//if (set_iv_len)
+				//EVP_CIPHER_CTX_ctrl (sa->context[thread_id].cipher_ctx, EVP_CTRL_GCM_SET_IVLEN, 8, NULL);
 #else
 			EVP_CipherInit_ex (&sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, is_encrypt ? 1 : 0);
+
+			EVP_CIPHER_CTX_set_padding(&sa->context[thread_id].cipher_ctx, 0);
 #endif
-		if (set_iv_len)
-			EVP_CIPHER_CTX_ctrl (&sa->context[thread_id].cipher_ctx, EVP_CTRL_GCM_SET_IVLEN, 8, NULL);
 		}
 }
 
