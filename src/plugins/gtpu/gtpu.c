@@ -1431,9 +1431,9 @@ gtpu_init (vlib_main_t * vm)
 				       sizeof (mcast_shared_t));
 
 #if 1
-  udp_register_dst_port (vm, UDP_DST_PORT_GTPU,
+  udp_register_dst_port (vm, GTPU_UDP_DST_PORT,
 			 gtpu4_input_node.index, /* is_ip4 */ 1);
-  udp_register_dst_port (vm, UDP_DST_PORT_GTPU6,
+  udp_register_dst_port (vm, GTPU6_UDP_DST_PORT,
 			 gtpu6_input_node.index, /* is_ip4 */ 0);
 #endif
 
@@ -1444,11 +1444,11 @@ gtpu_init (vlib_main_t * vm)
   pn = pg_get_node (gtpu6_input_node.index);
   pn->unformat_edit = unformat_pg_gtpu_header;
 
-  pi = udp_get_dst_port_info (&udp_main, UDP_DST_PORT_GTPU, 1);
+  pi = udp_get_dst_port_info (&udp_main, GTPU_UDP_DST_PORT, 1);
   if (pi)
     pi->unformat_pg_edit = unformat_pg_gtpu_header;
 
-  pi = udp_get_dst_port_info (&udp_main, UDP_DST_PORT_GTPU6, 0);
+  pi = udp_get_dst_port_info (&udp_main, GTPU6_UDP_DST_PORT, 0);
   if (pi)
     pi->unformat_pg_edit = unformat_pg_gtpu_header;
 
