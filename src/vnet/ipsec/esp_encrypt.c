@@ -111,7 +111,7 @@ esp_encrypt_cbc (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 }
 
 always_inline void
-esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv, u8 * tag)
+esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * aad, size_t aad_len, u8 * iv, u8 * tag)
 {
   u32 thread_index = vlib_get_thread_index ();
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
@@ -122,24 +122,18 @@ esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 
 	//fformat (stdout, "CLEAR: %U \n", format_hexdump, in, in_len);
 
-
-#if 0
-		ipsec_proto_main_t *em = &ipsec_proto_main;
-
-		const EVP_CIPHER *cipher = cipher = em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
-			EVP_CipherInit_ex (ctx, cipher, NULL, sa->crypto_key, NULL, 1);
-			EVP_CIPHER_CTX_ctrl (ctx, EVP_CTRL_GCM_SET_IVLEN, 8, NULL);
-#endif
-
   int out_len = 0;
 
 	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
 
 	/* Zero or more calls to specify any AAD */
-	EVP_CipherUpdate (ctx, NULL, &out_len, (u8 *)&sa->seq, 4);
+	EVP_CipherUpdate (ctx, NULL, &out_len, aad, aad_len);
 
 	/* Encrypt plaintext */
 	EVP_CipherUpdate(ctx, out, &out_len, in, in_len);
+
+	/* Output encrypted block */
+	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
 
 	/* Finalise: note get no output for GCM */
 	EVP_EncryptFinal_ex(ctx, out, &out_len);
@@ -147,8 +141,6 @@ esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 	/* Get tag */
   EVP_CIPHER_CTX_ctrl (ctx, EVP_CTRL_GCM_GET_TAG, 16, tag);
 
-	/* Output encrypted block */
-	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
 	//fformat (stdout, "TAG: %U \n", format_hexdump, tag, 16);
 
 	return;
@@ -336,9 +328,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
     f0->next_header = next_hdr_type;
 		
 		iv = (u8 *) vlib_buffer_get_current (i_b0) - IV_SIZE;
-    //RAND_bytes (iv, sizeof (iv));
-    memset (iv, 0xfe, IV_SIZE);
- 			
+
 		switch (sa0->crypto_alg)
 		{
 			case IPSEC_CRYPTO_ALG_NONE:
@@ -347,29 +337,72 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			case IPSEC_CRYPTO_ALG_AES_CBC_128:
 			case IPSEC_CRYPTO_ALG_AES_CBC_192:
 			case IPSEC_CRYPTO_ALG_AES_CBC_256:
+			case IPSEC_CRYPTO_ALG_DES_CBC:
+			case IPSEC_CRYPTO_ALG_3DES_CBC:
+				RAND_bytes (iv, IV_SIZE);
+				//memset (iv, 0xfe, IV_SIZE);
+				esp_encrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, sa0->crypto_key, iv);
+				break;
+				
 			case IPSEC_CRYPTO_ALG_AES_CTR_128:
 			case IPSEC_CRYPTO_ALG_AES_CTR_192:
 			case IPSEC_CRYPTO_ALG_AES_CTR_256:
-			case IPSEC_CRYPTO_ALG_DES_CBC:
-			case IPSEC_CRYPTO_ALG_3DES_CBC:
-				esp_encrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), BLOCK_SIZE * blocks, sa0->crypto_key, iv);
+				{
+					u32 *_iv = (u32 *) iv;
+					_iv[0] = sa0->seq;
+	      	_iv[1] = sa0->seq_hi;
+
+					u32 ctr_iv[4];
+					ctr_iv[0] = sa0->salt;
+					clib_memcpy (&ctr_iv[1], iv, IV_SIZE);
+					ctr_iv[3] = clib_host_to_net_u32 (1);
+					
+					esp_encrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, sa0->crypto_key, (u8 *) ctr_iv);
+	    	}			
 				break;
+
 			case IPSEC_CRYPTO_ALG_AES_GCM_128:
 			case IPSEC_CRYPTO_ALG_AES_GCM_192:
 			case IPSEC_CRYPTO_ALG_AES_GCM_256:
-				//u8 tag[16];
-				esp_encrypt_gcm (sa0,
-						 (u8 *) vlib_buffer_get_current (i_b0),
-						 (u8 *) vlib_buffer_get_current (i_b0),
-						 BLOCK_SIZE * blocks,
-						 sa0->crypto_key, iv, (u8 *) vlib_buffer_get_current (i_b0) + i_b0->current_length);
-				
+					{
+						u32 *_iv = (u32 *) iv;
+						_iv[0] = sa0->seq;
+						_iv[1] = sa0->seq_hi;
 
-				break;
+						u32 aad[3];
+						size_t aad_len = 8;
+						aad[0] = clib_host_to_net_u32 (sa0->spi);
+						aad[1] = clib_host_to_net_u32 (sa0->seq);
+
+						/* esn enabled? */
+						if (PREDICT_TRUE (sa0->use_esn))
+						{
+							aad[2] = clib_host_to_net_u32 (sa0->seq_hi);
+							aad_len = 12;
+						}
+
+						u32 gcm_iv[3];
+						gcm_iv[0] = sa0->salt;
+						clib_memcpy (&gcm_iv[1], iv, IV_SIZE);						
+
+						esp_encrypt_gcm (sa0,
+						 	(u8 *) vlib_buffer_get_current (i_b0),
+						 	(u8 *) vlib_buffer_get_current (i_b0),
+						 	i_b0->current_length,
+						 	sa0->crypto_key, (u8 *) aad, aad_len,
+						 	(u8 *) gcm_iv, (u8 *) vlib_buffer_get_tail (i_b0));
+
+						/* gcm tag */
+						i_b0->current_length += 16;
+					}
+					break;
+					
 		}
 
 		/* Prepend the IP header + ESP header, + IV if there is */
 		vlib_buffer_advance (i_b0, 0 - (ip_hdr_size + sizeof (esp_header_t) + IV_SIZE));
+
+		MAC_FUNC mac = 0;
 
 		switch (sa0->integ_alg)
 		{
@@ -381,17 +414,21 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			case IPSEC_INTEG_ALG_SHA_256_96:
 			case IPSEC_INTEG_ALG_SHA_256_128:
 			case IPSEC_INTEG_ALG_SHA_384_192:
-				i_b0->current_length += hmac_calc (sa0, (u8 *) vlib_buffer_get_current (i_b0) + ip_hdr_size, 
-																	i_b0->current_length - ip_hdr_size, vlib_buffer_get_tail (i_b0), sa0->use_esn, sa0->seq_hi);
+				mac = hmac_calc;
 				break;
-			case IPSEC_INTEG_ALG_CMAC:			
-				i_b0->current_length += cmac_calc (sa0, (u8 *) vlib_buffer_get_current (i_b0) + ip_hdr_size, 
-																	i_b0->current_length - ip_hdr_size, vlib_buffer_get_tail (i_b0), sa0->use_esn, sa0->seq_hi);
+			case IPSEC_INTEG_ALG_CMAC:
+				mac = cmac_calc;
 				break;
 		}
+
+		if (PREDICT_TRUE (mac != 0))
+		{
+			i_b0->current_length += mac (sa0, (u8 *) vlib_buffer_get_current (i_b0) + ip_hdr_size, 
+																i_b0->current_length - ip_hdr_size, vlib_buffer_get_tail (i_b0), sa0->use_esn, sa0->seq_hi);
+		}		
 			
-			// dont have to change 
-			//vnet_buffer (i_b0)->sw_if_index[VLIB_RX] = vnet_buffer (i_b0)->sw_if_index[VLIB_RX];
+		// dont have to change 
+		//vnet_buffer (i_b0)->sw_if_index[VLIB_RX] = vnet_buffer (i_b0)->sw_if_index[VLIB_RX];
 
 	  if (PREDICT_FALSE (is_ipv6))
     {

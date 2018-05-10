@@ -232,7 +232,7 @@ ipsec_proto_init ()
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_NONE];
   c->type = NULL;
   c->iv_size = 0;
-  c->block_size = 1;
+  c->block_size = 4;
 
 	/* CBC */
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128];
@@ -253,34 +253,34 @@ ipsec_proto_init ()
 	/* CTR */
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_128];
   c->type = EVP_aes_128_ctr ();
-  c->iv_size = 16;
-  c->block_size = 1;
+  c->iv_size = 8;
+  c->block_size = 4;
 
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_192];
   c->type = EVP_aes_192_ctr ();
-  c->iv_size = 16;
-  c->block_size = 1;
+  c->iv_size = 8;
+  c->block_size = 4;
     
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_256];
 	c->type = EVP_aes_256_ctr ();
-	c->iv_size = 16;
-	c->block_size = 1;
+	c->iv_size = 8;
+	c->block_size = 4;
 
 	/* GCM */
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_128];
   c->type = EVP_aes_128_gcm ();
   c->iv_size = 8;
-  c->block_size = 1;
+  c->block_size = 4;
 
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_192];
   c->type = EVP_aes_192_gcm ();
   c->iv_size = 8;
-  c->block_size = 1;
+  c->block_size = 4;
     
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_256];
 	c->type = EVP_aes_256_gcm ();
 	c->iv_size = 8;
-	c->block_size = 1;
+	c->block_size = 4;
 
 	/* DES 3DES */
 	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC];
@@ -336,6 +336,9 @@ ipsec_proto_init ()
   i->mac_size = 16;
   i->trunc_size = 16;
 }
+
+typedef unsigned int (* MAC_FUNC) (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi);
+
 
 always_inline unsigned int
 hmac_calc (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi)

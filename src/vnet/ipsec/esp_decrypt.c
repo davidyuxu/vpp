@@ -41,6 +41,7 @@ typedef enum
  _(RX_PKTS, "ESP pkts received")                    \
  _(DECRYPTION_FAILED, "ESP decryption failed")      \
  _(LENGTH_ERROR, "ESP Invalid Length") 		 					\
+ _(TRAILER_ERROR, "ESP Invalid Tailer") 						\
  _(INTEG_ERROR, "Integrity check failed")           \
  _(REPLAY, "SA replayed packet")                    \
  _(NOT_IP, "Not IP packet (dropped)")
@@ -106,6 +107,46 @@ esp_decrypt_cbc (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 
 	//fformat (stdout, "After DE: rv=%d outlen=%d\n", rv, out_len);
 }
+
+always_inline int
+esp_decrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv, u8 * aad, size_t aad_len, u8 * tag)
+{
+  u32 thread_index = vlib_get_thread_index ();
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+		EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
+#else
+		EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
+#endif
+
+  int out_len;
+
+	//fformat (stdout, "Before DE: %U\n", format_hexdump, in, in_len);
+
+	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
+
+	/* Specify IV */ 	 
+	EVP_CipherInit_ex(ctx, NULL, NULL, NULL, iv, -1);
+
+	/* Zero or more calls to specify any AAD */ 	 
+	EVP_CipherUpdate(ctx, NULL, &out_len, aad, aad_len); 	 
+
+	/* Decrypt plaintext */		
+	EVP_CipherUpdate(ctx, out, &out_len, in, in_len);		
+
+	//fformat (stdout, "After DE: %U\n", format_hexdump, out, in_len);
+
+	/* Set expected tag value. */		
+	EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, (void *)tag);
+
+	/* Finalise: note get no output for GCM */
+
+	int rv = EVP_CipherFinal_ex(ctx, out + out_len, &out_len);
+
+	//fformat (stdout, "GCM TAG: %U\n rv=%d outen=%d\n", format_hexdump, tag, 16, rv, out_len);
+
+	return rv;
+}
+
 
 static uword
 esp_decrypt_node_fn (vlib_main_t * vm,
@@ -188,44 +229,45 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 
 		  sa0->total_data_size += i_b0->current_length;
 
-			/* DOn't check GCM for integrity, do we really need this ? */
-			//if (sa0->crypto_alg < IPSEC_CRYPTO_ALG_AES_GCM_128 && sa0->crypto_alg > IPSEC_CRYPTO_ALG_AES_GCM_256)
-			{
-				switch (sa0->integ_alg)
-				{
-					case IPSEC_INTEG_ALG_NONE:
-					default:
-						break;
-					case IPSEC_INTEG_ALG_MD5_96:
-					case IPSEC_INTEG_ALG_SHA1_96:
-					case IPSEC_INTEG_ALG_SHA_256_96:
-					case IPSEC_INTEG_ALG_SHA_256_128:
-					case IPSEC_INTEG_ALG_SHA_384_192:
-						break;
-					case IPSEC_INTEG_ALG_CMAC:			
-						break;
-				} 		
+			/* MAC here */
+			MAC_FUNC mac = 0;
 
-				if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
+			switch (sa0->integ_alg)
+			{
+				case IPSEC_INTEG_ALG_NONE:
+				default:
+					break;
+				case IPSEC_INTEG_ALG_MD5_96:
+				case IPSEC_INTEG_ALG_SHA1_96:
+				case IPSEC_INTEG_ALG_SHA_256_96:
+				case IPSEC_INTEG_ALG_SHA_256_128:
+				case IPSEC_INTEG_ALG_SHA_384_192:
+					mac = hmac_calc;
+					break;
+				case IPSEC_INTEG_ALG_CMAC:
+					mac = cmac_calc;
+					break;
+			}
+
+			if (PREDICT_TRUE (mac != 0))
+			{
+				u8 sig[64];
+
+				int icv_size = em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
+			
+				u8 *icv = vlib_buffer_get_tail (i_b0) - icv_size;
+				i_b0->current_length -= icv_size;
+			
+				mac (sa0, (u8 *) esp0, i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
+			
+				if (PREDICT_FALSE (memcmp (icv, sig, icv_size)))
 				{
-					u8 sig[64];
-					int icv_size = em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
-					//memset (sig, 0, sizeof (sig));
-				
-					u8 *icv = vlib_buffer_get_tail (i_b0) - icv_size;
-					i_b0->current_length -= icv_size;
-				
-					hmac_calc (sa0, (u8 *) esp0, i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
-				
-					if (PREDICT_FALSE (memcmp (icv, sig, icv_size)))
-					{
-						vlib_node_increment_counter (vm, esp_decrypt_node.index,
-									 ESP_DECRYPT_ERROR_INTEG_ERROR,
-									 1);
-						to_next[0] = i_bi0;
-						to_next += 1;
-						goto trace;
-					}
+					vlib_node_increment_counter (vm, esp_decrypt_node.index,
+								 ESP_DECRYPT_ERROR_INTEG_ERROR,
+								 1);
+					to_next[0] = i_bi0;
+					to_next += 1;
+					goto trace;
 				}
 			}
 
@@ -244,19 +286,16 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 			/* skip ESP header & IV */
 			vlib_buffer_advance (i_b0, sizeof (esp_header_t) + IV_SIZE);
 
-			if (PREDICT_TRUE (sa0->crypto_alg != IPSEC_CRYPTO_ALG_NONE))
+			blocks = i_b0->current_length / BLOCK_SIZE;
+			
+			/* invalid ESP length, has to be muiltple blocks size */
+			if (PREDICT_FALSE (i_b0->current_length % BLOCK_SIZE))
 			{
-				blocks = i_b0->current_length / BLOCK_SIZE;
-				
-				/* invalid ESP length, has to be muiltple blocks size */
-				if (PREDICT_FALSE (i_b0->current_length % BLOCK_SIZE))
-				{
-					vlib_node_increment_counter (vm,
-										 esp_decrypt_node.index,
-										 ESP_DECRYPT_ERROR_LENGTH_ERROR,
-										 1);
-					goto trace;
-				}
+				vlib_node_increment_counter (vm,
+									 esp_decrypt_node.index,
+									 ESP_DECRYPT_ERROR_LENGTH_ERROR,
+									 1);
+				goto trace;
 			}
 			
 			switch (sa0->crypto_alg)
@@ -267,16 +306,54 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 				case IPSEC_CRYPTO_ALG_AES_CBC_128:
 				case IPSEC_CRYPTO_ALG_AES_CBC_192:
 				case IPSEC_CRYPTO_ALG_AES_CBC_256:
-				case IPSEC_CRYPTO_ALG_AES_CTR_128:
-				case IPSEC_CRYPTO_ALG_AES_CTR_192:
-				case IPSEC_CRYPTO_ALG_AES_CTR_256:
 				case IPSEC_CRYPTO_ALG_DES_CBC:
 				case IPSEC_CRYPTO_ALG_3DES_CBC:
 					esp_decrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), BLOCK_SIZE * blocks, sa0->crypto_key, esp0->data);
 					break;
+				case IPSEC_CRYPTO_ALG_AES_CTR_128:
+				case IPSEC_CRYPTO_ALG_AES_CTR_192:
+				case IPSEC_CRYPTO_ALG_AES_CTR_256:
+					{
+						u32 ctr_iv[4];
+						ctr_iv[0] = sa0->salt;
+						clib_memcpy (&ctr_iv[1], esp0->data, IV_SIZE);
+						ctr_iv[3] = clib_host_to_net_u32 (1);
+						
+						esp_decrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, sa0->crypto_key, (u8 *) ctr_iv);
+					} 	
+					break;
 				case IPSEC_CRYPTO_ALG_AES_GCM_128:
 				case IPSEC_CRYPTO_ALG_AES_GCM_192:
 				case IPSEC_CRYPTO_ALG_AES_GCM_256:
+					{
+						u32 gcm_iv[3];
+						gcm_iv[0] = sa0->salt;
+						clib_memcpy (&gcm_iv[1], esp0->data, IV_SIZE);
+						
+						u32 aad[3];
+						size_t aad_len = 8;
+						aad[0] = clib_host_to_net_u32 (sa0->spi);
+						aad[1] = esp0->seq;
+
+						/* esn enabled? */
+						if (PREDICT_TRUE (sa0->use_esn))
+						{
+							aad[2] = clib_host_to_net_u32 (sa0->seq_hi);
+							aad_len = 12;
+						}
+
+						int rv = esp_decrypt_gcm (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length - 16, 
+														sa0->crypto_key, (u8 *) gcm_iv, (u8 *) aad, aad_len, (u8 *) vlib_buffer_get_tail (i_b0) - 16);
+
+						if (PREDICT_FALSE (!rv))
+						{
+							vlib_node_increment_counter (vm, esp_decrypt_node.index, ESP_DECRYPT_ERROR_INTEG_ERROR, 1);
+							goto trace;						
+						}
+
+						/* gcm tag */
+						i_b0->current_length -= 16;
+					} 	
 
 					break;
 			}
@@ -313,6 +390,14 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 
 	      i_b0->current_length -= sizeof (esp_footer_t);
 	      f0 = (esp_footer_t *) ((u8 *) vlib_buffer_get_current (i_b0) + i_b0->current_length);
+
+				/* for some reason, footer is wrong */
+				if (PREDICT_FALSE (f0->pad_length >= BLOCK_SIZE))
+				{
+				  vlib_node_increment_counter (vm, esp_decrypt_node.index, ESP_DECRYPT_ERROR_TRAILER_ERROR, 1);
+				  goto trace;
+				}
+
 	      i_b0->current_length -= f0->pad_length;
 
 				//fformat (stdout, "DE: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
