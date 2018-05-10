@@ -72,6 +72,8 @@ typedef struct
 #define GTPU_V1_VER   (1<<5)
 
 #define GTPU_PT_GTP    (1<<4)
+#define GTPU_HEADER_MIN   (8)
+
 
 #define	GTPU_TYPE_ECHO_REQUEST			        1
 #define	GTPU_TYPE_ECHO_RESPONSE				    2

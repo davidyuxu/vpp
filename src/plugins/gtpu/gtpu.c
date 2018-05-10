@@ -1255,10 +1255,163 @@ gtpu_config (vlib_main_t * vm, unformat_input_t * input)
 
 VLIB_CONFIG_FUNCTION (gtpu_config, "gtpu");
 
+
+
+/**************************Start of pg***************************/
+
+#define GTPU_PG_EDIT_LENGTH (1 << 0)
+
+typedef struct
+{
+  pg_edit_t ver_flags;
+  pg_edit_t type;
+  pg_edit_t length;
+  pg_edit_t teid;
+  pg_edit_t sequence;
+  pg_edit_t pdu_number;
+  pg_edit_t next_ext_type;
+} pg_gtpu_header_t;
+
+always_inline void
+gtpu_pg_edit_function_inline (pg_main_t * pg,
+                                 pg_stream_t * s,
+                                 pg_edit_group_t * g,
+                                 u32 * packets, u32 n_packets, u32 flags)
+{
+  vlib_main_t *vm = vlib_get_main ();
+  u32 gtpu_offset;
+
+  gtpu_offset = g->start_byte_offset;
+
+  while (n_packets >= 1)
+    {
+      vlib_buffer_t *p0;
+      gtpu_header_t *gtpu0;
+      u32 gtpu_len0;
+
+      p0 = vlib_get_buffer (vm, packets[0]);
+      n_packets -= 1;
+      packets += 1;
+
+      gtpu0 = (void *) (p0->data + gtpu_offset);
+      gtpu_len0 = vlib_buffer_length_in_chain (vm, p0) - gtpu_offset - GTPU_HEADER_MIN;
+
+      if (flags & GTPU_PG_EDIT_LENGTH)
+        gtpu0->length = clib_host_to_net_u16 (gtpu_len0);
+    }
+}
+
+static void
+gtpu_pg_edit_function (pg_main_t * pg,
+                         pg_stream_t * s,
+                         pg_edit_group_t * g, u32 * packets, u32 n_packets)
+{
+  switch (g->edit_function_opaque)
+  {
+    case GTPU_PG_EDIT_LENGTH:
+      gtpu_pg_edit_function_inline (pg, s, g, packets, n_packets, GTPU_PG_EDIT_LENGTH);
+      break;
+
+    default:
+      ASSERT (0);
+      break;
+  }
+}
+
+static inline void
+pg_gtpu_header_init (pg_gtpu_header_t * p)
+{
+  /* Initialize fields that are not bit fields in the IP header. */
+#define _(f) pg_edit_init (&p->f, gtpu_header_t, f);
+  _(ver_flags);
+  _(type);
+  _(length);
+  _(teid);
+  _(sequence);
+  _(pdu_number);
+  _(next_ext_type);
+#undef _
+}
+
+uword
+unformat_pg_gtpu_header (unformat_input_t * input, va_list * args)
+{
+  pg_stream_t *s = va_arg (*args, pg_stream_t *);
+  unformat_input_t sub_input = { 0 };
+  pg_gtpu_header_t *p;
+  u32 group_index;
+
+  p = pg_create_edit_group (s, sizeof (p[0]), sizeof (gtpu_header_t), &group_index);
+  pg_gtpu_header_init (p);
+
+  /* Defaults. */
+  pg_edit_set_fixed (&p->ver_flags, GTPU_V1_VER | GTPU_PT_GTP | GTPU_S_BIT);
+  pg_edit_set_fixed (&p->type, GTPU_TYPE_GTPU);
+  pg_edit_set_fixed (&p->sequence, 0);
+  pg_edit_set_fixed (&p->pdu_number, 0);
+  pg_edit_set_fixed (&p->next_ext_type, 0);
+  
+  p->teid.type   = PG_EDIT_UNSPECIFIED;
+  p->length.type = PG_EDIT_UNSPECIFIED;
+
+  if (!unformat (input, "GTPU %U", unformat_input, &sub_input))
+    goto error;
+
+  /* Parse options. */
+  while (1)
+    {
+      if (unformat (&sub_input, "teid %U",
+		    unformat_pg_edit, unformat_pg_number, &p->teid))
+	    ;
+
+      else if (unformat (&sub_input, "length %U",
+			 unformat_pg_edit, unformat_pg_number, &p->length))
+	    ;
+
+      else if (unformat (&sub_input, "type %U",
+			 unformat_pg_edit, unformat_pg_number, &p->type))
+	    ;
+
+      /* Can't parse input: try next protocol level. */
+      else
+	    break;
+    }
+
+  {
+    if (!unformat_user (&sub_input, unformat_pg_payload, s))
+      goto error;
+
+    p = pg_get_edit_group (s, group_index);
+    if (p->length.type == PG_EDIT_UNSPECIFIED)
+    {
+      pg_edit_group_t *g = pg_stream_get_group (s, group_index);
+      g->edit_function = gtpu_pg_edit_function;
+      g->edit_function_opaque = 0;
+      if (p->length.type == PG_EDIT_UNSPECIFIED)
+        g->edit_function_opaque |= GTPU_PG_EDIT_LENGTH;
+    }
+
+	unformat_free (&sub_input);
+    return 1;
+  }
+
+error:
+  /* Free up any edits we may have added. */
+  pg_free_edit_group (s);
+  unformat_free (&sub_input);
+
+  return 0;
+}
+
+/***************************End of pg****************************/
+
+
 clib_error_t *
 gtpu_init (vlib_main_t * vm)
 {
   gtpu_main_t *gtm = &gtpu_main;
+  udp_dst_port_info_t *pi;
+  pg_node_t *pn;
 
   gtm->vnet_main = vnet_get_main ();
   gtm->vlib_main = vm;
@@ -1277,12 +1430,27 @@ gtpu_init (vlib_main_t * vm)
 				       sizeof (ip46_address_t),
 				       sizeof (mcast_shared_t));
 
-#if 0
+#if 1
   udp_register_dst_port (vm, UDP_DST_PORT_GTPU,
 			 gtpu4_input_node.index, /* is_ip4 */ 1);
   udp_register_dst_port (vm, UDP_DST_PORT_GTPU6,
 			 gtpu6_input_node.index, /* is_ip4 */ 0);
 #endif
+
+  /* Added for PG, brant */
+  pn = pg_get_node (gtpu4_input_node.index);
+  pn->unformat_edit = unformat_pg_gtpu_header;
+  
+  pn = pg_get_node (gtpu6_input_node.index);
+  pn->unformat_edit = unformat_pg_gtpu_header;
+
+  pi = udp_get_dst_port_info (&udp_main, UDP_DST_PORT_GTPU, 1);
+  if (pi)
+    pi->unformat_pg_edit = unformat_pg_gtpu_header;
+
+  pi = udp_get_dst_port_info (&udp_main, UDP_DST_PORT_GTPU6, 0);
+  if (pi)
+    pi->unformat_pg_edit = unformat_pg_gtpu_header;
 
   gtm->fib_node_type = fib_node_register_new_type (&gtpu_vft);
 
