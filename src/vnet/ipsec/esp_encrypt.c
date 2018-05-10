@@ -352,7 +352,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 					_iv[0] = sa0->seq;
 	      	_iv[1] = sa0->seq_hi;
 
-					u32 ctr_iv[4];
+					u32 ctr_iv[IV_SIZE+2];
 					ctr_iv[0] = sa0->salt;
 					clib_memcpy (&ctr_iv[1], iv, IV_SIZE);
 					ctr_iv[3] = clib_host_to_net_u32 (1);
@@ -381,7 +381,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 							aad_len = 12;
 						}
 
-						u32 gcm_iv[3];
+						u32 gcm_iv[IV_SIZE+1];
 						gcm_iv[0] = sa0->salt;
 						clib_memcpy (&gcm_iv[1], iv, IV_SIZE);						
 
