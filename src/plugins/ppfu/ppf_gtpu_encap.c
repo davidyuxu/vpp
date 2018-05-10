@@ -163,7 +163,6 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  b2 = vlib_get_buffer (vm, bi2);
 	  b3 = vlib_get_buffer (vm, bi3);
 
-
 	  flow_hash0 = vnet_l2_compute_flow_hash (b0);
 	  flow_hash1 = vnet_l2_compute_flow_hash (b1);
 	  flow_hash2 = vnet_l2_compute_flow_hash (b2);

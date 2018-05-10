@@ -561,8 +561,8 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         vlib_buffer_t * b0;
         u32 error0 = 0;
         u32 tunnel_index0;
-        ppf_gtpu_tunnel_t * t0;
-        u32 call_id0;
+        ppf_gtpu_tunnel_t * t0 = NULL;
+        u32 call_id0 = 0;
         ppf_callline_t * c0 = NULL;
         ppf_pdcp_session_t * pdcp0 = NULL;
         u8 * buf0;
@@ -594,6 +594,11 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
         
         /* Find rx tunnel */
+        if (pool_is_free_index (gtm->tunnels, tunnel_index0)) {
+          error0 = PPF_PDCP_DECRYPT_ERROR_NO_SUCH_CALL;
+          next0 = PPF_PDCP_DECRYPT_NEXT_DROP;
+          goto trace00;
+        }
         t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
 
         /* Handle buffer 0 */

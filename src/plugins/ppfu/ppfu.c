@@ -310,6 +310,7 @@ void ppf_reset_calline (u32 call_id)
 	call_line->ue_bearer_id = ~0;
 	call_line->call_type = INVALID_CALL_TYPE;
 	call_line->call_index = ~0;
+	call_line->sb_multi_path = 0;
 }
 
 void ppf_init_calline (u32 call_id, ppf_calline_type_t call_type) 
@@ -341,7 +342,8 @@ void ppf_init_calline (u32 call_id, ppf_calline_type_t call_type)
 	
 	call_line->pdcp.session_id = ~0;
  	call_line->sb_policy = ~0;
-	call_line->ue_bearer_id = ~0;	
+	call_line->ue_bearer_id = ~0;
+	call_line->sb_multi_path = 0;
 }
 
 int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c)
@@ -506,7 +508,7 @@ ppf_init (vlib_main_t * vm)
   if (pm->max_capacity == 0)
     pm->max_capacity = DEF_MAX_PPF_SESSION;
 
-  pm->ppf_calline_table = clib_mem_alloc (pm->max_capacity * sizeof (ppf_callline_t));
+  pm->ppf_calline_table = clib_mem_alloc_aligned (pm->max_capacity * sizeof (ppf_callline_t), CLIB_CACHE_LINE_BYTES);
   ASSERT(pm->ppf_calline_table != NULL);
 
   for (i = 0; i < pm->max_capacity; i++) {

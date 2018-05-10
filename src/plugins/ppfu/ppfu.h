@@ -328,36 +328,37 @@ typedef struct
 
 typedef struct _ppf_pdcp_sa_t_
 {
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
   EVP_CIPHER_CTX *cypher_ctx;
 #else
   EVP_CIPHER_CTX cypher_ctx;
 #endif
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
   CMAC_CTX *integrity_ctx;
-
 } ppf_pdcp_aes_sa_t;
 
 
 
 typedef struct
 {
-
-
-  ppf_pdcp_aes_sa_t up_sa;
   ppf_pdcp_aes_sa_t down_sa;
+  ppf_pdcp_aes_sa_t up_sa;
 
-  //snow 3g ctx
-  snow3g_ctx_t  snow3g_ctx;
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
 
-
-  u8  integrity_key[MAX_PDCP_KEY_LEN];
-  u8  crypto_key[MAX_PDCP_KEY_LEN];
   u8  security_algorithms;
   u8  sn_length;
   u8  header_length;
   u8  mac_length;
   u32 tx_hfn;
   u32 tx_next_sn;
+  void (*encap_header)(u8 *, u8, u32);
+  pdcp_intergity_handler protect;
+  pdcp_security_handler encrypt;
+
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
+
   u32 rx_hfn;
   u32 rx_next_expected_sn;
   u32 rx_last_forwarded_sn;
@@ -365,12 +366,17 @@ typedef struct
   u64 in_flight_limit;
   uword * rx_replay_bitmap;  /* bitmap of rx sn */
   u32 * rx_reorder_buffers;  /* rx reordering vector*/
-  void (*encap_header)(u8 *, u8, u32);
   void (*decap_header)(u8 *, u8 *, u32 *);
-  pdcp_intergity_handler protect;
   pdcp_intergity_handler validate;
-  pdcp_security_handler encrypt;
   pdcp_security_handler decrypt;
+
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline2);
+
+  //snow 3g ctx
+  snow3g_ctx_t  snow3g_ctx;
+
+  u8  integrity_key[MAX_PDCP_KEY_LEN];
+  u8  crypto_key[MAX_PDCP_KEY_LEN];
 } ppf_pdcp_session_t;
 
 typedef struct
@@ -451,22 +457,18 @@ typedef enum
 {
    PPF_SRB_CALL = 0,
    PPF_DRB_CALL
- }ppf_calline_type_t;
+} ppf_calline_type_t;
 
  typedef enum
 {
    PPF_TUNNEL_MODE = 0,
    PPF_LBO_MODE
- }ppf_calline_mode_t;
-
-#define PPF_GTPU_TUNNEL_STATUS_RX  (1 << 1)
-#define PPF_GTPU_TUNNEL_STATUS_TX  (1 << 2)
+} ppf_calline_mode_t;
 
 typedef struct
 {
   ppf_gtpu_tunnel_type_t tunnel_type;
   u32 tunnel_id;
-  u32 rx_tx_status;
 } ppf_gtpu_tunnel_id_type_t;
 
 typedef union {
@@ -494,6 +496,13 @@ typedef struct
   u32 session_id;
 } ppf_pdcp_callline_t;
 
+#define PPF_SB_COUNT_MASK             (0x03) // pow2_mask(max_log2(MAX_SB_PER_CALL))
+#define PPF_SB_PATH_MASK              (0x07) // pow2_mask(MAX_SB_PER_CALL)
+#define PPF_SB_PATH_GET_VALID(mp, i)  ((mp) & (i))
+#define PPF_SB_PATH_SET_VALID(mp, i)  ((mp) |= ((i) << 2))
+#define PPF_SB_COUNT(mp)              ((mp) & PPF_SB_COUNT_MASK)
+#define PPF_SB_VALID_PATH(mp)         min_log2(((mp) >> 2) & PPF_SB_PATH_MASK)
+
 typedef struct 
 {	
   u32 call_index;
@@ -503,13 +512,14 @@ typedef struct
     ppf_srb_callline_t srb;
   } rb;
   ppf_pdcp_callline_t pdcp;
-  u32 sb_policy;
+  u8  sb_multi_path;
+  u8  sb_policy;
+  u8  lbo_mode;
+  u8  ue_mode;
   u32 ue_bearer_id;
-  u32 lbo_mode;
-  u32 ue_mode;
+  u32 sw_if_index;
   u32 inner_vrf_id;
   u32 hw_if_index;
-  u32 sw_if_index;
 } ppf_callline_t;
 
 #define PPF_BEARER(ub)  (((ub) >> 25) & 0x1f)

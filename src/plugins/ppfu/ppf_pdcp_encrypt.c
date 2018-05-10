@@ -104,12 +104,12 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    vlib_buffer_t * b0, * b1, *b2, *b3;
 	    u32 error0 = 0, error1 = 0, error2 = 0, error3 = 0;
 	    u32 tunnel_index0, tunnel_index1, tunnel_index2, tunnel_index3;
-	    ppf_gtpu_tunnel_t * t0, * t1, * t2, * t3;
-	    ppf_callline_t * c0, * c1, * c2, * c3;
-	    ppf_pdcp_session_t * pdcp0, * pdcp1, * pdcp2, *pdcp3;
+	    ppf_gtpu_tunnel_t * t0 = 0, * t1 = 0, * t2 = 0, * t3 = 0;
+	    ppf_callline_t * c0 = 0, * c1 = 0, * c2 = 0, * c3 = 0;
+	    ppf_pdcp_session_t * pdcp0 = 0, * pdcp1 = 0, * pdcp2 = 0, *pdcp3 = 0;
 	    u8 * buf0, * buf1, * buf2, * buf3;
-	    u32 count0, count1, count2, count3;
-	    u32 sn0, sn1, sn2, sn3;
+	    u32 count0 = 0, count1 = 0, count2 = 0, count3 = 0;
+	    u32 sn0 = 0, sn1 = 0, sn2 = 0, sn3 = 0;
 	    u32 len0, len1, len2, len3;
 	    ppf_pdcp_security_param_t sp0, sp1, sp2, sp3;
 	    
@@ -150,20 +150,21 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    tunnel_index2 = vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
 	    tunnel_index3 = vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
 
-	    t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
-	    t1 = pool_elt_at_index (gtm->tunnels, tunnel_index1);
-	    t2 = pool_elt_at_index (gtm->tunnels, tunnel_index2);
-	    t3 = pool_elt_at_index (gtm->tunnels, tunnel_index3);
+        /* Handle packet 0 */
 
+	    if (PREDICT_FALSE(pool_is_free_index(gtm->tunnels, tunnel_index0))) {
+          error0 = PPF_PDCP_ENCRYPT_ERROR_NO_SUCH_CALL;
+          goto next0;
+        }
+
+        t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
 	    c0 = &(pm->ppf_calline_table[t0->call_id]);
-	    c1 = &(pm->ppf_calline_table[t1->call_id]);
-	    c2 = &(pm->ppf_calline_table[t2->call_id]);
-	    c3 = &(pm->ppf_calline_table[t3->call_id]);
-
 	    pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
-	    pdcp1 = pool_elt_at_index(ppm->sessions, c1->pdcp.session_id);
-	    pdcp2 = pool_elt_at_index(ppm->sessions, c2->pdcp.session_id);
-	    pdcp3 = pool_elt_at_index(ppm->sessions, c3->pdcp.session_id);
+
+	    if (PREDICT_FALSE(0 == pdcp0->header_length)) {
+	      error0 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
+	      goto next0;
+	    }
 
         if (PREDICT_TRUE(PPF_DRB_CALL == c0->call_type)) {
 			sn0 = pdcp0->tx_next_sn;
@@ -173,41 +174,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 			sn0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn;
 			count0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.count;
         }
-
-        if (PREDICT_TRUE(PPF_DRB_CALL == c1->call_type)) {
-			sn1 = pdcp1->tx_next_sn;
-			count1 = PPF_PDCP_COUNT (pdcp1->tx_hfn, pdcp1->tx_next_sn, pdcp1->sn_length);
-			PPF_PDCP_COUNT_INC (pdcp1->tx_hfn, pdcp1->tx_next_sn, pdcp1->sn_length);
-        } else {
-			sn1 = vnet_buffer2(b1)->ppf_du_metadata.pdcp.sn;
-			count1 = vnet_buffer2(b1)->ppf_du_metadata.pdcp.count;
-        }
-
-        if (PREDICT_TRUE(PPF_DRB_CALL == c2->call_type)) {
-			sn2 = pdcp2->tx_next_sn;
-			count2 = PPF_PDCP_COUNT (pdcp2->tx_hfn, pdcp2->tx_next_sn, pdcp2->sn_length);
-			PPF_PDCP_COUNT_INC (pdcp2->tx_hfn, pdcp2->tx_next_sn, pdcp2->sn_length);
-        } else {
-			sn2 = vnet_buffer2(b2)->ppf_du_metadata.pdcp.sn;
-			count2 = vnet_buffer2(b2)->ppf_du_metadata.pdcp.count;
-        }
-		
-        if (PREDICT_TRUE(PPF_DRB_CALL == c3->call_type)) {
-			sn3 = pdcp3->tx_next_sn;
-			count3 = PPF_PDCP_COUNT (pdcp3->tx_hfn, pdcp3->tx_next_sn, pdcp3->sn_length);
-			PPF_PDCP_COUNT_INC (pdcp3->tx_hfn, pdcp3->tx_next_sn, pdcp3->sn_length);
-        } else {
-			sn3 = vnet_buffer2(b3)->ppf_du_metadata.pdcp.sn;
-			count3 = vnet_buffer2(b3)->ppf_du_metadata.pdcp.count;
-        }
-		
-        /* Handle packet 0 */
-	    
-	    if (PREDICT_FALSE(0 == pdcp0->header_length)) {
-	      error0 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
-	      goto next0;
-	    }
-
+		    
 	    /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b0, -(word)(pdcp0->header_length));
 	    buf0 = vlib_buffer_get_current (b0);
@@ -249,11 +216,28 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
           }
 
         /* Handle packet 1 */
+	    if (PREDICT_FALSE(pool_is_free_index(gtm->tunnels, tunnel_index1))) {
+          error1 = PPF_PDCP_ENCRYPT_ERROR_NO_SUCH_CALL;
+          goto next1;
+        }
+
+	    t1 = pool_elt_at_index (gtm->tunnels, tunnel_index1);
+	    c1 = &(pm->ppf_calline_table[t1->call_id]);
+	    pdcp1 = pool_elt_at_index(ppm->sessions, c1->pdcp.session_id);
 
 	    if (PREDICT_FALSE(0 == pdcp1->header_length)) {
 	      error1 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
 	      goto next1;
 	    }
+
+        if (PREDICT_TRUE(PPF_DRB_CALL == c1->call_type)) {
+			sn1 = pdcp1->tx_next_sn;
+			count1 = PPF_PDCP_COUNT (pdcp1->tx_hfn, pdcp1->tx_next_sn, pdcp1->sn_length);
+			PPF_PDCP_COUNT_INC (pdcp1->tx_hfn, pdcp1->tx_next_sn, pdcp1->sn_length);
+        } else {
+			sn1 = vnet_buffer2(b1)->ppf_du_metadata.pdcp.sn;
+			count1 = vnet_buffer2(b1)->ppf_du_metadata.pdcp.count;
+        }
 
 	    /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b1, -(word)(pdcp1->header_length));
@@ -296,12 +280,29 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
           }
 
         /* Handle packet 2 */
+	    if (PREDICT_FALSE(pool_is_free_index(gtm->tunnels, tunnel_index2))) {
+          error2 = PPF_PDCP_ENCRYPT_ERROR_NO_SUCH_CALL;
+          goto next2;
+        }
+
+	    t2 = pool_elt_at_index (gtm->tunnels, tunnel_index2);
+	    c2 = &(pm->ppf_calline_table[t2->call_id]);
+	    pdcp2 = pool_elt_at_index(ppm->sessions, c2->pdcp.session_id);
 
 	    if (PREDICT_FALSE(0 == pdcp2->header_length)) {
 	      error2 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
 	      goto next2;
 	    }
 
+        if (PREDICT_TRUE(PPF_DRB_CALL == c2->call_type)) {
+			sn2 = pdcp2->tx_next_sn;
+			count2 = PPF_PDCP_COUNT (pdcp2->tx_hfn, pdcp2->tx_next_sn, pdcp2->sn_length);
+			PPF_PDCP_COUNT_INC (pdcp2->tx_hfn, pdcp2->tx_next_sn, pdcp2->sn_length);
+        } else {
+			sn2 = vnet_buffer2(b2)->ppf_du_metadata.pdcp.sn;
+			count2 = vnet_buffer2(b2)->ppf_du_metadata.pdcp.count;
+        }
+		
 	    /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b2, -(word)(pdcp2->header_length));
 	    buf2 = vlib_buffer_get_current (b2);
@@ -343,11 +344,28 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
           }
 
         /* Handle packet 3 */
+	    if (PREDICT_FALSE(pool_is_free_index(gtm->tunnels, tunnel_index3))) {
+          error3 = PPF_PDCP_ENCRYPT_ERROR_NO_SUCH_CALL;
+          goto next3;
+        }
+
+	    t3 = pool_elt_at_index (gtm->tunnels, tunnel_index3);
+	    c3 = &(pm->ppf_calline_table[t3->call_id]);
+	    pdcp3 = pool_elt_at_index(ppm->sessions, c3->pdcp.session_id);
 
 	    if (PREDICT_FALSE(0 == pdcp3->header_length)) {
 	      error3 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
 	      goto next3;
 	    }
+
+        if (PREDICT_TRUE(PPF_DRB_CALL == c3->call_type)) {
+			sn3 = pdcp3->tx_next_sn;
+			count3 = PPF_PDCP_COUNT (pdcp3->tx_hfn, pdcp3->tx_next_sn, pdcp3->sn_length);
+			PPF_PDCP_COUNT_INC (pdcp3->tx_hfn, pdcp3->tx_next_sn, pdcp3->sn_length);
+        } else {
+			sn3 = vnet_buffer2(b3)->ppf_du_metadata.pdcp.sn;
+			count3 = vnet_buffer2(b3)->ppf_du_metadata.pdcp.count;
+        }
 
 	    /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b3, -(word)(pdcp3->header_length));
@@ -404,12 +422,12 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    vlib_buffer_t * b0; 
 	    u32 error0 = 0;
 	    u32 tunnel_index0;
-	    ppf_gtpu_tunnel_t * t0;
-	    ppf_callline_t * c0;
-	    ppf_pdcp_session_t * pdcp0;
+	    ppf_gtpu_tunnel_t * t0 = 0;
+	    ppf_callline_t * c0 = 0;
+	    ppf_pdcp_session_t * pdcp0 = 0;
 	    u8 * buf0;
-	    u32 count0;
-	    u32 sn0;
+	    u32 count0 = 0;
+	    u32 sn0 = 0;
 	    u32 len0;
 	    ppf_pdcp_security_param_t sp0;
 
@@ -425,9 +443,19 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 
         /* Find context */
 	    tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
+	    if (PREDICT_FALSE(pool_is_free_index(gtm->tunnels, tunnel_index0))) {
+          error0 = PPF_PDCP_ENCRYPT_ERROR_NO_SUCH_CALL;
+          goto next00;
+        }
+
 	    t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
 	    c0 = &(pm->ppf_calline_table[t0->call_id]);
 	    pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
+
+	    if (PREDICT_FALSE(0 == pdcp0->header_length)) {
+	      error0 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
+	      goto next00;
+	    }
 
         if (PREDICT_TRUE(PPF_DRB_CALL == c0->call_type)) {
 			sn0 = pdcp0->tx_next_sn;
@@ -437,11 +465,6 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 			sn0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn;
 			count0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.count;
         }
-
-	    if (PREDICT_FALSE(0 == pdcp0->header_length)) {
-	      error0 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
-	      goto next00;
-	    }
 
         /* Prepend and encap pdcp header */
 	    vlib_buffer_advance (b0, -(word)(pdcp0->header_length));
