@@ -918,6 +918,8 @@ start_workers (vlib_main_t * vm)
 
 	      vm_clone->error_main.counters = vec_dup_aligned
 		(vlib_mains[0]->error_main.counters, CLIB_CACHE_LINE_BYTES);
+				vm_clone->error_main.rate_counters =
+		vec_dup_aligned (vlib_mains[0]->error_main.rate_counters, CLIB_CACHE_LINE_BYTES);
 	      vm_clone->error_main.counters_last_clear = vec_dup_aligned
 		(vlib_mains[0]->error_main.counters_last_clear,
 		 CLIB_CACHE_LINE_BYTES);
@@ -1086,14 +1088,18 @@ vlib_worker_thread_node_refork (void)
 
   /* Re-clone error heap */
   u64 *old_counters = vm_clone->error_main.counters;
+  u64 *old_rate_counters = vm_clone->error_main.rate_counters;
   u64 *old_counters_all_clear = vm_clone->error_main.counters_last_clear;
 
   clib_memcpy (&vm_clone->error_main, &vm->error_main,
 	       sizeof (vm->error_main));
   j = vec_len (vm->error_main.counters) - 1;
-  vec_validate_aligned (old_counters, j, CLIB_CACHE_LINE_BYTES);
-  vec_validate_aligned (old_counters_all_clear, j, CLIB_CACHE_LINE_BYTES);
+
+	vec_validate_aligned (old_counters, j, CLIB_CACHE_LINE_BYTES);
+  vec_validate (old_counters_all_clear, j);
+  vec_validate (old_rate_counters, j);
   vm_clone->error_main.counters = old_counters;
+  vm_clone->error_main.rate_counters = old_rate_counters;
   vm_clone->error_main.counters_last_clear = old_counters_all_clear;
 
   nm_clone = &vm_clone->node_main;
