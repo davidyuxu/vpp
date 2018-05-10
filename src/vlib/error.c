@@ -170,8 +170,8 @@ vlib_register_errors (vlib_main_t * vm,
 	       error_strings, n_errors * sizeof (error_strings[0]));
 
   /* Allocate a counter/elog type for each error. */
-  vec_validate (em->counters, l - 1);
-  vec_validate (vm->error_elog_event_types, l - 1);
+  vec_validate_aligned (em->counters, l - 1, CLIB_CACHE_LINE_BYTES);
+  vec_validate_aligned (vm->error_elog_event_types, l - 1, CLIB_CACHE_LINE_BYTES);
 
   /* Zero counters for re-registrations of errors. */
   if (n->error_heap_index + n_errors <= vec_len (em->counters_last_clear))
@@ -233,49 +233,38 @@ show_errors (vlib_main_t * vm,
 
     em = &this_vlib_main->error_main;
 
-		vec_validate (sums, vec_len (em->counters));
+		int len = vec_len (em->counters);
 
-		vec_validate (tmp, vec_len (em->counters));
-		vec_validate (tmp_sum, vec_len (em->counters));
+		vec_validate (sums, len - 1);
+		vec_validate (tmp, len - 1);
+		vec_validate (tmp_sum, len - 1);
+		vec_validate (em->rate_counters, len - 1);
 		
-		vec_validate (em->rate_counters, vec_len (em->counters));
-		
-		//vec_validate (em->rate_counters, vec_len (em->counters));
-
-    if (verbose)
-      vlib_cli_output(vm, "Thread %u (%v):", index,
-                      vlib_worker_threads[index].name);
-
     for (ni = 0; ni < vec_len (this_vlib_main->node_main.nodes); ni++)
-      {
-	n = vlib_get_node (this_vlib_main, ni);
-	for (code = 0; code < n->n_errors; code++)
-	  {
-	    i = n->error_heap_index + code;
-	    c = em->counters[i];
-	    if (i < vec_len (em->counters_last_clear))
-	      c -= em->counters_last_clear[i];
-	    sums[i] += c;
+    {
+			n = vlib_get_node (this_vlib_main, ni);
+			for (code = 0; code < n->n_errors; code++)
+		  {
+		    i = n->error_heap_index + code;
+		    c = em->counters[i];
+		    if (i < vec_len (em->counters_last_clear))
+		      c -= em->counters_last_clear[i];
+		    sums[i] += c;
 
-		tmp[i] = em->counters[i] - em->rate_counters[i];
-		tmp_sum[i] += tmp[i];
+				tmp[i] = em->counters[i] - em->rate_counters[i];
+				tmp_sum[i] += tmp[i];
+		    if (c == 0 && verbose < 2)
+		      continue;
 
-	    if (c == 0 && verbose < 2)
-	      continue;
-
-            if (verbose)
-              vlib_cli_output (vm, "%10Ld %U   %=40v%=20s%=10d", c, format_mbps_pps, tmp[i]/duration, n->name,
-                               em->error_strings_heap[i], i);
-            else
-              vlib_cli_output (vm, "%10Ld %U   %=40v%s", c, format_mbps_pps, tmp[i]/duration, n->name,
-                               em->error_strings_heap[i]);
-	  }
-      }
+	      vlib_cli_output (vm, "%10Ld %U   %=40v%=20s%=10d", c, format_mbps_pps, tmp[i]/duration, n->name,
+	                       em->error_strings_heap[i], i);
+		  }
+    }
 
 
-	/* remember what we got this time */
-	em->rate_counters = vec_dup (em->counters);
-	
+		/* remember what we got this time */
+		vec_copy (em->rate_counters, em->counters);
+
     index++;
   }));
   /* *INDENT-ON* */
