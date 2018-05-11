@@ -22,6 +22,8 @@
 #include <ppfu/ppf_gtpu.h>
 #include <vnet/feature/feature.h>
 
+#define MAX_TRACES    (1 << 10)
+
 typedef struct
 {
   u32 cached_next_index;
@@ -40,6 +42,12 @@ typedef struct
   u32 num_tx_workers;
   u32 first_tx_worker_index;
   u32 tx_frame_queue_index;
+
+  u32 trace;
+  u32 *pdcp_trace_index;
+  u32 *tx_trace_index;
+  u32 **pdcp_vectors_trace;
+  u32 **tx_vectors_trace;
 
   /* convenience variables */
   vlib_main_t *vlib_main;
@@ -518,6 +526,13 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
 
+  if (PREDICT_FALSE(hm->trace)) {
+    uword tid = vlib_get_thread_index ();
+    hm->pdcp_vectors_trace[tid][hm->pdcp_trace_index[tid]] = n_left_from;
+    hm->pdcp_trace_index[tid]++;
+    hm->pdcp_trace_index[tid] &= (MAX_TRACES - 1);
+  }
+
   while (n_left_from > 0)
     {
       u32 bi0;
@@ -957,6 +972,13 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
 
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
+
+  if (PREDICT_FALSE(hm->trace)) {
+    uword tid = vlib_get_thread_index ();
+    hm->tx_vectors_trace[tid][hm->tx_trace_index[tid]] = n_left_from;
+    hm->tx_trace_index[tid]++;
+    hm->tx_trace_index[tid] &= (MAX_TRACES - 1);
+  }
 
   while (n_left_from > 0)
     {
@@ -1429,12 +1451,17 @@ ppfu_handoff_init (vlib_main_t * vm)
 	vlib_frame_queue_main_init (ppf_tx_handoff_dispatch_node.index, 0);
 
 
+  hm->trace = 0;
+  hm->pdcp_trace_index = 0;
+  hm->pdcp_vectors_trace = 0;
+  hm->tx_trace_index = 0;
+  hm->tx_vectors_trace = 0;
+
   /* *INDENT-ON* */
   return 0;
 }
 
 VLIB_INIT_FUNCTION (ppfu_handoff_init);
-
 
 static clib_error_t *
 ppfu_handoff_set_command_fn (vlib_main_t * vm,
@@ -1443,6 +1470,7 @@ ppfu_handoff_set_command_fn (vlib_main_t * vm,
 {
   clib_error_t *error = NULL;
   int handoff_enable = ~0;
+  int trace = ~0;
   u32 io_mode = ~0;
   
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
@@ -1455,6 +1483,8 @@ ppfu_handoff_set_command_fn (vlib_main_t * vm,
         else if (unformat (input, "dedicated"))
           io_mode = PPF_IO_MODE_DEDICATED;
       }
+      else if (unformat(input, "trace %U", unformat_vlib_enable_disable, &trace))
+        ;
       else
       {
         error = clib_error_return (0, "parse error: '%U'", format_unformat_error, input);
@@ -1482,6 +1512,32 @@ ppfu_handoff_set_command_fn (vlib_main_t * vm,
     }
   }
 
+  if (trace != ~0) {
+    ppfu_handoff_main_t *hm = &ppfu_handoff_main;
+    u32 **vectors = 0;
+    if (trace) {
+      vec_validate_init_empty_aligned (hm->pdcp_trace_index, hm->num_workers - 1, 0,
+                                       CLIB_CACHE_LINE_BYTES);
+      vec_validate_aligned (hm->pdcp_vectors_trace, hm->num_workers - 1,
+                            CLIB_CACHE_LINE_BYTES);
+      vec_foreach (vectors, hm->pdcp_vectors_trace)
+      {
+        vec_validate_init_empty (*vectors, MAX_TRACES - 1, ~0);
+      }
+      
+      vec_validate_init_empty_aligned (hm->tx_trace_index, hm->num_workers - 1, 0,
+                                       CLIB_CACHE_LINE_BYTES);
+      vec_validate_aligned (hm->tx_vectors_trace, hm->num_workers - 1,
+                            CLIB_CACHE_LINE_BYTES);
+      vec_foreach (vectors, hm->tx_vectors_trace)
+      {
+        vec_validate_init_empty (*vectors, MAX_TRACES - 1, ~0);
+      }
+    }
+
+    hm->trace = trace;
+  }
+
   vlib_cli_output (vm, "PPF handoff %s, io-mode %s\n",
                    (ppf_main.handoff_enable ? "enable" : "disable"),
                    ((ppf_main.io_mode == PPF_IO_MODE_DEDICATED) ? "dedicated" : "shared"));
@@ -1492,10 +1548,78 @@ ppfu_handoff_set_command_fn (vlib_main_t * vm,
 /* *INDENT-OFF* */
 VLIB_CLI_COMMAND (set_ppf_handoff_command, static) = {
   .path = "set ppf_handoff",
-  .short_help =	"set ppf_handoff [<enable|disable>] [io-mode <shared|dedicated>]",
+  .short_help =	"set ppf_handoff [<enable|disable>] [io-mode <shared|dedicated>] [trace <on|off>]",
   .function = ppfu_handoff_set_command_fn,
 };
 /* *INDENT-ON* */
+
+u8 *
+format_vec32_adv2 (u8 * s, va_list * va)
+{
+  u32 *v = va_arg (*va, u32 *);
+  char *fmt = va_arg (*va, char *);
+  u32 num_per_row = va_arg (*va, u32);
+  u32 skip = va_arg (*va, u32);
+  uword i, ncols = 0;
+  for (i = 0; i < vec_len (v); i++)
+    {
+      if (v[i] != skip) {
+        s = format (s, fmt, v[i]);
+        ncols++;
+      }
+
+      if (ncols > 0) {
+	    s = format (s, ", ");
+		if (ncols == num_per_row) {
+		  s = format (s, "\n");
+          ncols = 0;
+        }
+      }
+    }
+
+  if (ncols)
+    s = format (s, "\n");
+
+  return s;
+}
+
+static clib_error_t *
+ppfu_handoff_show_trace_command_fn (vlib_main_t * vm,
+					unformat_input_t * input,
+					vlib_cli_command_t * cmd)
+{
+  ppfu_handoff_main_t *hm = &ppfu_handoff_main;
+  clib_error_t *error = NULL;
+  u32 **vectors;
+  
+  if (!hm->trace)
+    return error;
+
+  vlib_cli_output (vm, "PDCP handoff trace: \n");
+  vec_foreach (vectors, hm->pdcp_vectors_trace)
+  {
+    vlib_cli_output (vm, "thread %d: \n%U", vectors - hm->pdcp_vectors_trace,
+                     format_vec32_adv2, *vectors, "%3d", 16, ~0);
+  }
+
+  vlib_cli_output (vm, "TX handoff trace: \n");
+  vec_foreach (vectors, hm->tx_vectors_trace)
+  {
+    vlib_cli_output (vm, "thread %d: \n%U", vectors - hm->tx_vectors_trace,
+                     format_vec32_adv2, *vectors, "%3d", 16, ~0);
+  }
+
+  return error;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (show_ppf_handoff_trace_command, static) = {
+  .path = "show ppf_handoff trace",
+  .short_help =	"show ppf_handoff trace",
+  .function = ppfu_handoff_show_trace_command_fn,
+};
+/* *INDENT-ON* */
+
 
 
 /*
