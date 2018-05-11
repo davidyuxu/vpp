@@ -638,9 +638,9 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         if (PREDICT_FALSE(sn0 != pdcp0->rx_next_expected_sn)) {
           w0 = pdcp0->replay_window;
           if (sn0 + w0 < pdcp0->rx_last_forwarded_sn)
-            hfn0 = pdcp0->rx_hfn + 1;
+            hfn0 = PPF_PDCP_HFN_INC (pdcp0->rx_hfn, pdcp0->sn_length);
           else if (sn0 >= pdcp0->rx_last_forwarded_sn + w0)
-            hfn0 = pdcp0->rx_hfn - 1;
+            hfn0 = PPF_PDCP_HFN_DEC (pdcp0->rx_hfn, pdcp0->sn_length);
 
 		  count0 = PPF_PDCP_COUNT (hfn0, sn0, pdcp0->sn_length);
 		  count_last_fwd0  = PPF_PDCP_COUNT (pdcp0->rx_hfn, pdcp0->rx_last_forwarded_sn, pdcp0->sn_length);
@@ -654,7 +654,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 		  reorder0 = 1;
         } else {
           if (sn0 < pdcp0->rx_last_forwarded_sn)
-            hfn0 = pdcp0->rx_hfn + 1;
+            hfn0 = PPF_PDCP_HFN_INC (pdcp0->rx_hfn, pdcp0->sn_length);
 
 		  count0 = PPF_PDCP_COUNT (hfn0, sn0, pdcp0->sn_length);
         }
@@ -710,7 +710,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 
 	    /* Send to next */
         if (sn0 < pdcp0->rx_last_forwarded_sn)
-          pdcp0->rx_hfn++;
+          pdcp0->rx_hfn = PPF_PDCP_HFN_INC (pdcp0->rx_hfn, pdcp0->sn_length);
 
         pdcp0->rx_last_forwarded_sn = sn0;
         pdcp0->rx_next_expected_sn  = PPF_PDCP_SN_INC (sn0, pdcp0->sn_length);
@@ -787,7 +787,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         	count0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.count;
           
             if (sn0 < pdcp0->rx_last_forwarded_sn)
-              pdcp0->rx_hfn++;
+              pdcp0->rx_hfn = PPF_PDCP_HFN_INC (pdcp0->rx_hfn, pdcp0->sn_length);
         	pdcp0->rx_last_forwarded_sn = sn0;
         	pdcp0->rx_next_expected_sn	= PPF_PDCP_SN_INC (sn0, pdcp0->sn_length);
           

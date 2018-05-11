@@ -146,17 +146,19 @@ _(IP4_LOOKUP, "ip4-lookup")
 #define PPF_PDCP_COUNT(hfn, sn, len)   ((255 == (len)) ? (sn) : ((hfn) << (len) | (sn)))
 #define PPF_PDCP_HFN(count, len)       ((255 == (len)) ? 0 : ((count) >> (len)))
 #define PPF_PDCP_SN(count, len)        ((255 == (len)) ? (count) : (count & pow2_mask((len))))
-#define PPF_PDCP_COUNT_INC(hfn, sn, len)   \
-do {                                       \
-	(sn)++;                                \
-	if ((sn) == (1 << (len))) {           \
-		(hfn)++;                           \
-		(sn) = 0;                          \
-	}                                      \
-} while (0)
 #define PPF_PDCP_SN_INC(sn, len)           (((sn) + 1) & pow2_mask((len)))
 #define PPF_PDCP_SN_DEC(sn, len)           (((sn) - 1) & pow2_mask((len)))
+#define PPF_PDCP_HFN_INC(hfn, len)         (((hfn) + 1) & pow2_mask(32 - (len)))
+#define PPF_PDCP_HFN_DEC(hfn, len)         (((hfn) - 1) & pow2_mask(32 - (len)))
 #define PPF_PDCP_COUNT_HFN_DEC(count, len) ((255 == (len)) ? (((count) >> (len)) - 1) : ((((count) >> (len)) - 1) & pow2_mask(32 - (len))))
+#define PPF_PDCP_COUNT_INC(hfn, sn, len)                \
+do {                                                    \
+	(sn)++;                                             \
+	if ((sn) == (1 << (len))) {                        \
+		(hfn) = (hfn + 1) & pow2_mask(32 - (len));      \
+		(sn) = 0;                                       \
+	}                                                   \
+} while (0)
 
 /* PDCP replay bitmap operations */
 #define BITMAP_LEN(bm)               (vec_len((bm)))

@@ -864,7 +864,7 @@ ppf_pdcp_add_del_session_command_fn (vlib_main_t * vm,
   unformat_input_t _line_input, *line_input = &_line_input;
   u8 is_add = 1;
   u32 call_id = ~0;
-  u32 sn_length = ~0, init_ul_count = 1, init_dl_count = 1, in_flight_limit = 0;
+  u32 sn_length = ~0, init_ul_count = 0, init_dl_count = 0, in_flight_limit = 0;
   u32 alg;
   u8 *key = 0;
   ppf_pdcp_config_t pdcp_cfg;
