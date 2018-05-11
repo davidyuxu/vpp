@@ -202,7 +202,7 @@ ppf_pdcp_eia1_protect (vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 
         //TODO : use crypto key for intergity, align with wrong salt implemnt, need correct after salt FIX the bug
         //append 4 octs at end of data for caculating MAC 
-        snow3g_protect(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
+        snow3g_protect(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
         //snow3g_protect(ctx,sec_para->pdcp_sess->integrity_key,sec_para->count,sec_para->bearer,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
 
 	return ret;
@@ -228,7 +228,7 @@ ppf_pdcp_eia1_validate (vlib_main_t * vm,vlib_buffer_t * b0, void * security_par
 	//calculate mac exlucde 4 octs MAC-I
 	len -= EIA_MAC_LEN;	
     //TODO : use crypto key for intergity, align with wrong salt implemnt, need correct after salt FIX the bug		
-    snow3g_validate(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,mact);
+    snow3g_validate(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,buf0,len,mact);
 	//snow3g_validate(ctx,sec_para->pdcp_sess->integrity_key,sec_para->count,sec_para->bearer,buf0,len,mact);
 	ret = (buf0[len+0]== mact[0] && buf0[len+1]== mact[1] && buf0[len+2]== mact[2] && buf0[len+3]== mact[3]);
 	//trim 4 octs of MAC 
@@ -247,7 +247,7 @@ ppf_pdcp_eea1_enc (u8 * in, u8 * out, u32 size, void * security_parameters)
 	
 	snow3g_ctx_t *ctx = &(pdcp_sess->snow3g_ctx);
 
-	snow3g_encrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,in,out,size);
+	snow3g_encrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,in,out,size);
 
 
 	return 0;
@@ -262,7 +262,7 @@ ppf_pdcp_eea1_dec(u8 * in, u8 * out, u32 size, void * security_parameters)
 	
 	snow3g_ctx_t *ctx = &(pdcp_sess->snow3g_ctx);
 
-	snow3g_decrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,in,out,size);
+	snow3g_decrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,in,out,size);
 	return 0;
 }
 
@@ -279,7 +279,7 @@ ppf_pdcp_eia2_protect (vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
 	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
 
-        CMAC_CTX *ctx = (PPF_PDCP_DIR_ENC == sec_para->dir) ? pdcp_sess->down_sa.integrity_ctx : pdcp_sess->up_sa.integrity_ctx;
+    CMAC_CTX *ctx = pdcp_sess->down_sa.integrity_ctx ;
 	//prepare IV
 	vlib_buffer_advance (b0, -(word)EIA2_IV_LEN);
 	// length include IV
@@ -323,7 +323,7 @@ ppf_pdcp_eia2_validate(vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
 	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
 
-        CMAC_CTX *ctx = (PPF_PDCP_DIR_ENC == sec_para->dir) ? pdcp_sess->down_sa.integrity_ctx : pdcp_sess->up_sa.integrity_ctx;
+    CMAC_CTX *ctx =  pdcp_sess->up_sa.integrity_ctx;
 	//prepare IV
 	vlib_buffer_advance (b0, -(word)EIA2_IV_LEN);
 	// length include IV
@@ -1265,4 +1265,5 @@ VLIB_INIT_FUNCTION (ppf_pdcp_init);
  * eval: (c-set-style "gnu")
  * End:
  */
+
 
