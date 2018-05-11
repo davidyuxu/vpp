@@ -169,6 +169,68 @@ random_string (u32 * seed, uword len)
 
 f64 clib_chisquare (u64 * values);
 
+
+
+always_inline u64 splitmix64(u64 * seed) {
+	u64 z = (*seed += 0x9e3779b97f4a7c15);
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9;
+	z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
+	return z ^ (z >> 31);
+}
+
+/* This is xoshiro256** 1.0, our all-purpose, rock-solid generator. It has
+   excellent (sub-ns) speed, a state (256 bits) that is large enough for
+   any parallel application, and it passes all tests we are aware of.
+
+   For generating just floating-point numbers, xoshiro256+ is even faster.
+
+   The state must be seeded so that it is not everywhere zero. If you have
+   a 64-bit seed, we suggest to seed a splitmix64 generator and use its
+   output to fill s. */
+
+always_inline u64 
+__rotl (const u64 x, int k) 
+{
+	return (x << k) | (x >> (64 - k));
+}
+
+typedef struct 
+{
+	CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+	u64 s[4];
+} xoshiro256starstar_t;
+
+always_inline void
+xoshiro256starstar_seed (xoshiro256starstar_t *s)
+{
+	u64 seed1 = (u64) random_default_seed ();
+
+	for (int i = 0; i < 4; i++)
+		s->s[i] = splitmix64 (&seed1);
+}
+
+
+always_inline u64
+xoshiro256starstar (xoshiro256starstar_t *s)
+{
+	const u64 result_starstar = __rotl(s->s[1] * 5, 7) * 9;
+
+	const u64 t = s->s[1] << 17;
+
+	s->s[2] ^= s->s[0];
+	s->s[3] ^= s->s[1];
+	s->s[1] ^= s->s[2];
+	s->s[0] ^= s->s[3];
+
+	s->s[2] ^= t;
+
+	s->s[3] = __rotl(s->s[3], 45);
+
+	return result_starstar;
+}
+
+
+
 #endif /* included_random_h */
 
 /*

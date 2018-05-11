@@ -146,7 +146,6 @@ esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 	return;
 }
 
-
 static uword
 esp_encrypt_node_fn (vlib_main_t * vm,
 		     vlib_node_runtime_t * node, vlib_frame_t * from_frame)
@@ -156,6 +155,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
   n_left_from = from_frame->n_vectors;
   ipsec_main_t *im = &ipsec_main;
   ipsec_proto_main_t *em = &ipsec_proto_main;
+	int thread_id = vlib_get_thread_index ();
 
   next_index = node->cached_next_index;
 
@@ -339,9 +339,22 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			case IPSEC_CRYPTO_ALG_AES_CBC_256:
 			case IPSEC_CRYPTO_ALG_DES_CBC:
 			case IPSEC_CRYPTO_ALG_3DES_CBC:
-				RAND_bytes (iv, IV_SIZE);
+				//RAND_bytes (iv, IV_SIZE);
 				//memset (iv, 0xfe, IV_SIZE);
-				esp_encrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, sa0->crypto_key, iv);
+				{
+#if 1
+					u64 *_iv = (u64 *) iv;
+					_iv[0] = xoshiro256starstar (&em->rand_state[thread_id]);
+	      	_iv[1] = xoshiro256starstar (&em->rand_state[thread_id]);
+#else
+					i32 *_iv = (i32 *) iv;
+	      	random_r (&em->rand_data[thread_id].data, &_iv[0]);
+	      	random_r (&em->rand_data[thread_id].data, &_iv[1]);
+	      	random_r (&em->rand_data[thread_id].data, &_iv[2]);
+	      	random_r (&em->rand_data[thread_id].data, &_iv[3]);
+#endif	
+					esp_encrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, sa0->crypto_key, iv);
+				}
 				break;
 				
 			case IPSEC_CRYPTO_ALG_AES_CTR_128:
