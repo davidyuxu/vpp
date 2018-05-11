@@ -140,8 +140,7 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   nb = &(mp->nb);
 
-  // the source ip of nb is 0, means the nb is invalid, the call is SRB
-  if (nb->src_ip_address[0] != 0)
+  if (clib_net_to_host_u32(nb->protocol_configuration) != 1 /*INTERNAL_DATA_RELAY = 1*/)
   	call_type = PPF_DRB_CALL;
   else 
   	call_type = PPF_SRB_CALL;
@@ -182,11 +181,11 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   if (callline->lbo_mode == PPF_LBO_MODE) 
   {
-
   	rv = ip_table_bind (FIB_PROTOCOL_IP4, callline->sw_if_index, callline->inner_vrf_id, 0);
+	if (rv != 0)
+	  goto out;
+	goto create_sb_tunnels;
 
-	  if (rv != 0)
-	      goto out;
   }
 
   if (callline->call_type == PPF_DRB_CALL)
@@ -238,6 +237,8 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 	  }
 
   }
+
+create_sb_tunnels:
 
   for (i = 0; i< MAX_SB_PER_CALL; i++)
   {
