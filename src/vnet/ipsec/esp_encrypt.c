@@ -87,9 +87,8 @@ format_esp_encrypt_trace (u8 * s, va_list * args)
 }
 
 always_inline void
-esp_encrypt_cbc (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * iv)
+esp_encrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * iv)
 {
-  u32 thread_index = vlib_get_thread_index ();
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
   EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
 #else
@@ -104,7 +103,7 @@ esp_encrypt_cbc (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 
 	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
 
-  EVP_CipherUpdate (ctx, out, &out_len, in, in_len);
+  EVP_CipherUpdate (ctx, in, &out_len, in, in_len);
 
 	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
 
@@ -114,9 +113,8 @@ esp_encrypt_cbc (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 }
 
 always_inline void
-esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 * aad, size_t aad_len, u8 * iv, u8 * tag)
+esp_encrypt_gcm (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * aad, size_t aad_len, u8 * iv, u8 * tag)
 {
-  u32 thread_index = vlib_get_thread_index ();
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
   EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
 #else
@@ -133,13 +131,13 @@ esp_encrypt_gcm (ipsec_sa_t *sa, u8 * in, u8 * out, size_t in_len, u8 * key, u8 
 	EVP_CipherUpdate (ctx, NULL, &out_len, aad, aad_len);
 
 	/* Encrypt plaintext */
-	EVP_CipherUpdate(ctx, out, &out_len, in, in_len);
+	EVP_CipherUpdate(ctx, in, &out_len, in, in_len);
 
 	/* Output encrypted block */
 	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
 
 	/* Finalise: note get no output for GCM */
-	EVP_EncryptFinal_ex(ctx, out, &out_len);
+	EVP_EncryptFinal_ex(ctx, in, &out_len);
 
 	/* Get tag */
   EVP_CIPHER_CTX_ctrl (ctx, EVP_CTRL_GCM_GET_TAG, 16, tag);
@@ -356,7 +354,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 	      	random_r (&em->rand_data[thread_id].data, &_iv[2]);
 	      	random_r (&em->rand_data[thread_id].data, &_iv[3]);
 #endif	
-					esp_encrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, sa0->crypto_key, iv);
+					esp_encrypt_cbc (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, iv);
 				}
 				break;
 				
@@ -373,7 +371,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 					clib_memcpy (&ctr_iv[1], iv, IV_SIZE);
 					ctr_iv[3] = clib_host_to_net_u32 (1);
 					
-					esp_encrypt_cbc (sa0, (u8 *) vlib_buffer_get_current (i_b0), (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, sa0->crypto_key, (u8 *) ctr_iv);
+					esp_encrypt_cbc (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, (u8 *) ctr_iv);
 	    	}			
 				break;
 
@@ -401,12 +399,8 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 						gcm_iv[0] = sa0->salt;
 						clib_memcpy (&gcm_iv[1], iv, IV_SIZE);						
 
-						esp_encrypt_gcm (sa0,
-						 	(u8 *) vlib_buffer_get_current (i_b0),
-						 	(u8 *) vlib_buffer_get_current (i_b0),
-						 	i_b0->current_length,
-						 	sa0->crypto_key, (u8 *) aad, aad_len,
-						 	(u8 *) gcm_iv, (u8 *) vlib_buffer_get_tail (i_b0));
+						esp_encrypt_gcm (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length,
+						 							(u8 *) aad, aad_len, (u8 *) gcm_iv, (u8 *) vlib_buffer_get_tail (i_b0));
 
 						/* gcm tag */
 						i_b0->current_length += 16;
@@ -439,8 +433,8 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 		if (PREDICT_TRUE (mac != 0))
 		{
-			i_b0->current_length += mac (sa0, (u8 *) vlib_buffer_get_current (i_b0) + ip_hdr_size, 
-																i_b0->current_length - ip_hdr_size, vlib_buffer_get_tail (i_b0), sa0->use_esn, sa0->seq_hi);
+			i_b0->current_length += mac (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0) + ip_hdr_size, 
+																i_b0->current_length - ip_hdr_size, vlib_buffer_get_tail (i_b0));
 		}		
 			
 		// dont have to change 

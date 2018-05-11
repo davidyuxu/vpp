@@ -86,6 +86,7 @@ ah_decrypt_node_fn (vlib_main_t * vm,
   ipsec_proto_main_t *em = &ipsec_proto_main;
   from = vlib_frame_vector_args (from_frame);
   n_left_from = from_frame->n_vectors;
+	int thread_id = vlib_get_thread_index ();
   int icv_size;
 
   next_index = node->cached_next_index;
@@ -156,8 +157,7 @@ ah_decrypt_node_fn (vlib_main_t * vm,
 
 
 	  sa0->total_data_size += i_b0->current_length;
-	  icv_size =
-	    em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
+	  icv_size = em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
 	  if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
 	    {
 	      u8 sig[64];
@@ -177,7 +177,7 @@ ah_decrypt_node_fn (vlib_main_t * vm,
 		  ih4->flags_and_fragment_offset = 0;
 		}		//TODO else part for IPv6
 
-		hmac_calc (sa0, (u8 *) ih4, i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
+		hmac_calc (sa0, thread_id, (u8 *) ih4, i_b0->current_length, sig);
 
 	  if (PREDICT_FALSE (memcmp (digest, sig, icv_size)))
 		{

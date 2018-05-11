@@ -366,14 +366,14 @@ ipsec_proto_init ()
   i->trunc_size = 16;
 }
 
-typedef unsigned int (* MAC_FUNC) (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi);
+typedef unsigned int (* MAC_FUNC) (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature);
 
 
 always_inline unsigned int
-hmac_calc (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi)
+hmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature)
 {
   ipsec_proto_main_t *em = &ipsec_proto_main;
-  u32 thread_index = vlib_get_thread_index ();
+
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
   HMAC_CTX *ctx = sa->context[thread_index].hmac_ctx;
 #else
@@ -388,8 +388,8 @@ hmac_calc (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, 
 
   HMAC_Update (ctx, data, data_len);
 
-  if (PREDICT_TRUE (use_esn))
-    HMAC_Update (ctx, (u8 *) & seq_hi, sizeof (seq_hi));
+  if (PREDICT_TRUE (sa->use_esn))
+    HMAC_Update (ctx, (u8 *) & sa->seq_hi, sizeof (sa->seq_hi));
 	
   HMAC_Final (ctx, signature, &len);
 
@@ -399,10 +399,9 @@ hmac_calc (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, 
 }
 
 always_inline unsigned int
-cmac_calc (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi)
+cmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature)
 {
   ipsec_proto_main_t *em = &ipsec_proto_main;
-  u32 thread_index = vlib_get_thread_index ();
 
   CMAC_CTX *ctx = sa->context[thread_index].cmac_ctx;
 
@@ -415,8 +414,8 @@ cmac_calc (ipsec_sa_t *sa, u8 * data, int data_len, u8 * signature, u8 use_esn, 
 
   CMAC_Update (ctx, data, data_len);
 
-  if (PREDICT_TRUE (use_esn))
-    CMAC_Update (ctx, (u8 *) & seq_hi, sizeof (seq_hi));
+  if (PREDICT_TRUE (sa->use_esn))
+    CMAC_Update (ctx, (u8 *) & sa->seq_hi, sizeof (sa->seq_hi));
 	
   CMAC_Final (ctx, signature, &len);
 

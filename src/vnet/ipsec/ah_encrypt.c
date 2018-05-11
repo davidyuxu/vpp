@@ -88,6 +88,8 @@ ah_encrypt_node_fn (vlib_main_t * vm,
   n_left_from = from_frame->n_vectors;
   ipsec_main_t *im = &ipsec_main;
   ipsec_proto_main_t *em = &ipsec_proto_main;
+	int thread_id = vlib_get_thread_index ();
+
   next_index = node->cached_next_index;
 
   while (n_left_from > 0)
@@ -272,8 +274,7 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 		if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
 	    {
 
-			  hmac_calc (sa0, (u8 *) vlib_buffer_get_current (i_b0),
-		     i_b0->current_length, sig, sa0->use_esn, sa0->seq_hi);
+			  hmac_calc (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, sig);
 
 	  		memcpy (digest, (char *) &sig[0], 12);
 			}
