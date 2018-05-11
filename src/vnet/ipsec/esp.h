@@ -75,7 +75,17 @@ typedef struct
 {
   ipsec_proto_main_crypto_alg_t *ipsec_proto_main_crypto_algs;
   ipsec_proto_main_integ_alg_t *ipsec_proto_main_integ_algs;
+
+	xoshiro256starstar_t *rand_state;
+
+	struct {
+		CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+		struct random_data data;		
+		i8 buf[32];
+	} * rand_data;
+	
 } ipsec_proto_main_t;
+
 
 extern ipsec_proto_main_t ipsec_proto_main;
 
@@ -233,6 +243,17 @@ ipsec_proto_init ()
 {
   ipsec_proto_main_t *em = &ipsec_proto_main;
   memset (em, 0, sizeof (em[0]));
+
+	vlib_thread_main_t *tm = vlib_get_thread_main ();
+
+  vec_validate (em->rand_state, tm->n_vlib_mains - 1);
+  vec_validate (em->rand_data, tm->n_vlib_mains - 1);
+
+	for (int i = 0; i < vec_len (em->rand_state); i++)
+	{
+		xoshiro256starstar_seed (&em->rand_state[i]);
+		initstate_r (0, em->rand_data[i].buf, 32, &em->rand_data[i].data);
+	}
 
   vec_validate (em->ipsec_proto_main_crypto_algs, IPSEC_CRYPTO_N_ALG - 1);
 
