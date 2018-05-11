@@ -687,29 +687,30 @@ u8* f9(snow3g_ctx_t* ctx, u8* key, u32 count, u32 fresh, u32 dir, u8 *data, u64 
 
 
 
-void snow3g_encrypt(snow3g_ctx_t* ctx, u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length)
+void snow3g_encrypt(snow3g_ctx_t* ctx, u8* key, u32 count,u32 bearer,u32 dir,u8 *data, u8 *output,u32 length)
 {
-	f8(ctx,key,count,bearer,1,data,output,length<<3);
+	f8(ctx,key,count,bearer,dir,data,output,length<<3);
 
 }
 
-void snow3g_decrypt(snow3g_ctx_t* ctx,u8* key, u32 count,u32 bearer,u8 *data, u8 *output,u32 length)
+void snow3g_decrypt(snow3g_ctx_t* ctx,u8* key, u32 count,u32 bearer,u32 dir,u8 *data, u8 *output,u32 length)
 {
-	f8(ctx,key,count,bearer,0,data,output,length<<3);
+	f8(ctx,key,count,bearer,dir,data,output,length<<3);
 
 }
 //@length exclude 4-bytes MAC 
-void snow3g_protect(snow3g_ctx_t* ctx, u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I)
+void snow3g_protect(snow3g_ctx_t* ctx, u8* key, u32 count,u32 bearer,u32 dir,u8 *data, u64 length, u8* MAC_I)
 {
-	f9(ctx,key,count,bearer<<27,1,data,(length)<<3,MAC_I);
+	f9(ctx,key,count,bearer<<27,dir,data,(length)<<3,MAC_I);
 
 }
 
-void snow3g_validate(snow3g_ctx_t* ctx, u8* key, u32 count,u32 bearer,u8 *data, u64 length, u8* MAC_I)
+void snow3g_validate(snow3g_ctx_t* ctx, u8* key, u32 count,u32 bearer,u32 dir,u8 *data, u64 length, u8* MAC_I)
 { 
-	f9(ctx,key,count,bearer<<27,0,data,(length)<<3,MAC_I);
+	f9(ctx,key,count,bearer<<27,dir,data,(length)<<3,MAC_I);
 
 }
+
 
 
 
