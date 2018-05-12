@@ -259,7 +259,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
       n_ih0->ip4.tos = ih0->tos;
       n_ih0->ip4.fragment_id = 0;
       n_ih0->ip4.flags_and_fragment_offset = 0;
-      n_ih0->ip4.ttl = 2;
+      n_ih0->ip4.ttl = ih0->ttl;
       n_ih0->ip4.protocol = IP_PROTOCOL_IPSEC_ESP;
       n_ih0->ip4.src_address.as_u32 = ih0->src_address.as_u32;
       n_ih0->ip4.dst_address.as_u32 = ih0->dst_address.as_u32;
@@ -456,8 +456,6 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 	trace:
 	  if (PREDICT_FALSE (i_b0->flags & VLIB_BUFFER_IS_TRACED))
     {
-		  i_b0->flags |= VLIB_BUFFER_IS_TRACED;
-		  i_b0->trace_index = i_b0->trace_index;
 		  esp_encrypt_trace_t *tr =
 		    vlib_add_trace (vm, node, i_b0, sizeof (*tr));
 		  tr->spi = sa0->spi;

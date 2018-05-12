@@ -365,6 +365,11 @@ ipsec_output_inline (vlib_main_t * vm, vlib_node_runtime_t * node,
     }
 
   vlib_put_frame_to_node (vm, next_node_index, f);
+
+	// kingwel, fix up frame->flags, copy it from node
+	      /* Copy trace flag from next_frame and from runtime. */
+  f->flags |=	(f->flags & VLIB_NODE_FLAG_TRACE) | (node->flags & VLIB_NODE_FLAG_TRACE);
+	
   vlib_node_increment_counter (vm, node->node_index,
 			       IPSEC_OUTPUT_ERROR_POLICY_PROTECT, nc_protect);
   vlib_node_increment_counter (vm, node->node_index,
