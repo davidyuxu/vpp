@@ -1083,6 +1083,30 @@ dispatch_node (vlib_main_t * vm,
   return t;
 }
 
+#if CLIB_DEBUG > 0
+static __thread uword *h;
+
+static u32
+elog_id_for_msg_name (vlib_main_t * vm, u32 node_index)
+{
+  uword *p, r;
+
+  if (!h)
+    h = hash_create (0, sizeof (u32));
+
+  p = hash_get (h, node_index);
+  if (p)
+    return p[0];
+	
+  r = elog_string (&vm->elog_main, "%U", format_vlib_node_name, vm, node_index);
+
+  hash_set (h, node_index, r);
+
+  return r;
+}
+#endif
+
+
 static u64
 dispatch_pending_node (vlib_main_t * vm, uword pending_frame_index,
 		       u64 last_time_stamp)
@@ -1131,9 +1155,33 @@ dispatch_pending_node (vlib_main_t * vm, uword pending_frame_index,
   /* Copy trace flag from next frame to node.
      Trace flag indicates that at least one vector in the dispatched
      frame is traced. */
+
+	CLIB_UNUSED (u16 old) = n->flags;
   n->flags &= ~VLIB_NODE_FLAG_TRACE;
   n->flags |= (nf->flags & VLIB_FRAME_TRACE) ? VLIB_NODE_FLAG_TRACE : 0;
   nf->flags &= ~VLIB_FRAME_TRACE;
+
+#if CLIB_DEBUG > 0
+
+		/* *INDENT-OFF* */
+		ELOG_TYPE_DECLARE (e) =
+		{
+			.format = "%s old=%d new=%d",
+			.format_args = "T4i4i4",
+		};
+		/* *INDENT-ON* */
+
+		struct
+		{
+			u32 node_name, old, new;
+		} *ed = 0;
+	
+		ed = ELOG_DATA (&vlib_global_main.elog_main, e);
+		ed->node_name = elog_id_for_msg_name (vm, n->node_index);
+		ed->old = (int) old;
+		ed->new = (int) n->flags;
+#endif
+
 
   last_time_stamp = dispatch_node (vm, n,
 				   VLIB_NODE_TYPE_INTERNAL,
