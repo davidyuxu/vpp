@@ -110,8 +110,6 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 	  u8 ip_hdr_size;
 	  u8 next_hdr_type;
 	  u8 transport_mode = 0;
-	  u8 tos = 0;
-	  u8 ttl = 0;
 
 	  i_bi0 = from[0];
 	  from += 1;
@@ -142,8 +140,6 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 
 	  ssize_t adv;
 	  ih0 = vlib_buffer_get_current (i_b0);
-	  ttl = ih0->ip4.ttl;
-	  tos = ih0->ip4.tos;
 
 	  is_ipv6 = (ih0->ip4.ip_version_and_header_length & 0xF0) == 0x60;
 	  /* is ipv6 */
@@ -205,7 +201,6 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 	    {
 	      ip_hdr_size = sizeof (ip4_header_t);
 	      oh0 = vlib_buffer_get_current (i_b0);
-	      memset (oh0, 0, sizeof (ip4_and_ah_header_t));
 
 	      if (PREDICT_TRUE (sa0->is_tunnel))
 		{
@@ -222,8 +217,8 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 	      oh0->ip4.ip_version_and_header_length = 0x45;
 	      oh0->ip4.fragment_id = 0;
 	      oh0->ip4.flags_and_fragment_offset = 0;
-	      oh0->ip4.ttl = 0;
-	      oh0->ip4.tos = 0;
+	      oh0->ip4.ttl = ih0->ip4.ttl;
+	      oh0->ip4.tos = ih0->ip4.tos;
 	      oh0->ip4.protocol = IP_PROTOCOL_IPSEC_AH;
 	      oh0->ah.spi = clib_net_to_host_u32 (sa0->spi);
 	      oh0->ah.seq_no = clib_net_to_host_u32 (sa0->seq);
@@ -284,8 +279,6 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 	    }
 	  else
 	    {
-	      oh0->ip4.ttl = ttl;
-	      oh0->ip4.tos = tos;
 	      oh0->ip4.checksum = ip4_header_checksum (&oh0->ip4);
 	    }
 
@@ -295,7 +288,6 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 	trace:
 	  if (PREDICT_FALSE (i_b0->flags & VLIB_BUFFER_IS_TRACED))
 	    {
-	      i_b0->flags |= VLIB_BUFFER_IS_TRACED;
 	      ah_encrypt_trace_t *tr =
 		vlib_add_trace (vm, node, i_b0, sizeof (*tr));
 	      tr->spi = sa0->spi;
