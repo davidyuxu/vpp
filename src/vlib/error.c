@@ -240,6 +240,9 @@ show_errors (vlib_main_t * vm,
 		vec_validate (tmp_sum, len - 1);
 		vec_validate (em->rate_counters, len - 1);
 		
+    if (verbose)
+      vlib_cli_output(vm, "Thread %u (%v):", index, vlib_worker_threads[index].name);
+
     for (ni = 0; ni < vec_len (this_vlib_main->node_main.nodes); ni++)
     {
 			n = vlib_get_node (this_vlib_main, ni);
