@@ -92,15 +92,19 @@ esp_decrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 
   int out_len;
 
-	//fformat (stdout, "Before DE: %U\n", format_hexdump, in, in_len);
+#ifdef IPSEC_DEBUG_OUTPUT
+	fformat (stdout, "Before DE: %U\n", format_hexdump, in, in_len);
+#endif
 
 	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
 
-  EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
+  EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, 0);
 
   EVP_CipherUpdate (ctx, in, &out_len, in, in_len);
 
-	//fformat (stdout, "After DE: %U\n", format_hexdump, out, in_len);
+#ifdef IPSEC_DEBUG_OUTPUT
+	fformat (stdout, "After DE: %U\n", format_hexdump, in, in_len);
+#endif
 
   //EVP_CipherFinal_ex (ctx, out + out_len, &out_len);
 
@@ -123,7 +127,7 @@ esp_decrypt_gcm (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
 
 	/* Specify IV */ 	 
-	EVP_CipherInit_ex(ctx, NULL, NULL, NULL, iv, -1);
+	EVP_CipherInit_ex(ctx, NULL, NULL, NULL, iv, 0);
 
 	/* Zero or more calls to specify any AAD */ 	 
 	EVP_CipherUpdate(ctx, NULL, &out_len, aad, aad_len); 	 
@@ -179,8 +183,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 		  ip4_header_t *ih4 = 0;
 		  ip6_header_t *ih6 = 0;
 
-		  u8 tunnel_mode = 1;
-		  u8 transport_ip6 = 0;
+		  u8* old_ip_header;
 
 			esp_footer_t *f0;
 
@@ -354,36 +357,12 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 
 		  if (1)
 	    {
-				// TBD kingwel transport mode
-	      //o_b0->current_data = sizeof (ethernet_header_t);
-	      /* transport mode */
-	      if (PREDICT_FALSE (!sa0->is_tunnel && !sa0->is_tunnel_ip6))
-				{
-				  tunnel_mode = 0;
-				  ih4 = (ip4_header_t *) (i_b0->data + sizeof (ethernet_header_t));
-				  if (PREDICT_TRUE ((ih4->ip_version_and_header_length & 0xF0) != 0x40))
-			    {
-		      	if (PREDICT_TRUE ((ih4->ip_version_and_header_length & 0xF0) == 0x60))
-						{
-						  transport_ip6 = 1;
-						  ih6 = (ip6_header_t *) (i_b0->data + sizeof (ethernet_header_t));
-
-							// kingwel 
-							//oh6 = vlib_buffer_get_current (o_b0);
-						}
-		      	else
-						{
-						  vlib_node_increment_counter (vm,
-									       esp_decrypt_node.index,
-									       ESP_DECRYPT_ERROR_NOT_IP,
-									       1);
-						  goto trace;
-						}
-			    }
-				}
+#ifdef IPSEC_DEBUG_OUTPUT
+				fformat (stdout, "DE: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
+#endif
 
 	      i_b0->current_length -= sizeof (esp_footer_t);
-	      f0 = (esp_footer_t *) ((u8 *) vlib_buffer_get_current (i_b0) + i_b0->current_length);
+	      f0 = (esp_footer_t *) vlib_buffer_get_tail (i_b0);
 
 				/* for some reason, footer is wrong */
 				if (PREDICT_FALSE (f0->pad_length >= BLOCK_SIZE))
@@ -394,10 +373,8 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 
 	      i_b0->current_length -= f0->pad_length;
 
-				//fformat (stdout, "DE: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
-
 	      /* tunnel mode */
-	      if (PREDICT_TRUE (tunnel_mode))
+	      if (PREDICT_TRUE (sa0->is_tunnel || sa0->is_tunnel_ip6))
 				{
 		  		if (PREDICT_TRUE (f0->next_header == IP_PROTOCOL_IP_IN_IP))
 		    	{
@@ -421,33 +398,55 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 	      /* transport mode */
 	      else
 				{
-				  if (PREDICT_FALSE (transport_ip6))
+					ssize_t header_size = vnet_buffer (i_b0)->ipsec.ip_header_size;
+
+					ASSERT (header_size > 0);
+					
+					/* restore IP header */
+					vlib_buffer_advance (i_b0, 0 - header_size);
+					ih4 = vlib_buffer_get_current (i_b0);
+
+					old_ip_header = vlib_buffer_get_current (i_b0) - sizeof (esp_header_t) - IV_SIZE;					
+					
+					memmove (ih4, old_ip_header, header_size);
+
+					/* to figure out ipv4 or ipv6 */
+					if (PREDICT_TRUE ((ih4->ip_version_and_header_length & 0xF0) == 0x40))			    
 		    	{
-			      next0 = ESP_DECRYPT_NEXT_IP6_INPUT;
-			      ih6->ip_version_traffic_class_and_flow_label =
-						ih6->ip_version_traffic_class_and_flow_label;
-			      ih6->protocol = f0->next_header;
-			      ih6->hop_limit = ih6->hop_limit;
-			      ih6->src_address.as_u64[0] = ih6->src_address.as_u64[0];
-			      ih6->src_address.as_u64[1] = ih6->src_address.as_u64[1];
-			      ih6->dst_address.as_u64[0] = ih6->dst_address.as_u64[0];
-			      ih6->dst_address.as_u64[1] = ih6->dst_address.as_u64[1];
-			      ih6->payload_length = clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0) - sizeof (ip6_header_t));
-		  	  }
-				  else
-			    {
 			      next0 = ESP_DECRYPT_NEXT_IP4_INPUT;
+						
 			      ih4->ip_version_and_header_length = 0x45;
-			      ih4->tos = ih4->tos;
 			      ih4->fragment_id = 0;
 			      ih4->flags_and_fragment_offset = 0;
-			      ih4->ttl = ih4->ttl;
 			      ih4->protocol = f0->next_header;
 			      ih4->src_address.as_u32 = ih4->src_address.as_u32;
 			      ih4->dst_address.as_u32 = ih4->dst_address.as_u32;
 			      ih4->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0));
 			      ih4->checksum = ip4_header_checksum (ih4);
-			    }
+
+			      ih4->ttl = ih4->ttl;
+			      ih4->tos = ih4->tos;
+		    	}
+					else if (PREDICT_TRUE ((ih4->ip_version_and_header_length & 0xF0) == 0x60))						
+					{ 						
+						ih6 = (ip6_header_t *) ih4;
+
+			      next0 = ESP_DECRYPT_NEXT_IP6_INPUT;
+			      ih6->ip_version_traffic_class_and_flow_label = ih6->ip_version_traffic_class_and_flow_label;
+			      ih6->protocol = f0->next_header;
+			      ih6->src_address.as_u64[0] = ih6->src_address.as_u64[0];
+			      ih6->src_address.as_u64[1] = ih6->src_address.as_u64[1];
+			      ih6->dst_address.as_u64[0] = ih6->dst_address.as_u64[0];
+			      ih6->dst_address.as_u64[1] = ih6->dst_address.as_u64[1];
+			      ih6->payload_length = clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0) - sizeof (ip6_header_t));
+
+						ih6->hop_limit = ih6->hop_limit;
+		  		}
+		  		else
+		    	{
+						vlib_node_increment_counter (vm, esp_decrypt_node.index, ESP_DECRYPT_ERROR_NOT_IP, 1);
+		      	goto trace;
+		    	}					
 				}
 
 	      /* for IPSec-GRE tunnel next node is ipsec-gre-input */

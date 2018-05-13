@@ -185,7 +185,6 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 	  u8 ip_hdr_size;
 	  u8 next_hdr_type;
 	  u32 ip_proto = 0;
-	  u8 transport_mode = 0;
 
 	  i_bi0 = from[0];
 	  from += 1;
@@ -201,7 +200,9 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 		const int BLOCK_SIZE = em->ipsec_proto_main_crypto_algs[sa0->crypto_alg].block_size;
 		const int IV_SIZE = em->ipsec_proto_main_crypto_algs[sa0->crypto_alg].iv_size;
 
-		//fformat (stdout, "IN: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
+#ifdef IPSEC_DEBUG_OUTPUT
+		fformat (stdout, "IN: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
+#endif
 
 	  if (PREDICT_FALSE (esp_seq_advance (sa0)))
 	    {
@@ -292,8 +293,6 @@ esp_encrypt_node_fn (vlib_main_t * vm,
       next_hdr_type = ip_proto;
       if (vnet_buffer (i_b0)->sw_if_index[VLIB_TX] != ~0)
 			{
-			  transport_mode = 1;
-
 				//ethernet_header_t *ieh0, *oeh0;
 			  //ieh0 = (ethernet_header_t *) ((u8 *) vlib_buffer_get_current (i_b0) - sizeof (ethernet_header_t));
 			  //oeh0 = (ethernet_header_t *) o_b0->data;
@@ -447,11 +446,9 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			n_ih0->ip4.checksum = ip4_header_checksum (&n_ih0->ip4);
     }
 
-		//fformat (stdout, "IN2: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
-
-	  if (transport_mode)
-	    vlib_buffer_reset (i_b0);
-
+#ifdef IPSEC_DEBUG_OUTPUT
+		fformat (stdout, "IN2: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
+#endif
 
 	trace:
 	  if (PREDICT_FALSE (i_b0->flags & VLIB_BUFFER_IS_TRACED))
