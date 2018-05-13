@@ -183,7 +183,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 		  ip4_header_t *ih4 = 0;
 		  ip6_header_t *ih6 = 0;
 
-		  u8* old_ip_header;
+		  ip4_header_t *oih4;
 
 			esp_footer_t *f0;
 
@@ -195,6 +195,13 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 		  next0 = ESP_DECRYPT_NEXT_DROP;
 
 		  i_b0 = vlib_get_buffer (vm, i_bi0);
+
+			/* we start with ip headers */
+			oih4 = vlib_buffer_get_current (i_b0);
+
+			/* step into esp */
+			vlib_buffer_advance (i_b0, ip4_header_bytes (oih4));
+			
 		  esp0 = vlib_buffer_get_current (i_b0);
 
 		  sa_index0 = vnet_buffer (i_b0)->ipsec.sad_index;
@@ -398,34 +405,23 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 	      /* transport mode */
 	      else
 				{
-					ssize_t header_size = vnet_buffer (i_b0)->ipsec.ip_header_size;
-
-					ASSERT (header_size > 0);
-					
 					/* restore IP header */
-					vlib_buffer_advance (i_b0, 0 - header_size);
+					vlib_buffer_advance (i_b0, 0 - ip4_header_bytes (oih4));
+					/* local the new ip header */
 					ih4 = vlib_buffer_get_current (i_b0);
 
-					old_ip_header = vlib_buffer_get_current (i_b0) - sizeof (esp_header_t) - IV_SIZE;					
-					
-					memmove (ih4, old_ip_header, header_size);
+					memmove (ih4, oih4, ip4_header_bytes (oih4));
 
 					/* to figure out ipv4 or ipv6 */
 					if (PREDICT_TRUE ((ih4->ip_version_and_header_length & 0xF0) == 0x40))			    
 		    	{
 			      next0 = ESP_DECRYPT_NEXT_IP4_INPUT;
 						
-			      ih4->ip_version_and_header_length = 0x45;
 			      ih4->fragment_id = 0;
 			      ih4->flags_and_fragment_offset = 0;
 			      ih4->protocol = f0->next_header;
-			      ih4->src_address.as_u32 = ih4->src_address.as_u32;
-			      ih4->dst_address.as_u32 = ih4->dst_address.as_u32;
 			      ih4->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0));
 			      ih4->checksum = ip4_header_checksum (ih4);
-
-			      ih4->ttl = ih4->ttl;
-			      ih4->tos = ih4->tos;
 		    	}
 					else if (PREDICT_TRUE ((ih4->ip_version_and_header_length & 0xF0) == 0x60))						
 					{ 						
@@ -434,13 +430,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 			      next0 = ESP_DECRYPT_NEXT_IP6_INPUT;
 			      ih6->ip_version_traffic_class_and_flow_label = ih6->ip_version_traffic_class_and_flow_label;
 			      ih6->protocol = f0->next_header;
-			      ih6->src_address.as_u64[0] = ih6->src_address.as_u64[0];
-			      ih6->src_address.as_u64[1] = ih6->src_address.as_u64[1];
-			      ih6->dst_address.as_u64[0] = ih6->dst_address.as_u64[0];
-			      ih6->dst_address.as_u64[1] = ih6->dst_address.as_u64[1];
 			      ih6->payload_length = clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0) - sizeof (ip6_header_t));
-
-						ih6->hop_limit = ih6->hop_limit;
 		  		}
 		  		else
 		    	{

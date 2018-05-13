@@ -101,7 +101,7 @@ esp_encrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 
 	//fformat (stdout, "Before EN: %U\n", format_hexdump, in, in_len);
 
-	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
+	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, 1);
 
   EVP_CipherUpdate (ctx, in, &out_len, in, in_len);
 
@@ -184,10 +184,9 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 		int blocks = 0;
 		u8 * iv;
 		
-	  u8 is_ipv6;
-	  u8 ip_udp_hdr_size;
+	  u8 is_ipv6 = 0;
+	  u8 ip_hdr_size;
 	  u8 next_hdr_type;
-	  u32 ip_proto = 0;
 
 	  i_bi0 = from[0];
 	  from += 1;
@@ -219,7 +218,6 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 	  sa0->total_data_size += i_b0->current_length;
 
-
 	  ih0 = vlib_buffer_get_current (i_b0);
 
 	  to_next[0] = i_bi0;
@@ -227,33 +225,10 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 	  /* is ipv6 */
 	  if (PREDICT_FALSE ((ih0->ip_version_and_header_length & 0xF0) == 0x60))
-    {
       is_ipv6 = 1;
 
-			ih6_0 = vlib_buffer_get_current (i_b0);
-      ip_hdr_size = sizeof (ip6_header_t);
-      next_hdr_type = IP_PROTOCOL_IPV6;
-
-			n_ih6_0 = vlib_buffer_get_current (i_b0) - sizeof (ip6_and_esp_header_t) - IV_SIZE;
-
-      n_ih6_0->ip6.ip_version_traffic_class_and_flow_label = ih6_0->ip_version_traffic_class_and_flow_label;
-      n_ih6_0->ip6.protocol = IP_PROTOCOL_IPSEC_ESP;
-      n_ih6_0->ip6.hop_limit = 254;
-      n_ih6_0->ip6.src_address.as_u64[0] = ih6_0->src_address.as_u64[0];
-      n_ih6_0->ip6.src_address.as_u64[1] = ih6_0->src_address.as_u64[1];
-      n_ih6_0->ip6.dst_address.as_u64[0] = ih6_0->dst_address.as_u64[0];
-      n_ih6_0->ip6.dst_address.as_u64[1] = ih6_0->dst_address.as_u64[1];
-      n_ih6_0->esp.spi = clib_net_to_host_u32 (sa0->spi);
-      n_ih6_0->esp.seq = clib_net_to_host_u32 (sa0->seq);
-
-      ip_proto = ih6_0->protocol;
-
-      next0 = ESP_ENCRYPT_NEXT_IP6_LOOKUP;
-    }
-	  else
+	  if (PREDICT_TRUE (!is_ipv6 && sa0->is_tunnel && !sa0->is_tunnel_ip6))
     {
-      is_ipv6 = 0;
-			
       ip_hdr_size = sizeof (ip4_header_t);
       next_hdr_type = IP_PROTOCOL_IP_IN_IP;
 
@@ -265,47 +240,80 @@ esp_encrypt_node_fn (vlib_main_t * vm,
       n_ih0->ip4.flags_and_fragment_offset = 0;
       n_ih0->ip4.ttl = ih0->ttl;
       n_ih0->ip4.protocol = IP_PROTOCOL_IPSEC_ESP;
-      n_ih0->ip4.src_address.as_u32 = ih0->src_address.as_u32;
-      n_ih0->ip4.dst_address.as_u32 = ih0->dst_address.as_u32;
+      n_ih0->ip4.src_address.as_u32 = sa0->tunnel_src_addr.ip4.as_u32;
+      n_ih0->ip4.dst_address.as_u32 = sa0->tunnel_dst_addr.ip4.as_u32;
+
       n_ih0->esp.spi = clib_net_to_host_u32 (sa0->spi);
       n_ih0->esp.seq = clib_net_to_host_u32 (sa0->seq);
 
-      ip_proto = ih0->protocol;
-
       next0 = ESP_ENCRYPT_NEXT_IP4_LOOKUP;
-    }
-
-	  if (PREDICT_TRUE (!is_ipv6 && sa0->is_tunnel && !sa0->is_tunnel_ip6))
-    {
-      n_ih0->ip4.src_address.as_u32 = sa0->tunnel_src_addr.ip4.as_u32;
-      n_ih0->ip4.dst_address.as_u32 = sa0->tunnel_dst_addr.ip4.as_u32;
 
       vnet_buffer (i_b0)->sw_if_index[VLIB_TX] = (u32) ~ 0;
     }
 	  else if (is_ipv6 && sa0->is_tunnel && sa0->is_tunnel_ip6)
     {
+			ih6_0 = vlib_buffer_get_current (i_b0);
+      ip_hdr_size = sizeof (ip6_header_t);
+      next_hdr_type = IP_PROTOCOL_IPV6;
+
+			n_ih6_0 = vlib_buffer_get_current (i_b0) - sizeof (ip6_and_esp_header_t) - IV_SIZE;
+
+      n_ih6_0->ip6.ip_version_traffic_class_and_flow_label = ih6_0->ip_version_traffic_class_and_flow_label;
+      n_ih6_0->ip6.protocol = IP_PROTOCOL_IPSEC_ESP;
+      n_ih6_0->ip6.hop_limit = ih6_0->hop_limit;
       n_ih6_0->ip6.src_address.as_u64[0] = sa0->tunnel_src_addr.ip6.as_u64[0];
       n_ih6_0->ip6.src_address.as_u64[1] = sa0->tunnel_src_addr.ip6.as_u64[1];
       n_ih6_0->ip6.dst_address.as_u64[0] = sa0->tunnel_dst_addr.ip6.as_u64[0];
       n_ih6_0->ip6.dst_address.as_u64[1] = sa0->tunnel_dst_addr.ip6.as_u64[1];
 
+      n_ih6_0->esp.spi = clib_net_to_host_u32 (sa0->spi);
+      n_ih6_0->esp.seq = clib_net_to_host_u32 (sa0->seq);
+
+      next0 = ESP_ENCRYPT_NEXT_IP6_LOOKUP;
+
       vnet_buffer (i_b0)->sw_if_index[VLIB_TX] = (u32) ~ 0;
     }
+		/* transport mode */
 	  else
     {
-      next_hdr_type = ip_proto;
+			ip_hdr_size = ip4_header_bytes (ih0);
+
+			n_ih0 = vlib_buffer_get_current (i_b0) - sizeof (esp_header_t) - IV_SIZE;
+			n_ih6_0 = (ip6_and_esp_header_t *) n_ih0;
+			
       if (vnet_buffer (i_b0)->sw_if_index[VLIB_TX] != ~0)
 			{
-				//ethernet_header_t *ieh0, *oeh0;
-			  //ieh0 = (ethernet_header_t *) ((u8 *) vlib_buffer_get_current (i_b0) - sizeof (ethernet_header_t));
-			  //oeh0 = (ethernet_header_t *) o_b0->data;
+				ethernet_header_t *ieh0, *oeh0;
+			  ieh0 = (ethernet_header_t *) ((u8 *) vlib_buffer_get_current (i_b0) - sizeof (ethernet_header_t));
+			  oeh0 = (ethernet_header_t *) ((u8 *) n_ih0 - sizeof (ethernet_header_t));
 
-			  //clib_memcpy (oeh0, ieh0, sizeof (ethernet_header_t));
+			  clib_memcpy (oeh0, ieh0, sizeof (ethernet_header_t));
 			  next0 = ESP_ENCRYPT_NEXT_INTERFACE_OUTPUT;
-
-				// Dont have to modify sw_if_index
-			  //vnet_buffer (i_b0)->sw_if_index[VLIB_TX] = vnet_buffer (i_b0)->sw_if_index[VLIB_TX];
 			}
+
+			memmove (n_ih0, ih0, ip_hdr_size);
+
+			if (PREDICT_FALSE(is_ipv6))
+			{
+				n_ih6_0->ip6.protocol = IP_PROTOCOL_IPSEC_ESP;
+				
+				n_ih6_0->esp.spi = clib_net_to_host_u32 (sa0->spi);
+				n_ih6_0->esp.seq = clib_net_to_host_u32 (sa0->seq);
+
+				next_hdr_type = ih6_0->protocol;
+				next0 = ESP_ENCRYPT_NEXT_IP6_LOOKUP;
+			}
+			else
+			{
+				n_ih0->ip4.protocol = IP_PROTOCOL_IPSEC_ESP;
+				
+				n_ih0->esp.spi = clib_net_to_host_u32 (sa0->spi);
+				n_ih0->esp.seq = clib_net_to_host_u32 (sa0->seq);
+				
+				next_hdr_type = ih0->protocol;
+				next0 = ESP_ENCRYPT_NEXT_IP4_LOOKUP;
+			}
+
       vlib_buffer_advance (i_b0, ip_hdr_size);
     }
 
@@ -452,6 +460,14 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 #ifdef IPSEC_DEBUG_OUTPUT
 		fformat (stdout, "IN2: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
 #endif
+
+	/* transport VLIB_TX is set ? */
+	if (vnet_buffer (i_b0)->sw_if_index[VLIB_TX] != ~0)
+	{
+		ssize_t adv = sizeof (ethernet_header_t);
+		vlib_buffer_advance (i_b0, 0 - adv);
+		next0 = ESP_ENCRYPT_NEXT_INTERFACE_OUTPUT;
+	}
 
 	trace:
 	  if (PREDICT_FALSE (i_b0->flags & VLIB_BUFFER_IS_TRACED))
