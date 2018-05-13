@@ -263,6 +263,8 @@ typedef struct
     /* interface output features */
     struct
     {
+    	/* kingwel for transport mode */
+      u32 ip_header_size;
       u32 flags;
       u32 sad_index;
     } ipsec;
