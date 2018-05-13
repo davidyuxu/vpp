@@ -243,11 +243,8 @@ ipsec_input_ip4_node_fn (vlib_main_t * vm,
 		  p0->counter.packets++;
 		  p0->counter.bytes += clib_net_to_host_u16 (ip0->length);
 		  vnet_buffer (b0)->ipsec.sad_index = p0->sa_index;
-			/* kingwel, keep header size here so decrypt will be happy to know where the original header is */
-			vnet_buffer (b0)->ipsec.ip_header_size = ip4_header_bytes (ip0);
 		  vnet_buffer (b0)->ipsec.flags = 0;
 		  next0 = im->esp_decrypt_next_index;
-		  vlib_buffer_advance (b0, ip4_header_bytes (ip0));
 		  goto trace0;
 		}
 
