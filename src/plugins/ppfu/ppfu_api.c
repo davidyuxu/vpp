@@ -550,7 +550,7 @@ vl_api_ppfu_plugin_bearer_release_t_handler
 	goto out;
   }
 
-  if (callline->call_type == PPF_DRB_CALL)
+  if ((callline->lbo_mode != PPF_LBO_MODE) && (callline->call_type == PPF_DRB_CALL))
   {
 	  nb_tunnel = &(callline->rb.drb.nb_tunnel);
 
