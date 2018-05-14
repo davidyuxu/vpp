@@ -150,7 +150,7 @@ ipsec_add_del_tunnel_if (ipsec_add_del_tunnel_args_t * args)
 }
 
 void
-ipsec_create_sa_contexts (ipsec_sa_t *sa, u8 is_encrypt)
+ipsec_create_sa_contexts (ipsec_sa_t *sa)
 {
   vlib_thread_main_t *tm = vlib_get_thread_main ();
 
@@ -166,10 +166,12 @@ ipsec_create_sa_contexts (ipsec_sa_t *sa, u8 is_encrypt)
 			EVP_CIPHER_CTX_init (&(sa->context[thread_id].cipher_ctx));
 #endif
 		sa->context[thread_id].cmac_ctx = CMAC_CTX_new ();
+
+		sa->context[thread_id].cipher_initialized = 0;
 		}
 
 	ipsec_set_sa_contexts_integ_key (sa);
-	ipsec_set_sa_contexts_crypto_key (sa, is_encrypt);
+	ipsec_set_sa_contexts_crypto_key (sa);
 }
 
 void
@@ -209,7 +211,7 @@ ipsec_set_sa_contexts_integ_key (ipsec_sa_t *sa)
 }
 
 void
-ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa, u8 is_encrypt)
+ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa)
 {
   vlib_thread_main_t *tm = vlib_get_thread_main ();
 
@@ -220,17 +222,18 @@ ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa, u8 is_encrypt)
 	for (int thread_id = 0; thread_id < tm->n_vlib_mains; thread_id++)
 		{
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-			EVP_CipherInit_ex (sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, is_encrypt ? 1 : 0);
+			EVP_CipherInit_ex (sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, 1);
 
 			EVP_CIPHER_CTX_set_padding(sa->context[thread_id].cipher_ctx, 0);
 
 			//if (set_iv_len)
 				//EVP_CIPHER_CTX_ctrl (sa->context[thread_id].cipher_ctx, EVP_CTRL_GCM_SET_IVLEN, 8, NULL);
 #else
-			EVP_CipherInit_ex (&sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, is_encrypt ? 1 : 0);
+			EVP_CipherInit_ex (&sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, 1);
 
 			EVP_CIPHER_CTX_set_padding(&sa->context[thread_id].cipher_ctx, 0);
 #endif
+			sa->context[thread_id].cipher_initialized = 0;
 		}
 }
 
@@ -283,7 +286,7 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
 		       args->remote_crypto_key_len);
 	}
 			/* kingwel, initialize encrypt & hmac context */
-			ipsec_create_sa_contexts (sa, 0);
+			ipsec_create_sa_contexts (sa);
 
       pool_get (im->sad, sa);
       memset (sa, 0, sizeof (*sa));
@@ -309,7 +312,7 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
 		       args->local_crypto_key_len);
 	}
 			/* kingwel, initialize encrypt & hmac context */
-			ipsec_create_sa_contexts (sa, 1);
+			ipsec_create_sa_contexts (sa);
 
       hash_set (im->ipsec_if_pool_index_by_key, key,
 		t - im->tunnel_interfaces);
@@ -466,7 +469,7 @@ ipsec_set_interface_key (vnet_main_t * vnm, u32 hw_if_index,
       sa->crypto_alg = alg;
       sa->crypto_key_len = vec_len (key);
       clib_memcpy (sa->crypto_key, key, vec_len (key));
-			ipsec_set_sa_contexts_crypto_key (sa, 1);
+			ipsec_set_sa_contexts_crypto_key (sa);
     }
   else if (type == IPSEC_IF_SET_KEY_TYPE_LOCAL_INTEG)
     {
@@ -482,7 +485,7 @@ ipsec_set_interface_key (vnet_main_t * vnm, u32 hw_if_index,
       sa->crypto_alg = alg;
       sa->crypto_key_len = vec_len (key);
       clib_memcpy (sa->crypto_key, key, vec_len (key));
-			ipsec_set_sa_contexts_crypto_key (sa, 0);
+			ipsec_set_sa_contexts_crypto_key (sa);
     }
   else if (type == IPSEC_IF_SET_KEY_TYPE_REMOTE_INTEG)
     {
@@ -551,12 +554,16 @@ ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
       t->input_sa_index = sa_index;
       key = (u64) sa->tunnel_src_addr.ip4.as_u32 << 32 | (u64) sa->spi;
       hash_set (im->ipsec_if_pool_index_by_key, key, hi->dev_instance);
+
+			ipsec_create_sa_contexts (sa);
     }
   else
     {
       old_sa_index = t->output_sa_index;
       old_sa = pool_elt_at_index (im->sad, old_sa_index);
       t->output_sa_index = sa_index;
+
+			ipsec_create_sa_contexts (sa);
     }
 
   /* remove sa_id to sa_index mapping on old SA */
@@ -571,6 +578,8 @@ ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
       if (err)
 	return VNET_API_ERROR_SYSCALL_ERROR_1;
     }
+
+	ipsec_delete_sa_contexts (old_sa);
 
   pool_put (im->sad, old_sa);
 

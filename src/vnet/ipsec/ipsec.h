@@ -26,8 +26,9 @@
 
 #define IPSEC_FLAG_IPSEC_GRE_TUNNEL (1 << 0)
 
+#if CLIB_DEBUG > 0
 #define IPSEC_DEBUG_OUTPUT
-
+#endif
 
 #define foreach_ipsec_output_next                \
 _(DROP, "error-drop")                            \
@@ -125,6 +126,7 @@ typedef struct
 #else
   EVP_CIPHER_CTX cipher_ctx;
 #endif
+
   CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
   HMAC_CTX *hmac_ctx;
@@ -132,8 +134,10 @@ typedef struct
   HMAC_CTX hmac_ctx;
 #endif
 	CMAC_CTX *cmac_ctx;
-} ipsec_sa_per_thread_data_t;
 
+	/* policy based, we don't know the direction in the beginning 0 de, 1 en, -1 unknown */
+	u32 cipher_initialized;
+} ipsec_sa_per_thread_data_t;
 
 
 typedef struct
@@ -368,8 +372,8 @@ int ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
 
 /* per sa context */
 void ipsec_set_sa_contexts_integ_key (ipsec_sa_t *sa);
-void ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa, u8 is_encrypt);
-void ipsec_create_sa_contexts (ipsec_sa_t *sa, u8 is_encrypt);
+void ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa);
+void ipsec_create_sa_contexts (ipsec_sa_t *sa);
 void ipsec_delete_sa_contexts (ipsec_sa_t *sa);
 
 
