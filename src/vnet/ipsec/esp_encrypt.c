@@ -98,7 +98,7 @@ esp_encrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 
 	//fformat (stdout, "Before EN: %U\n", format_hexdump, in, in_len);
 
-	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, 1);
+	EVP_CipherInit_ex (ctx, NULL, NULL, sa->crypto_key, iv, 1);
 
   EVP_CipherUpdate (ctx, in, &out_len, in, in_len);
 
@@ -292,22 +292,24 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 			if (PREDICT_FALSE(is_ipv6))
 			{
+				next_hdr_type = n_ih6_0->ip6.protocol;
+
 				n_ih6_0->ip6.protocol = IP_PROTOCOL_IPSEC_ESP;
 				
 				n_ih6_0->esp.spi = clib_net_to_host_u32 (sa0->spi);
 				n_ih6_0->esp.seq = clib_net_to_host_u32 (sa0->seq);
 
-				next_hdr_type = ih6_0->protocol;
 				next0 = ESP_ENCRYPT_NEXT_IP6_LOOKUP;
 			}
 			else
 			{
+				next_hdr_type = n_ih0->ip4.protocol;
+
 				n_ih0->ip4.protocol = IP_PROTOCOL_IPSEC_ESP;
 				
 				n_ih0->esp.spi = clib_net_to_host_u32 (sa0->spi);
 				n_ih0->esp.seq = clib_net_to_host_u32 (sa0->seq);
 				
-				next_hdr_type = ih0->protocol;
 				next0 = ESP_ENCRYPT_NEXT_IP4_LOOKUP;
 			}
 
