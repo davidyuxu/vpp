@@ -446,14 +446,14 @@ ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add,
 	  if (err)
 	    return VNET_API_ERROR_SYSCALL_ERROR_1;
 	}
-      pool_put (im->sad, sa);
 			ipsec_delete_sa_contexts (sa);
+      pool_put (im->sad, sa);
     }
   else				/* create new SA */
     {
       pool_get (im->sad, sa);
       clib_memcpy (sa, new_sa, sizeof (*sa));
-			ipsec_create_sa_contexts (sa, 0);
+			ipsec_create_sa_contexts (sa);
 			
       sa_index = sa - im->sad;
       sa->udp_encap = udp_encap ? 1 : 0;
@@ -501,7 +501,7 @@ ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update)
     }
 
 	ipsec_set_sa_contexts_integ_key (sa);
-	ipsec_set_sa_contexts_crypto_key (sa, 1);
+	ipsec_set_sa_contexts_crypto_key (sa);
 
   if (0 < sa_update->crypto_key_len || 0 < sa_update->integ_key_len)
     {

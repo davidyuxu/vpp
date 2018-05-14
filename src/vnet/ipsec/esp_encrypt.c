@@ -101,7 +101,7 @@ esp_encrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 
 	//fformat (stdout, "Before EN: %U\n", format_hexdump, in, in_len);
 
-	EVP_CipherInit_ex (ctx, NULL, NULL, sa->crypto_key, iv, 1);
+	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
 
   EVP_CipherUpdate (ctx, in, &out_len, in, in_len);
 

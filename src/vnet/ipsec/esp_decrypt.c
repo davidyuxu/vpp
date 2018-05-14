@@ -90,7 +90,13 @@ esp_decrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 		EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
 #endif
 
-  int out_len;
+	if (PREDICT_FALSE (!sa->context[thread_index].cipher_initialized))
+	{
+		sa->context[thread_index].cipher_initialized = 1;
+		EVP_CipherInit_ex (ctx, NULL, NULL, sa->crypto_key, iv, 0);
+	}
+
+	int out_len;
 
 #ifdef IPSEC_DEBUG_OUTPUT
 	fformat (stdout, "Before DE: %U\n", format_hexdump, in, in_len);
@@ -98,7 +104,7 @@ esp_decrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 
 	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
 
-  EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, 0);
+  EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
 
   EVP_CipherUpdate (ctx, in, &out_len, in, in_len);
 
@@ -120,14 +126,20 @@ esp_decrypt_gcm (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 		EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
 #endif
 
-  int out_len;
+	if (PREDICT_FALSE (!sa->context[thread_index].cipher_initialized))
+	{
+		sa->context[thread_index].cipher_initialized = 1;
+		EVP_CipherInit_ex (ctx, NULL, NULL, sa->crypto_key, iv, 0);
+	}
+
+	int out_len;
 
 	//fformat (stdout, "Before DE: %U\n", format_hexdump, in, in_len);
 
 	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
 
 	/* Specify IV */ 	 
-	EVP_CipherInit_ex(ctx, NULL, NULL, NULL, iv, 0);
+	EVP_CipherInit_ex(ctx, NULL, NULL, NULL, iv, -1);
 
 	/* Zero or more calls to specify any AAD */ 	 
 	EVP_CipherUpdate(ctx, NULL, &out_len, aad, aad_len); 	 
