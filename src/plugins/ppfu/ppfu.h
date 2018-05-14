@@ -501,7 +501,7 @@ typedef struct
 #define PPF_SB_COUNT_MASK             (0x03) // pow2_mask(max_log2(MAX_SB_PER_CALL))
 #define PPF_SB_PATH_MASK              (0x07) // pow2_mask(MAX_SB_PER_CALL)
 #define PPF_SB_PATH_GET_VALID(mp, i)  ((mp) & (i))
-#define PPF_SB_PATH_SET_VALID(mp, i)  ((mp) |= ((i) << 2))
+#define PPF_SB_PATH_SET_VALID(mp, i)  ((mp) |= (1 << ((i) + 2)))
 #define PPF_SB_COUNT(mp)              ((mp) & PPF_SB_COUNT_MASK)
 #define PPF_SB_VALID_PATH(mp)         min_log2(((mp) >> 2) & PPF_SB_PATH_MASK)
 

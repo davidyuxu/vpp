@@ -199,7 +199,8 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
 #endif
           {
             /* Set call-id in buffer */
-            vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = srb0->call_id;
+            vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = INVALID_TUNNEL_ID;
+            vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = call_id0;
             
             /* Set path-info in buffer */
             vnet_buffer2(b0)->ppf_du_metadata.path.sb_num = srb0->msg.out.sb_num;
