@@ -315,7 +315,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      new_l2 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
 					     - sizeof (*ip4_2) - sizeof(*udp2) - 8);
 	      ppf_gtpu2->length = new_l2;
-	      ppf_gtpu3 = (ppf_gtpu_header_t *)(udp1+3);
+	      ppf_gtpu3 = (ppf_gtpu_header_t *)(udp3+1);
 	      new_l3 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
 					     - sizeof (*ip4_3) - sizeof(*udp3) - 8);
 	      ppf_gtpu3->length = new_l3;

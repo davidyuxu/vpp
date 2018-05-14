@@ -252,7 +252,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
           sp1.dir = PPF_PDCP_DIR_DEC;
 
         /* Integrity */
-	    pdcp0->protect (vm, b1, &sp1);
+	    pdcp1->protect (vm, b1, &sp1);
         /* Encrypt */
 	    len1 = vlib_buffer_length_in_chain(vm, b1);
 	    pdcp1->encrypt (buf1 + pdcp1->header_length,
