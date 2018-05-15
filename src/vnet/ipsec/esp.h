@@ -416,6 +416,28 @@ cmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signa
   return em->ipsec_proto_main_integ_algs[sa->integ_alg].trunc_size;
 }
 
+always_inline void 
+rand_bytes (void *buf, int num, xoshiro256starstar_t *s)
+{
+	u64 *_iv = (u64 *) buf;
+
+	for (int i = 0; i < num / sizeof (u64); i++)
+	{
+		_iv[i] = xoshiro256starstar (s);
+	}
+}
+
+always_inline void 
+c_rand_bytes (void *buf, int num, struct random_data * s)
+{
+	i32 *_iv = (i32 *) buf;
+
+	for (int i = 0; i < num / sizeof (i32); i++)
+	{
+		random_r (s, &_iv[i]);
+	}
+}
+
 #endif /* __ESP_H__ */
 
 /*
