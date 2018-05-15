@@ -123,10 +123,10 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
           p6 = vlib_get_buffer (vm, from[6]);
           p7 = vlib_get_buffer (vm, from[7]);
           
-          vlib_prefetch_buffer_header (p4, LOAD);
-          vlib_prefetch_buffer_header (p5, LOAD);
-          vlib_prefetch_buffer_header (p6, LOAD);
-          vlib_prefetch_buffer_header (p7, LOAD);
+          vlib_prefetch_buffer_header (p4, STORE);
+          vlib_prefetch_buffer_header (p5, STORE);
+          vlib_prefetch_buffer_header (p6, STORE);
+          vlib_prefetch_buffer_header (p7, STORE);
 	    }
 
 	    /* speculatively enqueue b0 and b1 to the current next frame */
