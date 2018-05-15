@@ -143,9 +143,9 @@ _(IP4_LOOKUP, "ip4-lookup")
 #define PDCP_MAX_REORDER_WINDOW_SIZE  1024
 #define INVALID_BUFFER_INDEX          ~0
 
-#define PPF_PDCP_COUNT(hfn, sn, len)   ((255 == (len)) ? (sn) : ((hfn) << (len) | (sn)))
-#define PPF_PDCP_HFN(count, len)       ((255 == (len)) ? 0 : ((count) >> (len)))
-#define PPF_PDCP_SN(count, len)        ((255 == (len)) ? (count) : (count & pow2_mask((len))))
+#define PPF_PDCP_COUNT(hfn, sn, len)       ((255 == (len)) ? (sn) : ((hfn) << (len) | (sn)))
+#define PPF_PDCP_HFN(count, len)           ((255 == (len)) ? 0 : ((count) >> (len)))
+#define PPF_PDCP_SN(count, len)            ((255 == (len)) ? (count) : (count & pow2_mask((len))))
 #define PPF_PDCP_SN_INC(sn, len)           (((sn) + 1) & pow2_mask((len)))
 #define PPF_PDCP_SN_DEC(sn, len)           (((sn) - 1) & pow2_mask((len)))
 #define PPF_PDCP_HFN_INC(hfn, len)         (((hfn) + 1) & pow2_mask(32 - (len)))
@@ -155,7 +155,7 @@ _(IP4_LOOKUP, "ip4-lookup")
 do {                                                    \
 	(sn)++;                                             \
 	if ((sn) == (1 << (len))) {                        \
-		(hfn) = (hfn + 1) & pow2_mask(32 - (len));      \
+		(hfn) = ((hfn) + 1) & pow2_mask(32 - (len));    \
 		(sn) = 0;                                       \
 	}                                                   \
 } while (0)

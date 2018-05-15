@@ -272,7 +272,7 @@ ppf_pdcp_eia2_protect (vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 {
 	u8 mact[MAX_PDCP_KEY_LEN] = {0};
 	u32 len;
-        size_t mactlen;
+    size_t mactlen;
 	u8 * buf0;
 	bool ret = true;
 
@@ -288,7 +288,7 @@ ppf_pdcp_eia2_protect (vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 	len = vlib_buffer_length_in_chain(vm, b0);
 
 	//set IV
-        buf0[0] = ((sec_para->count >> 24) & 0xFF);
+    buf0[0] = ((sec_para->count >> 24) & 0xFF);
 	buf0[1] = ((sec_para->count >> 16) & 0xFF);
 	buf0[2] = ((sec_para->count >> 8)  & 0xFF);
 	buf0[3] = ((sec_para->count >> 0)  & 0xFF);
@@ -316,7 +316,7 @@ ppf_pdcp_eia2_validate(vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 {
 	u8 mact[MAX_PDCP_KEY_LEN] = {0};
 	u32 len;
-        size_t mactlen;
+    size_t mactlen;
 	u8 * buf0;
 	bool ret = true;
 
@@ -332,7 +332,7 @@ ppf_pdcp_eia2_validate(vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 	len = vlib_buffer_length_in_chain(vm, b0);
 
 	//set IV
-        buf0[0] = ((sec_para->count >> 24) & 0xFF);
+    buf0[0] = ((sec_para->count >> 24) & 0xFF);
 	buf0[1] = ((sec_para->count >> 16) & 0xFF);
 	buf0[2] = ((sec_para->count >> 8)  & 0xFF);
 	buf0[3] = ((sec_para->count >> 0)  & 0xFF);
@@ -484,7 +484,7 @@ ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight
   pdcp_sess->tx_next_sn = PPF_PDCP_SN (tx_count, sn_length);
   pdcp_sess->tx_hfn = PPF_PDCP_HFN (tx_count, sn_length);
   pdcp_sess->rx_next_expected_sn = PPF_PDCP_SN (rx_count, sn_length);
-  pdcp_sess->rx_last_forwarded_sn = PPF_PDCP_SN_DEC (pdcp_sess->rx_next_expected_sn, sn_length - 1) & max_sn;
+  pdcp_sess->rx_last_forwarded_sn = PPF_PDCP_SN_DEC (pdcp_sess->rx_next_expected_sn, sn_length) & max_sn;
   pdcp_sess->rx_hfn = PPF_PDCP_HFN (rx_count, sn_length);
   pdcp_sess->rx_hfn = PPF_PDCP_COUNT_HFN_DEC (rx_count, sn_length);
 
