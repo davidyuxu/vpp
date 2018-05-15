@@ -99,13 +99,17 @@ esp_encrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 
 	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
 
-	//fformat (stdout, "Before EN: %U\n", format_hexdump, in, in_len);
+#ifdef IPSEC_DEBUG_OUTPUT
+	fformat (stdout, "Before EN: %U\n", format_hexdump, in, in_len);
+#endif
 
 	EVP_CipherInit_ex (ctx, NULL, NULL, NULL, iv, -1);
 
   EVP_CipherUpdate (ctx, in, &out_len, in, in_len);
 
-	//fformat (stdout, "CIPHER: %U \n", format_hexdump, out, out_len);
+#ifdef IPSEC_DEBUG_OUTPUT
+	fformat (stdout, "CIPHER: %U \n", format_hexdump, in, out_len);
+#endif
 
   //EVP_CipherFinal_ex (ctx, out + out_len, &out_len);
 
@@ -351,20 +355,12 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			case IPSEC_CRYPTO_ALG_3DES_CBC:
 				//RAND_bytes (iv, IV_SIZE);
 				//memset (iv, 0xfe, IV_SIZE);
-				{
 #if 1
-					u64 *_iv = (u64 *) iv;
-					_iv[0] = xoshiro256starstar (&em->rand_state[thread_id]);
-	      	_iv[1] = xoshiro256starstar (&em->rand_state[thread_id]);
+				rand_bytes (iv, IV_SIZE, &em->rand_state[thread_id]);
 #else
-					i32 *_iv = (i32 *) iv;
-	      	random_r (&em->rand_data[thread_id].data, &_iv[0]);
-	      	random_r (&em->rand_data[thread_id].data, &_iv[1]);
-	      	random_r (&em->rand_data[thread_id].data, &_iv[2]);
-	      	random_r (&em->rand_data[thread_id].data, &_iv[3]);
+				c_rand_bytes (iv, IV_SIZE, &em->rand_data[thread_id].data)
 #endif	
-					esp_encrypt_cbc (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, iv);
-				}
+				esp_encrypt_cbc (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, iv);
 				break;
 				
 			case IPSEC_CRYPTO_ALG_AES_CTR_128:
