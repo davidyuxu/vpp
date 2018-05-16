@@ -517,6 +517,37 @@ ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update)
 }
 
 static void
+ipsec_rand_engine (void)
+{
+	ENGINE *engine;
+	ENGINE_load_rdrand();
+
+	engine= ENGINE_by_id("rdrand");
+	if (engine == NULL)
+	{
+			clib_warning ("OPENSSL rdrand ENGINE_load_rdrand returned %lu", ERR_get_error());
+			return;
+	}
+	if ( !ENGINE_init(engine))
+	{
+			clib_warning ("ENGINE_init returned %lu", ERR_get_error());
+			return;
+	}
+	if ( !ENGINE_set_default(engine, ENGINE_METHOD_RAND) )
+	{
+			clib_warning ("ENGINE_set_default returned %lu", ERR_get_error());
+			return;
+	}
+
+	/* maybe clean up this engine somewhere ? */
+	/*
+	ENGINE_finish(engine);
+	ENGINE_free(engine);
+	ENGINE_cleanup();
+	*/
+}
+
+static void
 ipsec_rand_seed (void)
 {
   struct
@@ -553,6 +584,8 @@ ipsec_init (vlib_main_t * vm)
   vlib_node_t *node;
 
 	//CRYPTO_set_mem_functions (clib_mem_alloc, clib_mem_realloc2, clib_mem_free);
+
+	ipsec_rand_engine ();
 
   ipsec_rand_seed ();
 

@@ -22,6 +22,8 @@
 #include <openssl/rand.h>
 #include <openssl/evp.h>
 #include <openssl/cmac.h>
+#include <openssl/engine.h>
+
 
 
 #define IPSEC_FLAG_IPSEC_GRE_TUNNEL (1 << 0)

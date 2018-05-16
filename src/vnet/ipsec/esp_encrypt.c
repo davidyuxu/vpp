@@ -353,11 +353,11 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			case IPSEC_CRYPTO_ALG_AES_CBC_256:
 			case IPSEC_CRYPTO_ALG_DES_CBC:
 			case IPSEC_CRYPTO_ALG_3DES_CBC:
-				//RAND_bytes (iv, IV_SIZE);
 				//memset (iv, 0xfe, IV_SIZE);
 #if 1
-				rand_bytes (iv, IV_SIZE, &em->rand_state[thread_id]);
+				RAND_bytes (iv, IV_SIZE);
 #else
+				rand_bytes (iv, IV_SIZE, &em->rand_state[thread_id]);
 				c_rand_bytes (iv, IV_SIZE, &em->rand_data[thread_id].data)
 #endif	
 				esp_encrypt_cbc (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, iv);
