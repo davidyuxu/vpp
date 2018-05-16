@@ -29,7 +29,7 @@ format_crypto (u8 * s, va_list * args)
 
   s = format (s, "%-25s%-20s%-10s\n", dev->name, drv->name,
 	      rte_cryptodevs[dev->id].data->dev_started ? "up" : "down");
-  s = format (s, "  numa_node %u, max_queues %u\n", dev->numa, dev->max_qp);
+  s = format (s, "  numa_node %u, max_queues %u, max_nb_sessions %u, max_nb_sessions_per_qp %u \n", dev->numa, dev->max_qp, dev->max_nb_sessions, dev->max_nb_sessions_per_qp);
   s = format (s, "  free_resources %u, used_resources %u\n",
 	      vec_len (dev->free_resources), vec_len (dev->used_resources));
 

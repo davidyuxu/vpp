@@ -124,7 +124,10 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
     vec_elt_at_index (dcm->workers_main, thread_idx);
   struct rte_crypto_op **ops = cwm->ops;
 
-  from = vlib_frame_vector_args (from_frame);
+	/* ops must be allocated for both Numa zone when initializing - refer to vdev crypto_aesni_mb0,socket_id=0 */
+	ASSERT (ops);
+
+	from = vlib_frame_vector_args (from_frame);
   n_left_from = from_frame->n_vectors;
 
   ret = crypto_alloc_ops (numa, ops, n_left_from);

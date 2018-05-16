@@ -95,6 +95,10 @@ typedef struct
   u16 id;
   const char *name;
   u32 max_qp;
+	u32 max_nb_sessions;
+	/* Maximum number of sessions supported by device. */
+	u32 max_nb_sessions_per_qp;
+	/* Maximum number of sessions per queue pair. Default 0 for infinite sessions */
   u64 features;
 } crypto_dev_t;
 

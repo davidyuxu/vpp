@@ -464,6 +464,9 @@ dpdk_pool_create (vlib_main_t * vm, u8 * pool_name, u32 elt_size,
   u32 size, obj_size;
   i32 ret;
 
+	/* to make dpdk happy */
+	cache_size = clib_min (num_elts *2/3, cache_size);
+
   obj_size = rte_mempool_calc_obj_size (elt_size, 0, 0);
   size = rte_mempool_xmem_size (num_elts, obj_size, 21, 0);
 
@@ -477,8 +480,8 @@ dpdk_pool_create (vlib_main_t * vm, u8 * pool_name, u32 elt_size,
   pr = vlib_physmem_get_region (vm, pri[0]);
 
   mp =
-    rte_mempool_create_empty ((char *) pool_name, num_elts, elt_size,
-			      512, pool_priv_size, numa, 0);
+    rte_mempool_create_empty ((i8 *) pool_name, num_elts, elt_size,
+			      cache_size, pool_priv_size, numa, 0);
   if (!mp)
     return clib_error_return (0, "failed to create %s", pool_name);
 
