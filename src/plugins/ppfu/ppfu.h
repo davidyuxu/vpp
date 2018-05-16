@@ -54,23 +54,34 @@ typedef enum {
 
 #define foreach_ppf_pdcp_decrypt_next        \
 _(DROP, "error-drop")                        \
-_(IP4_LOOKUP, "ip4-lookup") 		         \
-_(IP6_LOOKUP, "ip6-lookup")		             \
+_(REORDER, "ppf_pdcp_reorder")
+
+typedef enum {
+    PPF_PDCP_DECRYPT_NEXT_DROP,
+    PPF_PDCP_DECRYPT_NEXT_REORDER,
+    PPF_PDCP_DECRYPT_N_NEXT,
+} ppf_pdcp_decrypt_next_t;
+
+#define foreach_ppf_pdcp_reorder_next        \
+_(DROP, "error-drop")                        \
+_(IP4_LOOKUP, "ip4-lookup")                  \
+_(IP6_LOOKUP, "ip6-lookup")	                 \
 _(PPF_GTPU4_ENCAP, "ppf_gtpu4-encap")        \
 _(PPF_GTPU6_ENCAP, "ppf_gtpu6-encap") 	     \
 _(PPF_SRB_NB_TX, "ppf_srb_nb_tx")            \
 _(PPF_TX_HANDOFF, "ppf_tx_handoff")
 
 typedef enum {
-    PPF_PDCP_DECRYPT_NEXT_DROP,
-    PPF_PDCP_DECRYPT_NEXT_IP4_LOOKUP,
-    PPF_PDCP_DECRYPT_NEXT_IP6_LOOKUP,
-    PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP,
-    PPF_PDCP_DECRYPT_NEXT_PPF_GTPU6_ENCAP,
-    PPF_PDCP_DECRYPT_NEXT_PPF_SRB_NB_TX,
-    PPF_PDCP_DECRYPT_NEXT_PPF_TX_HANDOFF,
-    PPF_PDCP_DECRYPT_N_NEXT,
-} ppf_pdcp_decrypt_next_t;
+    PPF_PDCP_REORDER_NEXT_DROP,
+    PPF_PDCP_REORDER_NEXT_IP4_LOOKUP,
+    PPF_PDCP_REORDER_NEXT_IP6_LOOKUP,
+    PPF_PDCP_REORDER_NEXT_PPF_GTPU4_ENCAP,
+    PPF_PDCP_REORDER_NEXT_PPF_GTPU6_ENCAP,
+    PPF_PDCP_REORDER_NEXT_PPF_SRB_NB_TX,
+    PPF_PDCP_REORDER_NEXT_PPF_TX_HANDOFF,
+    PPF_PDCP_REORDER_N_NEXT,
+} ppf_pdcp_reorder_next_t;
+
 
 #define foreach_ppf_pdcp_encrypt_next        \
 _(DROP, "error-drop")                        \
@@ -396,6 +407,7 @@ typedef struct
   u32 pdcp_input_next_index;
   u32 pdcp_decrypt_next_index;
   u32 pdcp_encrypt_next_index;
+  u32 pdcp_reorder_next_index;
 
   u32 rx_reorder;
   u32 rx_max_reorder_window;
@@ -557,6 +569,7 @@ extern ppf_main_t ppf_main;
 
 extern ppf_sb_main_t ppf_sb_main;
 
+extern vlib_node_registration_t ppf_pdcp_reorder_node;
 extern vlib_node_registration_t ppf_pdcp_decrypt_node;
 extern vlib_node_registration_t ppf_pdcp_encrypt_node;
 extern vlib_node_registration_t ppf_pdcp_input_node;
