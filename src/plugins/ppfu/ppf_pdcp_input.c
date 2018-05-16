@@ -102,19 +102,10 @@ ppf_pdcp_input_inline (vlib_main_t * vm,
 		p6 = vlib_get_buffer (vm, from[6]);
 		p7 = vlib_get_buffer (vm, from[7]);
 		
-		vlib_prefetch_buffer_header (p4, LOAD);
-		vlib_prefetch_buffer_header (p5, LOAD);
-		vlib_prefetch_buffer_header (p6, LOAD);
-		vlib_prefetch_buffer_header (p7, LOAD);
-
-		#if 0 
-		//dont know what to prefetch
-		// what is the difference between STORE & LOAD
-		CLIB_PREFETCH (p4->data, sizeof (en0[0]), STORE);
-		CLIB_PREFETCH (p5->data, sizeof (en0[0]), STORE);
-		CLIB_PREFETCH (p6->data, sizeof (en0[0]), STORE);
-		CLIB_PREFETCH (p7->data, sizeof (en0[0]), STORE);
-		#endif
+	    CLIB_PREFETCH (p4, 128, LOAD);
+	    CLIB_PREFETCH (p5, 128, LOAD);
+	    CLIB_PREFETCH (p6, 128, LOAD);
+	    CLIB_PREFETCH (p7, 128, LOAD);
 	    }
 
 	    /* speculatively enqueue b0 and b1 to the current next frame */
@@ -131,11 +122,6 @@ ppf_pdcp_input_inline (vlib_main_t * vm,
 	    b1 = vlib_get_buffer (vm, bi1);
 	    b2 = vlib_get_buffer (vm, bi2);
 	    b3 = vlib_get_buffer (vm, bi3);
-
-	    // ASSERT (b0->current_data == 0);
-	    // ASSERT (b1->current_data == 0);
-	    // ASSERT (b2->current_data == 0);
-	    // ASSERT (b3->current_data == 0);
 
 	    sw_if_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
 	    sw_if_index1 = vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];

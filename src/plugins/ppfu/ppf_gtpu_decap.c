@@ -131,11 +131,11 @@ ppf_gtpu_input (vlib_main_t * vm,
 	    p2 = vlib_get_buffer (vm, from[2]);
 	    p3 = vlib_get_buffer (vm, from[3]);
 
-	    vlib_prefetch_buffer_header (p2, LOAD);
-	    vlib_prefetch_buffer_header (p3, LOAD);
+		CLIB_PREFETCH (p2, 128, STORE);
+		CLIB_PREFETCH (p3, 128, STORE);
 
-	    CLIB_PREFETCH (p2->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
-	    CLIB_PREFETCH (p3->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
+	    CLIB_PREFETCH (p2->data, CLIB_CACHE_LINE_BYTES, LOAD);
+	    CLIB_PREFETCH (p3->data, CLIB_CACHE_LINE_BYTES, LOAD);
 	  }
 
 	  bi0 = from[0];
@@ -310,7 +310,7 @@ ppf_gtpu_input (vlib_main_t * vm,
       len0 = vlib_buffer_length_in_chain (vm, b0);
 
       /* Required to make the l2 tag push / pop code work on l2 subifs */
-      if (PREDICT_TRUE(next0 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
+      if (PREDICT_FALSE(next0 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
         vnet_update_l2_len (b0);
 
       if (sw_if_index0 != ~0) {
@@ -488,7 +488,7 @@ ppf_gtpu_input (vlib_main_t * vm,
       len1 = vlib_buffer_length_in_chain (vm, b1);
 
       /* Required to make the l2 tag push / pop code work on l2 subifs */
-      if (PREDICT_TRUE(next1 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
+      if (PREDICT_FALSE(next1 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
         vnet_update_l2_len (b1);
 
 	  if (sw_if_index1 != ~0) {
@@ -719,7 +719,7 @@ ppf_gtpu_input (vlib_main_t * vm,
 	  len0 = vlib_buffer_length_in_chain (vm, b0);
 
 	  /* Required to make the l2 tag push / pop code work on l2 subifs */
-	  if (PREDICT_TRUE(next0 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
+	  if (PREDICT_FALSE(next0 == PPF_GTPU_INPUT_NEXT_L2_INPUT))
 		  vnet_update_l2_len (b0);
 	  
 	  vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL] = tunnel_index0;
