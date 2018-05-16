@@ -105,7 +105,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	{
 		u32 bi0, bi1, bi2, bi3;
 		vlib_buffer_t * b0, * b1, * b2, * b3;
-		u32 flow_hash0, flow_hash1, flow_hash2, flow_hash3;
+		//u32 flow_hash0, flow_hash1, flow_hash2, flow_hash3;
 		u32 len0, len1, len2, len3;
 		ip4_header_t * ip4_0, * ip4_1, * ip4_2, * ip4_3;
 		ip6_header_t * ip6_0, * ip6_1, * ip6_2, * ip6_3;
@@ -134,15 +134,15 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	    p6 = vlib_get_buffer (vm, from[6]);
 	    p7 = vlib_get_buffer (vm, from[7]);
 
-	    vlib_prefetch_buffer_header (p4, LOAD);
-	    vlib_prefetch_buffer_header (p5, LOAD);
-	    vlib_prefetch_buffer_header (p6, LOAD);
-	    vlib_prefetch_buffer_header (p7, LOAD);
+	    CLIB_PREFETCH (p4, 128, LOAD);
+	    CLIB_PREFETCH (p5, 128, LOAD);
+	    CLIB_PREFETCH (p6, 128, LOAD);
+	    CLIB_PREFETCH (p7, 128, LOAD);
 
-	    CLIB_PREFETCH (p4->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
-	    CLIB_PREFETCH (p5->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
-	    CLIB_PREFETCH (p6->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
-	    CLIB_PREFETCH (p7->data, 2*CLIB_CACHE_LINE_BYTES, LOAD);
+	    CLIB_PREFETCH (p4->data, CLIB_CACHE_LINE_BYTES, STORE);
+	    CLIB_PREFETCH (p5->data, CLIB_CACHE_LINE_BYTES, STORE);
+	    CLIB_PREFETCH (p6->data, CLIB_CACHE_LINE_BYTES, STORE);
+	    CLIB_PREFETCH (p7->data, CLIB_CACHE_LINE_BYTES, STORE);
 	  }
 
 	  bi0 = from[0];
@@ -163,10 +163,10 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  b2 = vlib_get_buffer (vm, bi2);
 	  b3 = vlib_get_buffer (vm, bi3);
 
-	  flow_hash0 = vnet_l2_compute_flow_hash (b0);
-	  flow_hash1 = vnet_l2_compute_flow_hash (b1);
-	  flow_hash2 = vnet_l2_compute_flow_hash (b2);
-	  flow_hash3 = vnet_l2_compute_flow_hash (b3);
+	  //flow_hash0 = vnet_l2_compute_flow_hash (b0);
+	  //flow_hash1 = vnet_l2_compute_flow_hash (b1);
+	  //flow_hash2 = vnet_l2_compute_flow_hash (b2);
+	  //flow_hash3 = vnet_l2_compute_flow_hash (b3);
 
 	  tid0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
 	  tid1 = vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
@@ -372,16 +372,16 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      /* Fix UDP length  and set source port */
 	      udp0 = (udp_header_t *)(ip6_0+1);
 	      udp0->length = new_l0;
-	      udp0->src_port = flow_hash0;
+	      //udp0->src_port = flow_hash0;
 	      udp1 = (udp_header_t *)(ip6_1+1);
 	      udp1->length = new_l1;
-	      udp1->src_port = flow_hash1;
+	      //udp1->src_port = flow_hash1;
 	      udp2 = (udp_header_t *)(ip6_2+1);
 	      udp2->length = new_l2;
-	      udp2->src_port = flow_hash2;
+	      //udp2->src_port = flow_hash2;
 	      udp3 = (udp_header_t *)(ip6_3+1);
 	      udp3->length = new_l3;
-	      udp3->src_port = flow_hash3;
+	      //udp3->src_port = flow_hash3;
 
 	      /* IPv6 UDP checksum is mandatory */
 	      udp0->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b0,
