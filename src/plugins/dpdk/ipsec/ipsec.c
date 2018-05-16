@@ -681,6 +681,8 @@ crypto_scan_devs (u32 n_mains)
       dev->numa = rte_cryptodev_socket_id (i);
       dev->features = info.feature_flags;
       dev->max_qp = info.max_nb_queue_pairs;
+			dev->max_nb_sessions = info.sym.max_nb_sessions;
+			dev->max_nb_sessions_per_qp = info.sym.max_nb_sessions_per_qp;
       drv_id = info.driver_id;
       if (drv_id >= vec_len (dcm->drv))
 	vec_validate_init_empty (dcm->drv, drv_id,
@@ -858,7 +860,7 @@ crypto_create_crypto_op_pool (vlib_main_t * vm, u8 numa)
 }
 
 static clib_error_t *
-crypto_create_session_h_pool (vlib_main_t * vm, u8 numa)
+crypto_create_session_h_pool (vlib_main_t * vm, crypto_dev_t * dev)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_data_t *data;
@@ -867,6 +869,7 @@ crypto_create_session_h_pool (vlib_main_t * vm, u8 numa)
   clib_error_t *error = NULL;
   vlib_physmem_region_index_t pri;
   u32 elt_size;
+	u8 numa = dev->numa;
 
   data = vec_elt_at_index (dcm->data, numa);
 
@@ -878,7 +881,7 @@ crypto_create_session_h_pool (vlib_main_t * vm, u8 numa)
   elt_size = rte_cryptodev_get_header_session_size ();
 
   error =
-    dpdk_pool_create (vm, pool_name, elt_size, DPDK_CRYPTO_NB_SESS_OBJS,
+    dpdk_pool_create (vm, pool_name, elt_size, dev->max_nb_sessions,
 		      0, 512, numa, &mp, &pri);
 
   vec_free (pool_name);
@@ -915,7 +918,7 @@ crypto_create_session_drv_pool (vlib_main_t * vm, crypto_dev_t * dev)
   elt_size = rte_cryptodev_get_private_session_size (dev->id);
 
   error =
-    dpdk_pool_create (vm, pool_name, elt_size, DPDK_CRYPTO_NB_SESS_OBJS,
+    dpdk_pool_create (vm, pool_name, elt_size, dev->max_nb_sessions,
 		      0, 512, numa, &mp, &pri);
 
   vec_free (pool_name);
@@ -944,7 +947,7 @@ crypto_create_pools (vlib_main_t * vm)
       if (error)
 	return error;
 
-      error = crypto_create_session_h_pool (vm, dev->numa);
+      error = crypto_create_session_h_pool (vm, dev);
       if (error)
 	return error;
 

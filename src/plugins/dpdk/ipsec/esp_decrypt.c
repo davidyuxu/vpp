@@ -103,9 +103,11 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
   u32 ret, last_sa_index = ~0;
   u8 numa = rte_socket_id ();
   u8 is_aead = 0;
-  crypto_worker_main_t *cwm =
-    vec_elt_at_index (dcm->workers_main, thread_idx);
+  crypto_worker_main_t *cwm = vec_elt_at_index (dcm->workers_main, thread_idx);
   struct rte_crypto_op **ops = cwm->ops;
+
+	/* ops must be allocated for both Numa zone when initializing - refer to vdev crypto_aesni_mb0,socket_id=0 */
+	ASSERT (ops);
 
   from = vlib_frame_vector_args (from_frame);
   n_left_from = from_frame->n_vectors;
@@ -144,7 +146,13 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 
 	  b0 = vlib_get_buffer (vm, bi0);
 	  mb0 = rte_mbuf_from_vlib_buffer(b0);
-	  esp0 = vlib_buffer_get_current (b0);
+
+		/* we start with ip headers */
+		ip4_header_t *ih4 = vlib_buffer_get_current (b0);
+
+		/* step into esp */
+		vlib_buffer_advance (b0, ip4_header_bytes (ih4));
+		esp0 = vlib_buffer_get_current (b0);
 
 	  /* ih0/ih6_0 */
 	  CLIB_PREFETCH (esp0, sizeof (esp0[0]) + 16, LOAD);
