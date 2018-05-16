@@ -410,7 +410,10 @@ typedef struct
       {
         u32 count;
         u32 sn;
-        u32 integrity_status;
+        u8  integrity_status;
+        u8  bypass_reorder;
+        u8  dir;
+        u8  reserved;
       } pdcp;
   
       struct

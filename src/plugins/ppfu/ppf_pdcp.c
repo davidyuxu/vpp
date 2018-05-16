@@ -1241,9 +1241,10 @@ ppf_pdcp_init (vlib_main_t * vm)
   ppm->vnet_main = vnet_get_main ();
   ppm->vlib_main = vm;
 	
-  ppm->pdcp_input_next_index = PPF_PDCP_INPUT_NEXT_PPF_PDCP_DECRYPT;
-  ppm->pdcp_decrypt_next_index = PPF_PDCP_DECRYPT_NEXT_PPF_GTPU4_ENCAP;
+  ppm->pdcp_input_next_index   = PPF_PDCP_INPUT_NEXT_PPF_PDCP_DECRYPT;
+  ppm->pdcp_decrypt_next_index = PPF_PDCP_DECRYPT_NEXT_REORDER;
   ppm->pdcp_encrypt_next_index = PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU4_ENCAP;
+  ppm->pdcp_reorder_next_index = PPF_PDCP_REORDER_NEXT_PPF_GTPU4_ENCAP;
 
   ppm->rx_reorder = 0;
   ppm->rx_max_reorder_window = (1 << max_log2(PDCP_DEF_REORDER_WINDOW_SIZE));

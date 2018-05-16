@@ -588,7 +588,6 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   if (1 == sb_num0) {
 			   tunnel_id0 = callline0->rb.srb.sb_tunnel[sb_ids0[0]].tunnel_id; 				   
 			   vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id0;	   
-			   sb_num0 = 0;
 		   } else if ((sb_num0 > 1) && (sb_num0 <= MAX_SB_PER_CALL)) {
 			   sb_tunnels0 = callline0->rb.srb.sb_tunnel;
 		   } else {
