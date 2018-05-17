@@ -174,6 +174,10 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	  ih0 = vlib_buffer_get_current (b0);
 	  mb0 = rte_mbuf_from_vlib_buffer (b0);
 
+#ifdef IPSEC_DEBUG_OUTPUT
+		fformat (stdout, "ENIN  : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+#endif
+
 	  /* ih0/ih6_0 */
 	  CLIB_PREFETCH (ih0, sizeof (ih6_0[0]), LOAD);
 	  /* f0 */
@@ -259,10 +263,6 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	  res->ops[res->n_ops] = op;
 	  res->bi[res->n_ops] = bi0;
 	  res->n_ops += 1;
-
-	  dpdk_gcm_cnt_blk *icb = &priv->cb;
-
-	  crypto_set_icb (icb, sa0->salt, sa0->seq, sa0->seq_hi);
 
 	  is_ipv6 = (ih0->ip4.ip_version_and_header_length & 0xF0) == 0x60;
 
@@ -424,16 +424,25 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	  u64 digest_paddr =
 	    mb0->buf_physaddr + digest - ((u8 *) mb0->buf_addr);
 
-	  if (!is_aead && cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC)
+	  if (!is_aead && (cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC 
+				|| cipher_alg->alg == RTE_CRYPTO_CIPHER_DES_CBC 
+				|| cipher_alg->alg == RTE_CRYPTO_CIPHER_3DES_CBC))
 	    {
-	      cipher_off = sizeof (esp_header_t);
-	      cipher_len = iv_size + pad_payload_len;
+	    	RAND_bytes ((void *) &priv->cb, iv_size);
+
+	    	u8 *esp_iv = (u8 *) (esp0 + 1);
+				clib_memcpy (esp_iv, &priv->cb, iv_size);
+				
+	      cipher_off = sizeof (esp_header_t) + iv_size;
+	      cipher_len = pad_payload_len;
 	    }
 	  else			/* CTR/GCM */
-	    {
+	    {			
+				crypto_set_icb (&priv->cb, sa0->salt, sa0->seq, sa0->seq_hi);
+
 	      u32 *esp_iv = (u32 *) (esp0 + 1);
-	      esp_iv[0] = sa0->seq;
-	      esp_iv[1] = sa0->seq_hi;
+
+				clib_memcpy (esp_iv, &priv->cb.iv, iv_size);
 
 	      cipher_off = sizeof (esp_header_t) + iv_size;
 	      cipher_len = pad_payload_len;
@@ -465,6 +474,10 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 
 	  crypto_op_setup (is_aead, mb0, op, session, cipher_off, cipher_len,
 			   0, auth_len, (u8 *) aad, digest, digest_paddr);
+
+#ifdef IPSEC_DEBUG_OUTPUT
+		fformat (stdout, "ENCAP : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+#endif		
 
 	trace:
 	  if (PREDICT_FALSE (b0->flags & VLIB_BUFFER_IS_TRACED))

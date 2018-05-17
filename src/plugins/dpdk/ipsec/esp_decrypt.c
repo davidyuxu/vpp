@@ -147,6 +147,10 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	  b0 = vlib_get_buffer (vm, bi0);
 	  mb0 = rte_mbuf_from_vlib_buffer(b0);
 
+#ifdef IPSEC_DEBUG_OUTPUT
+		fformat (stdout, "DEIN  : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+#endif
+		
 		/* we start with ip headers */
 		ip4_header_t *ih4 = vlib_buffer_get_current (b0);
 
@@ -286,8 +290,10 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	  u64 digest_paddr =
 	    mb0->buf_physaddr + digest - ((u8 *) mb0->buf_addr);
 
-	  if (!is_aead && cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC)
-	    clib_memcpy(icb, iv, 16);
+	  if (!is_aead && (cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC 
+				|| cipher_alg->alg == RTE_CRYPTO_CIPHER_DES_CBC
+				|| cipher_alg->alg == RTE_CRYPTO_CIPHER_3DES_CBC))
+	    clib_memcpy(icb, iv, iv_size);
 	  else /* CTR/GCM */
 	    {
 	      u32 *_iv = (u32 *) iv;
@@ -457,6 +463,10 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 
 	  b0 = vlib_get_buffer (vm, bi0);
 	  esp0 = vlib_buffer_get_current (b0);
+
+#ifdef IPSEC_DEBUG_OUTPUT
+		fformat (stdout, "DEPOST: %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+#endif		
 
 	  sa_index0 = vnet_buffer(b0)->ipsec.sad_index;
 	  sa0 = pool_elt_at_index (im->sad, sa_index0);

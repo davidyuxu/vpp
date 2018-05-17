@@ -148,6 +148,10 @@ dpdk_crypto_dequeue (vlib_main_t * vm, vlib_node_runtime_t * node,
 	      b0 = vlib_buffer_from_rte_mbuf (op->sym[0].m_src);
 	      bi0 = vlib_get_buffer_index (vm, b0);
 
+#ifdef IPSEC_DEBUG_OUTPUT
+		fformat (stdout, "DEQ  %s: %U\n", outbound ? "O":"I", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+#endif			
+
 	      to_next[0] = bi0;
 	      to_next += 1;
 

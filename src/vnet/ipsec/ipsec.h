@@ -101,10 +101,12 @@ typedef enum
   _(1, MD5_96, "md5-96")           /* RFC2403 */                          \
   _(2, SHA1_96, "sha1-96")         /* RFC2404 */                          \
   _(3, SHA_256_96, "sha-256-96")   /* draft-ietf-ipsec-ciph-sha-256-00 */ 			\
-  _(4, SHA_256_128, "sha-256-128") /* RFC4868 */                          \
-  _(5, SHA_384_192, "sha-384-192") /* RFC4868 */                          \
-  _(6, SHA_512_256, "sha-512-256")	/* RFC4868 */													\
-  _(7, CMAC, "cmac")	/* kingwel test only */
+  _(4, SHA_224_112, "sha-224-112") /* RFC 3874 */  												\
+  _(5, SHA_256_128, "sha-256-128") /* RFC4868 */                          \
+  _(6, SHA_384_192, "sha-384-192") /* RFC4868 */                          \
+  _(7, SHA_512_256, "sha-512-256")	/* RFC4868 */													\
+  _(8, AES_XCBC, "aes-xcbc")				/* RFC3566 */													\
+  _(9, AES_CMAC, "aes-cmac")	/* kingwel test only */
 
 typedef enum
 {

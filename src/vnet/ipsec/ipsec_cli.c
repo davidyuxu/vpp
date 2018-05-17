@@ -631,8 +631,8 @@ show_ipsec_command_fn (vlib_main_t * vm,
     hi = vnet_get_hw_interface (im->vnet_main, t->hw_if_index);
     vlib_cli_output(vm, "  %s seq", hi->name);
     sa = pool_elt_at_index(im->sad, t->output_sa_index);
-    vlib_cli_output(vm, "   sa-id %u seq %u seq-hi %u esn %u anti-replay %u",
-                    sa->id, sa->seq, sa->seq_hi, sa->use_esn, sa->use_anti_replay);
+    vlib_cli_output(vm, "   sa-id %u salt %x seq %u seq-hi %u esn %u anti-replay %u",
+                    sa->id, sa->salt, sa->seq, sa->seq_hi, sa->use_esn, sa->use_anti_replay);
     vlib_cli_output(vm, "   local-spi %u local-ip %U", sa->spi,
                     format_ip4_address, &sa->tunnel_src_addr.ip4);
     vlib_cli_output(vm, "   local-crypto %U %U",

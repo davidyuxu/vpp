@@ -118,6 +118,21 @@ algos_init (u32 n_mains)
   a->iv_len = 8;
   a->trunc_size = 16;
 
+  a = &dcm->cipher_algs[IPSEC_CRYPTO_ALG_DES_CBC];
+  a->type = RTE_CRYPTO_SYM_XFORM_CIPHER;
+  a->alg = RTE_CRYPTO_CIPHER_DES_CBC;
+  a->boundary = 8;		
+  a->key_len = 8;
+  a->iv_len = 8;
+
+  a = &dcm->cipher_algs[IPSEC_CRYPTO_ALG_3DES_CBC];
+  a->type = RTE_CRYPTO_SYM_XFORM_CIPHER;
+  a->alg = RTE_CRYPTO_CIPHER_3DES_CBC;
+  a->boundary = 8;		
+  a->key_len = 24;
+  a->iv_len = 8;
+	
+
   vec_validate (dcm->auth_algs, IPSEC_INTEG_N_ALG - 1);
 
   {
@@ -152,6 +167,12 @@ algos_init (u32 n_mains)
   a->key_len = 32;
   a->trunc_size = 12;
 
+  a = &dcm->auth_algs[IPSEC_INTEG_ALG_SHA_224_112];
+  a->type = RTE_CRYPTO_SYM_XFORM_AUTH;
+  a->alg = RTE_CRYPTO_AUTH_SHA224_HMAC;
+  a->key_len = 28;
+  a->trunc_size = 14;
+
   a = &dcm->auth_algs[IPSEC_INTEG_ALG_SHA_256_128];
   a->type = RTE_CRYPTO_SYM_XFORM_AUTH;
   a->alg = RTE_CRYPTO_AUTH_SHA256_HMAC;
@@ -169,6 +190,18 @@ algos_init (u32 n_mains)
   a->alg = RTE_CRYPTO_AUTH_SHA512_HMAC;
   a->key_len = 64;
   a->trunc_size = 32;
+
+  a = &dcm->auth_algs[IPSEC_INTEG_ALG_AES_XCBC];
+  a->type = RTE_CRYPTO_SYM_XFORM_AUTH;
+  a->alg = RTE_CRYPTO_AUTH_AES_XCBC_MAC;
+  a->key_len = 16;
+  a->trunc_size = 12;
+
+	a = &dcm->auth_algs[IPSEC_INTEG_ALG_AES_CMAC];
+	a->type = RTE_CRYPTO_SYM_XFORM_AUTH;
+	a->alg = RTE_CRYPTO_AUTH_AES_CMAC;
+	a->key_len = 16;
+	a->trunc_size = 4;
 }
 
 static u8
@@ -486,6 +519,9 @@ add_del_sa_session (u32 sa_index, u8 is_add)
       u32 seed;
       switch (sa->crypto_alg)
 	{
+	case IPSEC_CRYPTO_ALG_AES_CTR_128:
+	case IPSEC_CRYPTO_ALG_AES_CTR_192:
+	case IPSEC_CRYPTO_ALG_AES_CTR_256:
 	case IPSEC_CRYPTO_ALG_AES_GCM_128:
 	case IPSEC_CRYPTO_ALG_AES_GCM_192:
 	case IPSEC_CRYPTO_ALG_AES_GCM_256:
@@ -603,7 +639,7 @@ crypto_parse_capabilities (crypto_dev_t * dev,
 	case RTE_CRYPTO_SYM_XFORM_AUTH:
 	  inc = cap->sym.auth.digest_size.increment;
 	  inc = inc ? inc : 1;
-	  for (len = cap->sym.auth.digest_size.min;
+	  for (len = 0;//cap->sym.auth.digest_size.min;
 	       len <= cap->sym.auth.digest_size.max; len += inc)
 	    {
 	      alg = auth_cap_to_alg (cap, len);
