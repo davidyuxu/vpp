@@ -30,6 +30,10 @@
 #define always_inline static inline __attribute__ ((__always_inline__))
 #endif
 
+#if CLIB_DEBUG > 0
+#define IPSEC_DEBUG_OUTPUT
+#endif
+
 #define foreach_dpdk_crypto_input_next		\
   _(DROP, "error-drop")				\
   _(IP4_LOOKUP, "ip4-lookup")                   \
@@ -341,6 +345,7 @@ crypto_set_icb (dpdk_gcm_cnt_blk * icb, u32 salt, u32 seq, u32 seq_hi)
   icb->salt = salt;
   icb->iv[0] = seq;
   icb->iv[1] = seq_hi;
+	icb->cnt = clib_host_to_net_u32 (1);
 }
 
 static_always_inline void

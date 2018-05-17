@@ -102,72 +102,78 @@ dpdk_crypto_dequeue (vlib_main_t * vm, vlib_node_runtime_t * node,
 
   next_index = node->cached_next_index;
 
-  {
-    ops = cwm->ops;
-    n_ops = rte_cryptodev_dequeue_burst (res->dev_id,
-					 res->qp_id + outbound,
-					 ops, VLIB_FRAME_SIZE);
-    res->inflights[outbound] -= n_ops;
-    ASSERT (res->inflights >= 0);
+  do
+    {
+      ops = cwm->ops;
+      n_ops = rte_cryptodev_dequeue_burst (res->dev_id,
+					   res->qp_id + outbound,
+					   ops, VLIB_FRAME_SIZE);
+      res->inflights[outbound] -= n_ops;
+      ASSERT (res->inflights >= 0);
 
-    n_deq = n_ops;
-    total_n_deq += n_ops;
+      n_deq = n_ops;
+      total_n_deq += n_ops;
 
-    while (n_ops > 0)
-      {
-	u32 n_left_to_next;
+      while (n_ops > 0)
+	{
+	  u32 n_left_to_next;
 
-	vlib_get_next_frame (vm, node, next_index, to_next, n_left_to_next);
+	  vlib_get_next_frame (vm, node, next_index, to_next, n_left_to_next);
 
-	while (n_ops > 0 && n_left_to_next > 0)
-	  {
-	    u32 bi0, next0;
-	    vlib_buffer_t *b0 = 0;
-	    struct rte_crypto_op *op;
+	  while (n_ops > 0 && n_left_to_next > 0)
+	    {
+	      u32 bi0, next0;
+	      vlib_buffer_t *b0 = 0;
+	      struct rte_crypto_op *op;
 
-	    op = ops[0];
-	    ops += 1;
-	    n_ops -= 1;
-	    n_left_to_next -= 1;
+	      op = ops[0];
+	      ops += 1;
+	      n_ops -= 1;
+	      n_left_to_next -= 1;
 
-	    dpdk_op_priv_t *priv = crypto_op_get_priv (op);
-	    next0 = priv->next;
+	      dpdk_op_priv_t *priv = crypto_op_get_priv (op);
+	      next0 = priv->next;
 
-	    if (PREDICT_FALSE (op->status != RTE_CRYPTO_OP_STATUS_SUCCESS))
-	      {
-		next0 = DPDK_CRYPTO_INPUT_NEXT_DROP;
-		vlib_node_increment_counter (vm,
-					     dpdk_crypto_input_node.index,
-					     DPDK_CRYPTO_INPUT_ERROR_STATUS,
-					     1);
-	      }
+	      if (PREDICT_FALSE (op->status != RTE_CRYPTO_OP_STATUS_SUCCESS))
+		{
+		  next0 = DPDK_CRYPTO_INPUT_NEXT_DROP;
+		  vlib_node_increment_counter (vm,
+					       dpdk_crypto_input_node.index,
+					       DPDK_CRYPTO_INPUT_ERROR_STATUS,
+					       1);
+		}
 
-	    /* XXX store bi0 and next0 in op private? */
+	      /* XXX store bi0 and next0 in op private? */
 
-	    b0 = vlib_buffer_from_rte_mbuf (op->sym[0].m_src);
-	    bi0 = vlib_get_buffer_index (vm, b0);
+	      b0 = vlib_buffer_from_rte_mbuf (op->sym[0].m_src);
+	      bi0 = vlib_get_buffer_index (vm, b0);
 
-	    to_next[0] = bi0;
-	    to_next += 1;
+#ifdef IPSEC_DEBUG_OUTPUT
+		fformat (stdout, "DEQ  %s: %U\n", outbound ? "O":"I", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+#endif			
 
-	    if (PREDICT_FALSE (b0->flags & VLIB_BUFFER_IS_TRACED))
-	      {
-		vlib_trace_next_frame (vm, node, next0);
-		dpdk_crypto_input_trace_t *tr =
-		  vlib_add_trace (vm, node, b0, sizeof (*tr));
-		tr->status = op->status;
-	      }
+	      to_next[0] = bi0;
+	      to_next += 1;
 
-	    op->status = RTE_CRYPTO_OP_STATUS_NOT_PROCESSED;
+	      if (PREDICT_FALSE (b0->flags & VLIB_BUFFER_IS_TRACED))
+		{
+		  vlib_trace_next_frame (vm, node, next0);
+		  dpdk_crypto_input_trace_t *tr =
+		    vlib_add_trace (vm, node, b0, sizeof (*tr));
+		  tr->status = op->status;
+		}
 
-	    vlib_validate_buffer_enqueue_x1 (vm, node, next_index, to_next,
-					     n_left_to_next, bi0, next0);
-	  }
-	vlib_put_next_frame (vm, node, next_index, n_left_to_next);
-      }
+	      op->status = RTE_CRYPTO_OP_STATUS_NOT_PROCESSED;
 
-    crypto_free_ops (numa, cwm->ops, n_deq);
-  }
+	      vlib_validate_buffer_enqueue_x1 (vm, node, next_index, to_next,
+					       n_left_to_next, bi0, next0);
+	    }
+	  vlib_put_next_frame (vm, node, next_index, n_left_to_next);
+	}
+
+      crypto_free_ops (numa, cwm->ops, n_deq);
+    }
+  while (n_deq == VLIB_FRAME_SIZE && res->inflights[outbound]);
 
   vlib_node_increment_counter (vm, dpdk_crypto_input_node.index,
 			       DPDK_CRYPTO_INPUT_ERROR_DQ_COPS, total_n_deq);

@@ -262,7 +262,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 				case IPSEC_INTEG_ALG_SHA_384_192:
 					mac = hmac_calc;
 					break;
-				case IPSEC_INTEG_ALG_CMAC:
+				case IPSEC_INTEG_ALG_AES_CMAC:
 					mac = cmac_calc;
 					break;
 			}

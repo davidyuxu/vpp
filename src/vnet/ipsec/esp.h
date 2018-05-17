@@ -345,6 +345,11 @@ ipsec_proto_init ()
   i->mac_size = 32;
   i->trunc_size = 12;
 
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_224_112];
+  i->md = EVP_sha224 ();
+  i->mac_size = 28;
+  i->trunc_size = 14;
+
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_256_128];
   i->md = EVP_sha256 ();
   i->mac_size = 32;
@@ -360,10 +365,15 @@ ipsec_proto_init ()
   i->mac_size = 64;
   i->trunc_size = 32;
 
-  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_CMAC];
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_AES_XCBC];
   i->md = NULL;
   i->mac_size = 16;
-  i->trunc_size = 16;
+  i->trunc_size = 12;
+
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_AES_CMAC];
+  i->md = NULL;
+  i->mac_size = 16;
+  i->trunc_size = 4;
 }
 
 typedef unsigned int (* MAC_FUNC) (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature);
@@ -382,7 +392,7 @@ hmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signa
 
   unsigned int len;
 
-  ASSERT (sa->integ_alg < IPSEC_INTEG_N_ALG && sa->integ_alg > IPSEC_INTEG_ALG_NONE && sa->integ_alg != IPSEC_INTEG_ALG_CMAC );
+  ASSERT (sa->integ_alg < IPSEC_INTEG_N_ALG && sa->integ_alg > IPSEC_INTEG_ALG_NONE && sa->integ_alg != IPSEC_INTEG_ALG_AES_CMAC );
 
 	HMAC_Init_ex (ctx, NULL, 0, NULL, NULL);
 
@@ -407,7 +417,7 @@ cmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signa
 
   size_t len;
 
-  ASSERT (sa->integ_alg == IPSEC_INTEG_ALG_CMAC);
+  ASSERT (sa->integ_alg == IPSEC_INTEG_ALG_AES_CMAC);
 
 	CMAC_Init (ctx, NULL, 0, NULL, NULL);
 	//CMAC_Init(ctx, "1234567890", 16, EVP_aes_128_cbc(), NULL);

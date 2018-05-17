@@ -353,7 +353,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			case IPSEC_CRYPTO_ALG_AES_CBC_256:
 			case IPSEC_CRYPTO_ALG_DES_CBC:
 			case IPSEC_CRYPTO_ALG_3DES_CBC:
-				//memset (iv, 0xfe, IV_SIZE);
+				//memset (iv, 0xee, IV_SIZE);
 #if 1
 				RAND_bytes (iv, IV_SIZE);
 #else
@@ -431,7 +431,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 			case IPSEC_INTEG_ALG_SHA_384_192:
 				mac = hmac_calc;
 				break;
-			case IPSEC_INTEG_ALG_CMAC:
+			case IPSEC_INTEG_ALG_AES_CMAC:
 				mac = cmac_calc;
 				break;
 		}
