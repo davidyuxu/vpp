@@ -60,8 +60,8 @@ typedef struct
 
 typedef struct
 {
+  dpdk_gcm_cnt_blk cb;
   u32 next;
-  dpdk_gcm_cnt_blk cb __attribute__ ((aligned (16)));
   u8 aad[16];
   u8 icv[32];
 } dpdk_op_priv_t;
@@ -72,7 +72,7 @@ typedef struct
   struct rte_crypto_op **ops;
   u16 cipher_resource_idx[IPSEC_CRYPTO_N_ALG];
   u16 auth_resource_idx[IPSEC_INTEG_N_ALG];
-} crypto_worker_main_t __attribute__ ((aligned (CLIB_CACHE_LINE_BYTES)));
+} crypto_worker_main_t;
 
 typedef struct
 {
@@ -85,7 +85,7 @@ typedef struct
   u8 boundary;
   u8 disabled;
   u8 resources;
-} crypto_alg_t __attribute__ ((aligned (8)));
+} crypto_alg_t;
 
 typedef struct
 {
@@ -124,7 +124,7 @@ typedef struct
   u16 __unused;
   struct rte_crypto_op *ops[VLIB_FRAME_SIZE];
   u32 bi[VLIB_FRAME_SIZE];
-} crypto_resource_t __attribute__ ((aligned (CLIB_CACHE_LINE_BYTES)));
+} crypto_resource_t;
 
 typedef struct
 {
