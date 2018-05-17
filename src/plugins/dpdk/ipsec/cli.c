@@ -29,7 +29,7 @@ format_crypto (u8 * s, va_list * args)
 
   s = format (s, "%-25s%-20s%-10s\n", dev->name, drv->name,
 	      rte_cryptodevs[dev->id].data->dev_started ? "up" : "down");
-  s = format (s, "  numa_node %u, max_queues %u, max_nb_sessions %u, max_nb_sessions_per_qp %u \n", dev->numa, dev->max_qp, dev->max_nb_sessions, dev->max_nb_sessions_per_qp);
+  s = format (s, "  id %u drv_id %u numa_node %u, max_queues %u, max_nb_sessions %u, max_nb_sessions_per_qp %u \n", dev->id, dev->drv_id, dev->numa, dev->max_qp, dev->max_nb_sessions, dev->max_nb_sessions_per_qp);
   s = format (s, "  free_resources %u, used_resources %u\n",
 	      vec_len (dev->free_resources), vec_len (dev->used_resources));
 
@@ -69,8 +69,48 @@ format_crypto (u8 * s, va_list * args)
       }
   s = format (s, "\n\n");
 
+	struct rte_cryptodev_stats stats;
+	rte_cryptodev_stats_get (dev->id, &stats);
+
+  s = format (s, "  enqueue %lu dequeue %lu enqueue_err %lu dequeue_err %lu \n", 
+							dev->id, dev->drv_id, dev->numa, stats.enqueued_count, stats.dequeued_count, stats.enqueue_err_count, stats.dequeue_err_count);
   return s;
 }
+
+
+static clib_error_t *
+clear_crypto_stats_fn (vlib_main_t * vm, unformat_input_t * input,
+		     vlib_cli_command_t * cmd)
+{
+  dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
+  crypto_dev_t *dev;
+
+  /* *INDENT-OFF* */
+  vec_foreach (dev, dcm->dev)
+    rte_cryptodev_stats_reset (dev->id);
+  /* *INDENT-ON* */
+
+  return NULL;
+}
+
+/*?
+ * This command is used to clear the DPDK Crypto device statistics.
+ *
+ * @cliexpar
+ * Example of how to clear the DPDK Crypto device statistics:
+ * @cliexsart{clear dpdk crypto devices statistics}
+ * vpp# clear dpdk crypto devices statistics
+ * @cliexend
+ * Example of clearing the DPDK Crypto device statistic data:
+ * @cliexend
+?*/
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (clear_dpdk_crypto_stats, static) = {
+    .path = "clear dpdk crypto devices statistics",
+    .short_help = "clear dpdk crypto devices statistics",
+    .function = clear_crypto_stats_fn,
+};
+
 
 static clib_error_t *
 show_dpdk_crypto_fn (vlib_main_t * vm, unformat_input_t * input,
