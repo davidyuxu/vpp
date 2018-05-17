@@ -31,7 +31,7 @@
 #include <vpp/app/version.h>
 #include <ppfu/ppfu.h>
 #include <ppfu/snow3g.h>
-
+#include <ppfu/zuc.h>
 
 ppf_pdcp_main_t ppf_pdcp_main; 
 
@@ -164,6 +164,18 @@ ppf_pdcp_gen_iv (u8 alg, u32 count, u8 bearer, u8 dir, u8 * iv)
 				iv[7] = 0;
 			}
 			break;
+                 
+                case PDCP_ZUC_INTEGRITY:
+                        {
+                            //TODO
+                        }
+                        break;
+        
+                case PDCP_ZUC_CIPHERING:
+                        {
+                           //TODO
+                        }
+                        break;                
 
 		default:
 			break;
@@ -412,43 +424,66 @@ ppf_pdcp_eea2_dec (u8 * in, u8 * out, u32 size, void * security_parameters)
 bool
 ppf_pdcp_eia3_protect (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 {
+       	u32 len;
+	u8 * buf0;
+	bool ret = true;
+
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
 	CLIB_UNUSED(u8 iv[16]) = {0};
-
-	ppf_pdcp_gen_iv (PDCP_ZUC_INTEGRITY,
-				sec_para->count, sec_para->bearer, sec_para->dir, iv);
-
-	// TODO:
+	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
+	zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
 	
-	return 0;
+	buf0 = vlib_buffer_get_current (b0);
+	len = vlib_buffer_length_in_chain(vm, b0);
+
+        zuc_protect(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
+
+	return ret;
+
 }
 
 
 bool
 ppf_pdcp_eia3_validate (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 {
+	u8 mact[MAX_PDCP_KEY_LEN] = {0};
+	u32 len;
+	u8 * buf0;
+	bool ret = true;
+
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
 	CLIB_UNUSED(u8 iv[16]) = {0};
-
-	ppf_pdcp_gen_iv (PDCP_ZUC_INTEGRITY,
-				sec_para->count, sec_para->bearer, sec_para->dir, iv);
-
-	// TODO:
+	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
+	zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
 	
-	return 0;
+	buf0 = vlib_buffer_get_current (b0);
+	len = vlib_buffer_length_in_chain(vm, b0);
+
+	//calculate mac exlucde 4 octs MAC-I
+	len -= EIA_MAC_LEN;	
+
+        zuc_validate(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,mact);
+
+	ret = (buf0[len+0]== mact[0] && buf0[len+1]== mact[1] && buf0[len+2]== mact[2] && buf0[len+3]== mact[3]);
+	//trim 4 octs of MAC 
+	b0->current_length -= EIA_MAC_LEN;
+
+	return ret;
+
 }
 
 
 u32
 ppf_pdcp_eea3_enc (u8 * in, u8 * out, u32 size, void * security_parameters)
 {
+
 	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
 	CLIB_UNUSED(u8 iv[16]) = {0};
+	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
+	
+	zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
 
-	ppf_pdcp_gen_iv (PDCP_ZUC_CIPHERING,
-				sec_para->count, sec_para->bearer, sec_para->dir, iv);
-
-	// TODO:
+	zuc_encrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,in,out,size);
 
 	return 0;
 }
@@ -457,15 +492,17 @@ ppf_pdcp_eea3_enc (u8 * in, u8 * out, u32 size, void * security_parameters)
 u32
 ppf_pdcp_eea3_dec (u8 * in, u8 * out, u32 size, void * security_parameters)
 {
-	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
+  
+     	ppf_pdcp_security_param_t * sec_para = (ppf_pdcp_security_param_t *)security_parameters;
 	CLIB_UNUSED(u8 iv[16]) = {0};
+	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
+	
+	zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
 
-	ppf_pdcp_gen_iv (PDCP_ZUC_CIPHERING,
-				sec_para->count, sec_para->bearer, sec_para->dir, iv);
-
-	// TODO:
+	zuc_decrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,in,out,size);
 
 	return 0;
+
 }
 
 
