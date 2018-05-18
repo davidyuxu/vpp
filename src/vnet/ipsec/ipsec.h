@@ -335,6 +335,9 @@ typedef struct
 
   /* callbacks */
   ipsec_main_callbacks_t cb;
+
+	/* debug fformat, generate HEXDUMP  */
+	u8 debug_fformat;
 } ipsec_main_t;
 
 extern ipsec_main_t ipsec_main;

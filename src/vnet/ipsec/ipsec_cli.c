@@ -890,6 +890,66 @@ VLIB_CLI_COMMAND (set_interface_key_command, static) = {
 };
 /* *INDENT-ON* */
 
+static clib_error_t *
+debug_ipsec_output_command_fn (vlib_main_t * vm,
+				 unformat_input_t * input,
+				 vlib_cli_command_t * cmd)
+{
+  ipsec_main_t *im = &ipsec_main;
+  unformat_input_t _line_input, *line_input = &_line_input;
+  clib_error_t *error = 0;	
+
+  /* Get a line of input. */
+  if (!unformat_user (input, unformat_line_input, line_input))
+    return 0;
+
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (line_input, "on"))
+	{
+	  if (im->debug_fformat == 0)
+	    {
+	      im->debug_fformat = 1;
+	    }
+	  else
+	    {
+	      vlib_cli_output (vm, "IPSEC debug_fformat already on...");
+	      break;
+	    }
+	}
+      else if (unformat (line_input, "off"))
+	{
+	  if (im->debug_fformat)
+	    {
+	      im->debug_fformat = 0;
+	    }
+	  else
+	    {
+	      vlib_cli_output (vm, "IPSEC debug_fformat already off...");
+	      break;
+	    }
+	}
+      else
+	{
+	  error = clib_error_return (0, "unknown input `%U'",
+				     format_unformat_error, line_input);
+	  break;
+	}
+    }
+  unformat_free (line_input);
+
+  return error;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (debug_ipsec_output_command, static) = {
+    .path = "debug ipsec output",
+    .short_help = "debug ipsec output [on|off]",
+    .function = debug_ipsec_output_command_fn,
+};
+/* *INDENT-ON* */
+
+
 clib_error_t *
 ipsec_cli_init (vlib_main_t * vm)
 {

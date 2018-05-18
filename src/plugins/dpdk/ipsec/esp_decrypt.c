@@ -148,7 +148,8 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	  mb0 = rte_mbuf_from_vlib_buffer(b0);
 
 #ifdef IPSEC_DEBUG_OUTPUT
-		fformat (stdout, "DEIN  : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+		if (PREDICT_FALSE (im->debug_fformat))
+			fformat (stdout, "DEIN  : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
 #endif
 		
 		/* we start with ip headers */
@@ -465,7 +466,8 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 	  esp0 = vlib_buffer_get_current (b0);
 
 #ifdef IPSEC_DEBUG_OUTPUT
-		fformat (stdout, "DEPOST: %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+		if (PREDICT_FALSE (im->debug_fformat))
+			fformat (stdout, "DEPOST: %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
 #endif		
 
 	  sa_index0 = vnet_buffer(b0)->ipsec.sad_index;
