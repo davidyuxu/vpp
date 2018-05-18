@@ -379,21 +379,21 @@ void EIA3(zuc_ctx_t* ctx,u8* IK, u32 COUNT, u32 BEARER, u32 DIRECTION, u32 LENGT
     free(z);
 }
 
-void zuc_encrypt(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u8* data, u8* output, u32 length)
+void zuc_encrypt(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u32 dir, u8* data, u8* output, u32 length)
 {
-    EEA3(ctx, key, count, bearer, 1,length<<3, (u32 *)data, (u32 *)output);
+    EEA3(ctx, key, count, bearer, dir,length<<3, (u32 *)data, (u32 *)output);
 }
-void zuc_decrypt(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u8* data, u8* output, u32 length)
+void zuc_decrypt(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u32 dir, u8* data, u8* output, u32 length)
 {
-    EEA3(ctx, key, count, bearer, 0, length<<3, (u32 *)data, (u32 *)output);
+    EEA3(ctx, key, count, bearer, dir, length<<3, (u32 *)data, (u32 *)output);
 }
 
-void zuc_protect  (zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u8* data, u32 length, u8* MAC)
+void zuc_protect  (zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u32 dir, u8* data, u32 length, u8* MAC)
 {
-    EIA3(ctx, key, count, bearer,1,length<<3, (u32 *)data, MAC);
+    EIA3(ctx, key, count, bearer,dir,length<<3, (u32 *)data, MAC);
 }
-void zuc_validate(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u8* data, u32 length, u8* MAC)
+void zuc_validate(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u32 dir, u8* data, u32 length, u8* MAC)
 {
-    EIA3(ctx, key, count, bearer,1,length<<3, (u32 *)data, MAC);
+    EIA3(ctx, key, count, bearer,dir,length<<3, (u32 *)data, MAC);
 }
 /* end of EIA3.c */

@@ -436,7 +436,7 @@ ppf_pdcp_eia3_protect (vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 	buf0 = vlib_buffer_get_current (b0);
 	len = vlib_buffer_length_in_chain(vm, b0);
 
-        zuc_protect(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
+        zuc_protect(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
 
 	return ret;
 
@@ -462,7 +462,7 @@ ppf_pdcp_eia3_validate (vlib_main_t * vm,vlib_buffer_t * b0, void * security_par
 	//calculate mac exlucde 4 octs MAC-I
 	len -= EIA_MAC_LEN;	
 
-        zuc_validate(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,buf0,len,mact);
+        zuc_validate(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,buf0,len,mact);
 
 	ret = (buf0[len+0]== mact[0] && buf0[len+1]== mact[1] && buf0[len+2]== mact[2] && buf0[len+3]== mact[3]);
 	//trim 4 octs of MAC 
@@ -483,7 +483,7 @@ ppf_pdcp_eea3_enc (u8 * in, u8 * out, u32 size, void * security_parameters)
 	
 	zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
 
-	zuc_encrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,in,out,size);
+	zuc_encrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,in,out,size);
 
 	return 0;
 }
@@ -499,7 +499,7 @@ ppf_pdcp_eea3_dec (u8 * in, u8 * out, u32 size, void * security_parameters)
 	
 	zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
 
-	zuc_decrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,in,out,size);
+	zuc_decrypt(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,in,out,size);
 
 	return 0;
 

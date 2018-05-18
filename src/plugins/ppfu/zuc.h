@@ -49,9 +49,9 @@ void EIA3(zuc_ctx_t* ctx, u8* IK, u32 COUNT, u32 BEARER, u32 DIRECTION, u32 LENG
 
 /* void zuc_encrypt(uint32_t user, uint8_t* dst, uint8_t* src, uint16_t len, SecurityContext* sctxt); */
 
-void zuc_encrypt(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u8* data, u8* output, u32 length);
-void zuc_decrypt(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u8* data, u8* output, u32 length);
+void zuc_encrypt(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u32 dir, u8* data, u8* output, u32 length);
+void zuc_decrypt(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u32 dir, u8* data, u8* output, u32 length);
 
-void zuc_protect (zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u8* data, u32 length, u8* MAC);
-void zuc_validate(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u8* data, u32 length, u8* MAC);
+void zuc_protect (zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u32 dir, u8* data, u32 length, u8* MAC);
+void zuc_validate(zuc_ctx_t* ctx, u8* key, u32 count, u32 bearer, u32 dir,u8* data, u32 length, u8* MAC);
 #endif
