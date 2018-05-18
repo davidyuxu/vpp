@@ -67,13 +67,16 @@ format_crypto (u8 * s, va_list * args)
 	s = format (s, "%s%s", pre, dcm->auth_algs[i].name);
 	pre = ", ";
       }
-  s = format (s, "\n\n");
+  s = format (s, "\n");
 
 	struct rte_cryptodev_stats stats;
 	rte_cryptodev_stats_get (dev->id, &stats);
 
-  s = format (s, "  enqueue %lu dequeue %lu enqueue_err %lu dequeue_err %lu \n", 
-							dev->id, dev->drv_id, dev->numa, stats.enqueued_count, stats.dequeued_count, stats.enqueue_err_count, stats.dequeue_err_count);
+  s = format (s, "  enqueue %-10lu dequeue %-10lu enqueue_err %-10lu dequeue_err %-10lu \n", 
+							stats.enqueued_count, stats.dequeued_count, stats.enqueue_err_count, stats.dequeue_err_count);
+
+  s = format (s, "\n");
+
   return s;
 }
 
