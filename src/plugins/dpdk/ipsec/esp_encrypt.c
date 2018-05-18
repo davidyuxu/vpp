@@ -175,7 +175,8 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	  mb0 = rte_mbuf_from_vlib_buffer (b0);
 
 #ifdef IPSEC_DEBUG_OUTPUT
-		fformat (stdout, "ENIN  : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+		if (PREDICT_FALSE (im->debug_fformat))
+			fformat (stdout, "ENIN  : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
 #endif
 
 	  /* ih0/ih6_0 */
@@ -476,7 +477,8 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 			   0, auth_len, (u8 *) aad, digest, digest_paddr);
 
 #ifdef IPSEC_DEBUG_OUTPUT
-		fformat (stdout, "ENCAP : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
+		if (PREDICT_FALSE (im->debug_fformat))
+			fformat (stdout, "ENCAP : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
 #endif		
 
 	trace:

@@ -99,7 +99,9 @@ esp_decrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 	int out_len;
 
 #ifdef IPSEC_DEBUG_OUTPUT
-	fformat (stdout, "Before DE: %U\n", format_hexdump, in, in_len);
+  ipsec_main_t *im = &ipsec_main;
+	if (PREDICT_FALSE (im->debug_fformat))
+		fformat (stdout, "Before DE: %U\n", format_hexdump, in, in_len);
 #endif
 
 	ASSERT (sa->crypto_alg < IPSEC_CRYPTO_N_ALG && sa->crypto_alg > IPSEC_CRYPTO_ALG_NONE);
@@ -109,7 +111,8 @@ esp_decrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
   EVP_CipherUpdate (ctx, in, &out_len, in, in_len);
 
 #ifdef IPSEC_DEBUG_OUTPUT
-	fformat (stdout, "After DE: %U\n", format_hexdump, in, in_len);
+	if (PREDICT_FALSE (im->debug_fformat))
+		fformat (stdout, "After DE: %U\n", format_hexdump, in, in_len);
 #endif
 
   //EVP_CipherFinal_ex (ctx, out + out_len, &out_len);
@@ -377,7 +380,8 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 		  if (1)
 	    {
 #ifdef IPSEC_DEBUG_OUTPUT
-				fformat (stdout, "DE: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
+				if (PREDICT_FALSE (im->debug_fformat))
+					fformat (stdout, "DE: %U\n", format_hexdump, vlib_buffer_get_current (i_b0), i_b0->current_length);
 #endif
 
 	      i_b0->current_length -= sizeof (esp_footer_t);
