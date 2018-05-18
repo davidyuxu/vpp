@@ -471,7 +471,6 @@ ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update)
   uword *p;
   u32 sa_index;
   ipsec_sa_t *sa = 0;
-  clib_error_t *err;
 
   p = hash_get (im->sa_index_by_sa_id, sa_update->id);
   if (!p)
@@ -491,23 +490,24 @@ ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update)
   /* new integ key */
   if (0 < sa_update->integ_key_len)
     {
-      clib_memcpy (sa->integ_key, sa_update->integ_key,
-		   sa_update->integ_key_len);
+      clib_memcpy (sa->integ_key, sa_update->integ_key, sa_update->integ_key_len);
       sa->integ_key_len = sa_update->integ_key_len;
     }
 
 	ipsec_set_sa_contexts_integ_key (sa);
 	ipsec_set_sa_contexts_crypto_key (sa);
 
-  if (0 < sa_update->crypto_key_len || 0 < sa_update->integ_key_len)
-    {
-      if (im->cb.add_del_sa_sess_cb)
+  if (im->cb.update_sa_sess_cb)
 	{
-	  err = im->cb.add_del_sa_sess_cb (sa_index, 0);
-	  if (err)
-	    return VNET_API_ERROR_SYSCALL_ERROR_1;
+		clib_error_t *e;
+
+		e = im->cb.update_sa_sess_cb (sa_index);
+		if (e)
+		{
+		  clib_error_free (e);
+			return VNET_API_ERROR_SYSCALL_ERROR_1;
+		}
 	}
-    }
 
   return 0;
 }

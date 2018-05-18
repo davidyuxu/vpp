@@ -137,9 +137,6 @@ typedef struct
   struct rte_mempool *crypto_op;
   struct rte_mempool *session_h;
   struct rte_mempool *session_drv;
-  crypto_session_disposal_t *session_disposal;
-  uword *session_by_sa_index;
-  uword *session_by_drv_id_and_sa_index;
   u64 crypto_op_get_failed;
   u64 session_h_failed;
   u64 session_drv_failed;
@@ -171,6 +168,8 @@ typedef struct
 
   u64 session_timeout;		/* nsec */
   u8 enabled;
+
+  crypto_session_disposal_t *session_disposal;
 } dpdk_crypto_main_t;
 
 extern dpdk_crypto_main_t dpdk_crypto_main;

@@ -216,6 +216,21 @@ ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa)
   vlib_thread_main_t *tm = vlib_get_thread_main ();
 
 	ipsec_proto_main_t *em = &ipsec_proto_main;
+
+	/* update the salt */
+	switch (sa->crypto_alg)
+	{
+		case IPSEC_CRYPTO_ALG_AES_CTR_128:
+		case IPSEC_CRYPTO_ALG_AES_CTR_192:
+		case IPSEC_CRYPTO_ALG_AES_CTR_256:
+		case IPSEC_CRYPTO_ALG_AES_GCM_128:
+		case IPSEC_CRYPTO_ALG_AES_GCM_192:
+		case IPSEC_CRYPTO_ALG_AES_GCM_256:
+			clib_memcpy (&sa->salt, &sa->crypto_key[sa->crypto_key_len - 4], 4);
+			break;
+		default:
+			sa->salt = 0;
+	}
 	
 	const EVP_CIPHER *cipher = em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
 
@@ -468,6 +483,7 @@ ipsec_set_interface_key (vnet_main_t * vnm, u32 hw_if_index,
       sa = pool_elt_at_index (im->sad, t->output_sa_index);
       sa->crypto_alg = alg;
       sa->crypto_key_len = vec_len (key);
+			memset (sa->crypto_key, 0, sizeof (sa->crypto_key));
       clib_memcpy (sa->crypto_key, key, vec_len (key));
 			ipsec_set_sa_contexts_crypto_key (sa);
     }
@@ -476,6 +492,7 @@ ipsec_set_interface_key (vnet_main_t * vnm, u32 hw_if_index,
       sa = pool_elt_at_index (im->sad, t->output_sa_index);
       sa->integ_alg = alg;
       sa->integ_key_len = vec_len (key);
+			memset (sa->integ_key, 0, sizeof (sa->integ_key));
       clib_memcpy (sa->integ_key, key, vec_len (key));
 			ipsec_set_sa_contexts_integ_key (sa);
     }
@@ -484,6 +501,7 @@ ipsec_set_interface_key (vnet_main_t * vnm, u32 hw_if_index,
       sa = pool_elt_at_index (im->sad, t->input_sa_index);
       sa->crypto_alg = alg;
       sa->crypto_key_len = vec_len (key);
+			memset (sa->crypto_key, 0, sizeof (sa->crypto_key));
       clib_memcpy (sa->crypto_key, key, vec_len (key));
 			ipsec_set_sa_contexts_crypto_key (sa);
     }
@@ -492,11 +510,30 @@ ipsec_set_interface_key (vnet_main_t * vnm, u32 hw_if_index,
       sa = pool_elt_at_index (im->sad, t->input_sa_index);
       sa->integ_alg = alg;
       sa->integ_key_len = vec_len (key);
+			memset (sa->integ_key, 0, sizeof (sa->integ_key));
       clib_memcpy (sa->integ_key, key, vec_len (key));
 			ipsec_set_sa_contexts_integ_key (sa);
     }
   else
     return VNET_API_ERROR_INVALID_VALUE;
+
+  if (im->cb.update_sa_sess_cb)
+	{
+		clib_error_t *e;
+
+		e = im->cb.update_sa_sess_cb (t->output_sa_index);
+		if (e)
+		{
+		  clib_error_free (e);
+			return VNET_API_ERROR_SYSCALL_ERROR_1;
+		}
+		e = im->cb.update_sa_sess_cb (t->input_sa_index);
+		if (e)
+		{
+		  clib_error_free (e);
+			return VNET_API_ERROR_SYSCALL_ERROR_1;
+		}
+	}	
 
   return 0;
 }
@@ -554,16 +591,12 @@ ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
       t->input_sa_index = sa_index;
       key = (u64) sa->tunnel_src_addr.ip4.as_u32 << 32 | (u64) sa->spi;
       hash_set (im->ipsec_if_pool_index_by_key, key, hi->dev_instance);
-
-			ipsec_create_sa_contexts (sa);
     }
   else
     {
       old_sa_index = t->output_sa_index;
       old_sa = pool_elt_at_index (im->sad, old_sa_index);
       t->output_sa_index = sa_index;
-
-			ipsec_create_sa_contexts (sa);
     }
 
   /* remove sa_id to sa_index mapping on old SA */
@@ -571,13 +604,12 @@ ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
     hash_unset (im->sa_index_by_sa_id, old_sa->id);
 
   if (im->cb.add_del_sa_sess_cb)
-    {
-      clib_error_t *err;
-
-      err = im->cb.add_del_sa_sess_cb (old_sa_index, 0);
-      if (err)
-	return VNET_API_ERROR_SYSCALL_ERROR_1;
-    }
+  {
+    clib_error_t *err;
+    err = im->cb.add_del_sa_sess_cb (old_sa_index, 0);
+    if (err)
+			return VNET_API_ERROR_SYSCALL_ERROR_1;
+  }
 
 	ipsec_delete_sa_contexts (old_sa);
 

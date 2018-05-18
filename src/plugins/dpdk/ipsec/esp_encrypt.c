@@ -212,7 +212,7 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 		  to_next += 1;
 		  n_left_to_next -= 1;
 		  goto trace;
-		}		
+		}
 
 		res = vec_elt_at_index (dcm->resource, res_idx);
 
@@ -234,8 +234,7 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 
 	  if (PREDICT_FALSE (esp_seq_advance (sa0)))
 	    {
-	      clib_warning ("sequence number counter has cycled SPI %u",
-			    sa0->spi);
+	      clib_warning ("sequence number counter has cycled SPI %u", sa0->spi);
 	      vlib_node_increment_counter (vm, dpdk_esp_encrypt_node.index,
 					   ESP_ENCRYPT_ERROR_SEQ_CYCLED, 1);
 	      //TODO: rekey SA
