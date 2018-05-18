@@ -364,6 +364,10 @@ create_sym_session (struct rte_cryptodev_sym_session **session,
   struct rte_cryptodev_sym_session **s;
   clib_error_t *erorr = 0;
 
+  key.drv_id = res->drv_id;
+  key.sa_idx = sa_idx;
+
+  data = vec_elt_at_index (dcm->per_numa_data, res->numa);
 
   sa = pool_elt_at_index (im->sad, sa_idx);
 
@@ -415,18 +419,13 @@ create_sym_session (struct rte_cryptodev_sym_session **session,
   else
     session[0] = s[0];
 
-  struct rte_mempool **mp;
-  mp = vec_elt_at_index (data->session_drv, res->drv_id);
-  ASSERT (mp[0] != NULL);
-
   i32 ret =
-    rte_cryptodev_sym_session_init (res->dev_id, session[0], xfs, mp[0]);
+    rte_cryptodev_sym_session_init (res->dev_id, session[0], xfs, data->session_drv);
   if (ret)
     {
-      data->session_drv_failed[res->drv_id] += 1;
-      erorr = clib_error_return (0, "failed to init session for drv %u",
-				 res->drv_id);
-      goto done;
+      data->session_drv_failed += 1;
+      return clib_error_return (0, "failed to init session for drv %u",
+				res->drv_id);
     }
 
   add_session_by_drv_and_sa_idx (session[0], data, res->drv_id, sa_idx);
@@ -543,7 +542,7 @@ add_del_sa_session (u32 sa_index, u8 is_add)
     }
 
   /* *INDENT-OFF* */
-  vec_foreach (data, dcm->data)
+  vec_foreach (data, dcm->per_numa_data)
     {
       clib_spinlock_lock_if_init (&data->lockp);
       val = hash_get (data->session_by_sa_index, sa_index);
@@ -863,7 +862,7 @@ crypto_create_crypto_op_pool (vlib_main_t * vm, u8 numa)
   clib_error_t *error = NULL;
   vlib_physmem_region_index_t pri;
 
-  data = vec_elt_at_index (dcm->data, numa);
+  data = vec_elt_at_index (dcm->per_numa_data, numa);
 
   /* Already allocated */
   if (data->crypto_op)
@@ -894,7 +893,7 @@ crypto_create_crypto_op_pool (vlib_main_t * vm, u8 numa)
 }
 
 static clib_error_t *
-crypto_create_session_h_pool (vlib_main_t * vm, crypto_dev_t * dev)
+crypto_create_session_h_pool (vlib_main_t * vm, u8 numa, u32 elts)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_data_t *data;
@@ -903,20 +902,15 @@ crypto_create_session_h_pool (vlib_main_t * vm, crypto_dev_t * dev)
   clib_error_t *error = NULL;
   vlib_physmem_region_index_t pri;
   u32 elt_size;
-	u8 numa = dev->numa;
 
-  data = vec_elt_at_index (dcm->data, numa);
-
-  if (data->session_h)
-    return NULL;
+  data = vec_elt_at_index (dcm->per_numa_data, numa);
 
   pool_name = format (0, "session_h_pool_numa%u%c", numa, 0);
 
   elt_size = rte_cryptodev_get_header_session_size ();
 
   error =
-    dpdk_pool_create (vm, pool_name, elt_size, dev->max_nb_sessions,
-		      0, 512, numa, &mp, &pri);
+    dpdk_pool_create (vm, pool_name, elt_size, elts, 0, 512, numa, &mp, &pri);
 
   vec_free (pool_name);
 
@@ -929,7 +923,7 @@ crypto_create_session_h_pool (vlib_main_t * vm, crypto_dev_t * dev)
 }
 
 static clib_error_t *
-crypto_create_session_drv_pool (vlib_main_t * vm, crypto_dev_t * dev)
+crypto_create_session_drv_pool (vlib_main_t * vm, u8 numa, u32 elt_size, u32 elts)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_data_t *data;
@@ -937,33 +931,20 @@ crypto_create_session_drv_pool (vlib_main_t * vm, crypto_dev_t * dev)
   struct rte_mempool *mp;
   clib_error_t *error = NULL;
   vlib_physmem_region_index_t pri;
-  u32 elt_size;
-  u8 numa = dev->numa;
 
-  data = vec_elt_at_index (dcm->data, numa);
+  data = vec_elt_at_index (dcm->per_numa_data, numa);
 
-  vec_validate (data->session_drv, dev->drv_id);
-  vec_validate (data->session_drv_failed, dev->drv_id);
-  vec_validate_aligned (data->session_by_drv_id_and_sa_index, 32,
-			CLIB_CACHE_LINE_BYTES);
-
-  if (data->session_drv[dev->drv_id])
-    return NULL;
-
-  pool_name = format (0, "session_drv%u_pool_numa%u%c", dev->drv_id, numa, 0);
-  elt_size = rte_cryptodev_get_private_session_size (dev->id);
+  pool_name = format (0, "session_drv_pool_numa%u%c", numa, 0);
 
   error =
-    dpdk_pool_create (vm, pool_name, elt_size, dev->max_nb_sessions,
-		      0, 512, numa, &mp, &pri);
+    dpdk_pool_create (vm, pool_name, elt_size, elts, 0, 512, numa, &mp, &pri);
 
   vec_free (pool_name);
 
   if (error)
     return error;
 
-  data->session_drv[dev->drv_id] = mp;
-  clib_spinlock_init (&data->lockp);
+  data->session_drv = mp;
 
   return NULL;
 }
@@ -975,23 +956,45 @@ crypto_create_pools (vlib_main_t * vm)
   clib_error_t *error = NULL;
   crypto_dev_t *dev;
 
+	u32 max_sess_size = 0, sess_sz;
+	u32 max_num_sessions = 0, num_sessions;
+
+	/* figure out the best fit private session size */
+	/* *INDENT-OFF* */
+	vec_foreach (dev, dcm->dev)
+	{
+		sess_sz = rte_cryptodev_get_private_session_size(dev->id);
+		if (sess_sz > max_sess_size)
+			max_sess_size = sess_sz;
+
+		num_sessions = dev->max_nb_sessions;
+		if (num_sessions > max_num_sessions)
+			max_num_sessions = num_sessions;
+	}
+	/* *INDENT-ON* */
+
   /* *INDENT-OFF* */
   vec_foreach (dev, dcm->dev)
-    {
-      vec_validate_aligned (dcm->data, dev->numa, CLIB_CACHE_LINE_BYTES);
+  {
+    vec_validate_aligned (dcm->per_numa_data, dev->numa, CLIB_CACHE_LINE_BYTES);
+	}
+  /* *INDENT-ON* */
 
-      error = crypto_create_crypto_op_pool (vm, dev->numa);
-      if (error)
-	return error;
+  /* *INDENT-OFF* */
+  for (int i = 0; i < vec_len (dcm->per_numa_data); i++)
+  {
+    error = crypto_create_crypto_op_pool (vm, i);
+    if (error)
+			return error;
 
-      error = crypto_create_session_h_pool (vm, dev);
-      if (error)
-	return error;
+    error = crypto_create_session_h_pool (vm, i, max_num_sessions);
+    if (error)
+			return error;
 
-      error = crypto_create_session_drv_pool (vm, dev);
-      if (error)
-	return error;
-    }
+    error = crypto_create_session_drv_pool (vm, i, max_sess_size, max_num_sessions);
+    if (error)
+			return error;
+  }
   /* *INDENT-ON* */
 
   return NULL;
@@ -1002,25 +1005,19 @@ crypto_disable (void)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_data_t *data;
-  u8 i;
 
   dcm->enabled = 0;
 
   /* *INDENT-OFF* */
-  vec_foreach (data, dcm->data)
+  vec_foreach (data, dcm->per_numa_data)
     {
       rte_mempool_free (data->crypto_op);
       rte_mempool_free (data->session_h);
-
-      vec_foreach_index (i, data->session_drv)
-	rte_mempool_free (data->session_drv[i]);
-
-      vec_free (data->session_drv);
-      clib_spinlock_free (&data->lockp);
+			rte_mempool_free (data->session_drv);
     }
   /* *INDENT-ON* */
 
-  vec_free (dcm->data);
+  vec_free (dcm->per_numa_data);
   vec_free (dcm->workers_main);
   vec_free (dcm->dev);
   vec_free (dcm->resource);

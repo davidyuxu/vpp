@@ -571,17 +571,14 @@ show_dpdk_crypto_pools_fn (vlib_main_t * vm,
   crypto_data_t *data;
 
   /* *INDENT-OFF* */
-  vec_foreach (data, dcm->data)
+  vec_foreach (data, dcm->per_numa_data)
   {
     if (data->crypto_op)
       vlib_cli_output (vm, "%U\n", format_dpdk_mempool, data->crypto_op);
     if (data->session_h)
       vlib_cli_output (vm, "%U\n", format_dpdk_mempool, data->session_h);
-
-    struct rte_mempool **mp;
-    vec_foreach (mp, data->session_drv)
-      if (mp[0])
-	vlib_cli_output (vm, "%U\n", format_dpdk_mempool, mp[0]);
+    if (data->session_drv)
+      vlib_cli_output (vm, "%U\n", format_dpdk_mempool, data->session_drv);
   }
   /* *INDENT-ON* */
 

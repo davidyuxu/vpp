@@ -144,14 +144,12 @@ typedef struct
   CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
   struct rte_mempool *crypto_op;
   struct rte_mempool *session_h;
-  struct rte_mempool **session_drv;
+  struct rte_mempool *session_drv;
   crypto_session_disposal_t *session_disposal;
   uword *session_by_sa_index;
   u64 crypto_op_get_failed;
   u64 session_h_failed;
-  u64 *session_drv_failed;
-  crypto_session_by_drv_t *session_by_drv_id_and_sa_index;
-  clib_spinlock_t lockp;
+  u64 session_drv_failed;
 } crypto_data_t;
 
 typedef struct
@@ -161,7 +159,7 @@ typedef struct
   crypto_resource_t *resource;
   crypto_alg_t *cipher_algs;
   crypto_alg_t *auth_algs;
-  crypto_data_t *data;
+  crypto_data_t *per_numa_data;
   crypto_drv_t *drv;
   u64 session_timeout;		/* nsec */
   u8 enabled;
@@ -240,8 +238,8 @@ crypto_get_session (struct rte_cryptodev_sym_session ** session,
   crypto_data_t *data;
   struct rte_cryptodev_sym_session *sess;
 
-  data = vec_elt_at_index (dcm->data, res->numa);
-  sess = get_session_by_drv_and_sa_idx (data, res->drv_id, sa_idx);
+  data = vec_elt_at_index (dcm->per_numa_data, res->numa);
+  val = hash_get (data->session_by_drv_id_and_sa_index, key.val);
 
   if (PREDICT_FALSE (!sess))
     return create_sym_session (session, sa_idx, res, cwm, is_outbound);
@@ -280,7 +278,7 @@ static_always_inline i32
 crypto_alloc_ops (u8 numa, struct rte_crypto_op ** ops, u32 n)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
-  crypto_data_t *data = vec_elt_at_index (dcm->data, numa);
+  crypto_data_t *data = vec_elt_at_index (dcm->per_numa_data, numa);
   i32 ret;
 
   ret = rte_mempool_get_bulk (data->crypto_op, (void **) ops, n);
@@ -296,7 +294,7 @@ static_always_inline void
 crypto_free_ops (u8 numa, struct rte_crypto_op **ops, u32 n)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
-  crypto_data_t *data = vec_elt_at_index (dcm->data, numa);
+  crypto_data_t *data = vec_elt_at_index (dcm->per_numa_data, numa);
 
   if (!n)
     return;
