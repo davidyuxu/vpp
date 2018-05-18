@@ -433,6 +433,8 @@ ppf_pdcp_eia3_protect (vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
 	zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
 	
+        memset(ctx,0,sizeof(zuc_ctx_t));
+
 	buf0 = vlib_buffer_get_current (b0);
 	len = vlib_buffer_length_in_chain(vm, b0);
 
@@ -456,6 +458,8 @@ ppf_pdcp_eia3_validate (vlib_main_t * vm,vlib_buffer_t * b0, void * security_par
 	ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
 	zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
 	
+        memset(ctx,0,sizeof(zuc_ctx_t));
+
 	buf0 = vlib_buffer_get_current (b0);
 	len = vlib_buffer_length_in_chain(vm, b0);
 
