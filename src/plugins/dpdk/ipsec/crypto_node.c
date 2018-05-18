@@ -93,7 +93,6 @@ dpdk_crypto_dequeue (vlib_main_t * vm, vlib_node_runtime_t * node,
 		     crypto_resource_t * res, u8 outbound)
 {
   u32 n_deq, total_n_deq = 0, *to_next = 0, n_ops, next_index;
-  ipsec_main_t *im = &ipsec_main;
   u32 thread_idx = vlib_get_thread_index ();
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   u8 numa = rte_socket_id ();
@@ -150,6 +149,7 @@ dpdk_crypto_dequeue (vlib_main_t * vm, vlib_node_runtime_t * node,
 	      bi0 = vlib_get_buffer_index (vm, b0);
 
 #ifdef IPSEC_DEBUG_OUTPUT
+		ipsec_main_t *im = &ipsec_main;
 		if (PREDICT_FALSE(im->debug_fformat))
 			fformat (stdout, "DEQ  %s: %U\n", outbound ? "O":"I", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
 #endif			
