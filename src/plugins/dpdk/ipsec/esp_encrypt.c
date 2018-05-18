@@ -113,15 +113,16 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
   ipsec_main_t *im = &ipsec_main;
   u32 thread_idx = vlib_get_thread_index ();
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
-  crypto_resource_t *res = 0;
   ipsec_sa_t *sa0 = 0;
-  crypto_alg_t *cipher_alg = 0, *auth_alg = 0;
-  struct rte_cryptodev_sym_session *session = 0;
-  u32 ret, last_sa_index = ~0;
+  crypto_session_t *cs0 = 0;
+
+	u16 res_idx;
+	crypto_resource_t *res;
+
   u8 numa = rte_socket_id ();
-  u8 is_aead = 0;
-  crypto_worker_main_t *cwm =
-    vec_elt_at_index (dcm->workers_main, thread_idx);
+
+  crypto_worker_main_t *cwm = vec_elt_at_index (dcm->workers_main, thread_idx);
+	
   struct rte_crypto_op **ops = cwm->ops;
 
 	/* ops must be allocated for both Numa zone when initializing - refer to vdev crypto_aesni_mb0,socket_id=0 */
@@ -130,14 +131,14 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	from = vlib_frame_vector_args (from_frame);
   n_left_from = from_frame->n_vectors;
 
-  ret = crypto_alloc_ops (numa, ops, n_left_from);
+  int ret = crypto_alloc_ops (numa, ops, n_left_from);
   if (ret)
-    {
-      vlib_node_increment_counter (vm, dpdk_esp_encrypt_node.index,
-				   ESP_ENCRYPT_ERROR_DISCARD, 1);
-      /* Discard whole frame */
-      return n_left_from;
-    }
+  {
+    vlib_node_increment_counter (vm, dpdk_esp_encrypt_node.index,
+			   ESP_ENCRYPT_ERROR_DISCARD, 1);
+    /* Discard whole frame */
+    return n_left_from;
+  }
 
   next_index = ESP_ENCRYPT_NEXT_DROP;
 
@@ -149,7 +150,6 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 
       while (n_left_from > 0 && n_left_to_next > 0)
 	{
-	  clib_error_t *error;
 	  u32 bi0;
 	  vlib_buffer_t *b0 = 0;
 	  u32 sa_index0;
@@ -164,7 +164,6 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	  u16 rewrite_len;
 	  struct rte_mbuf *mb0 = 0;
 	  struct rte_crypto_op *op;
-	  u16 res_idx;
 
 	  bi0 = from[0];
 	  from += 1;
@@ -198,25 +197,14 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 
 	  sa_index0 = vnet_buffer (b0)->ipsec.sad_index;
 
-	  if (sa_index0 != last_sa_index)
-	    {
-	      sa0 = pool_elt_at_index (im->sad, sa_index0);
+    sa0 = pool_elt_at_index (im->sad, sa_index0);
+		cs0 = crypto_session_from_sa_index (dcm, sa_index0);				
 
-	      cipher_alg =
-		vec_elt_at_index (dcm->cipher_algs, sa0->crypto_alg);
-	      auth_alg = vec_elt_at_index (dcm->auth_algs, sa0->integ_alg);
-
-	      is_aead = (cipher_alg->type == RTE_CRYPTO_SYM_XFORM_AEAD);
-
-	      if (is_aead)
-		auth_alg = cipher_alg;
-
-	      res_idx = get_resource (cwm, sa0);
-
-	      if (PREDICT_FALSE (res_idx == (u16) ~ 0))
+		/* figure out res_idx to use */
+		res_idx = crypto_get_resource (cwm, sa0);
+    if (PREDICT_FALSE (res_idx == (u16) ~ 0))
 		{
-		  clib_warning ("unsupported SA by thread index %u",
-				thread_idx);
+		  clib_warning ("No resource for thread %u", thread_idx);
 		  vlib_node_increment_counter (vm,
 					       dpdk_esp_encrypt_node.index,
 					       ESP_ENCRYPT_ERROR_NOSUP, 1);
@@ -224,24 +212,25 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 		  to_next += 1;
 		  n_left_to_next -= 1;
 		  goto trace;
-		}
-	      res = vec_elt_at_index (dcm->resource, res_idx);
+		}		
 
-	      error = crypto_get_session (&session, sa_index0, res, cwm, 1);
-	      if (PREDICT_FALSE (error || !session))
+		res = vec_elt_at_index (dcm->resource, res_idx);
+
+		if (PREDICT_FALSE (cs0->session == NULL))
 		{
-		  clib_warning ("failed to get crypto session");
-		  vlib_node_increment_counter (vm,
-					       dpdk_esp_encrypt_node.index,
-					       ESP_ENCRYPT_ERROR_SESSION, 1);
-		  to_next[0] = bi0;
-		  to_next += 1;
-		  n_left_to_next -= 1;
-		  goto trace;
+      ret = crypto_make_session (cs0, sa0, res, cwm, 1);
+      if (PREDICT_FALSE (!ret))
+			{
+			  clib_warning ("failed to create crypto session");
+			  vlib_node_increment_counter (vm,
+						       dpdk_esp_encrypt_node.index,
+						       ESP_ENCRYPT_ERROR_SESSION, 1);
+			  to_next[0] = bi0;
+			  to_next += 1;
+			  n_left_to_next -= 1;
+			  goto trace;
+			}
 		}
-
-	      last_sa_index = sa_index0;
-	    }
 
 	  if (PREDICT_FALSE (esp_seq_advance (sa0)))
 	    {
@@ -267,8 +256,8 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 
 	  is_ipv6 = (ih0->ip4.ip_version_and_header_length & 0xF0) == 0x60;
 
-	  iv_size = cipher_alg->iv_len;
-	  trunc_size = auth_alg->trunc_size;
+	  iv_size = cs0->cipher_alg->iv_len;
+	  trunc_size = cs0->auth_alg->trunc_size;
 
 	  if (sa0->is_tunnel)
 	    {
@@ -380,8 +369,9 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	      esp0->seq = clib_host_to_net_u32 (sa0->seq);
 	    }
 
-	  ASSERT (is_pow2 (cipher_alg->boundary));
-	  u16 mask = cipher_alg->boundary - 1;
+	  ASSERT (is_pow2 (cs0->cipher_alg->boundary));
+		
+	  u16 mask = cs0->cipher_alg->boundary - 1;
 	  u16 pad_payload_len = ((orig_sz + 2) + mask) & ~mask;
 	  u8 pad_bytes = pad_payload_len - 2 - orig_sz;
 
@@ -425,9 +415,9 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	  u64 digest_paddr =
 	    mb0->buf_physaddr + digest - ((u8 *) mb0->buf_addr);
 
-	  if (!is_aead && (cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC 
-				|| cipher_alg->alg == RTE_CRYPTO_CIPHER_DES_CBC 
-				|| cipher_alg->alg == RTE_CRYPTO_CIPHER_3DES_CBC))
+	  if (!cs0->is_aead && (cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC 
+				|| cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_DES_CBC 
+				|| cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_3DES_CBC))
 	    {
 	    	RAND_bytes ((void *) &priv->cb, iv_size);
 
@@ -449,7 +439,7 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	      cipher_len = pad_payload_len;
 	    }
 
-	  if (is_aead)
+	  if (cs0->is_aead)
 	    {
 	      aad = (u32 *) priv->aad;
 	      aad[0] = clib_host_to_net_u32 (sa0->spi);
@@ -473,7 +463,7 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 		}
 	    }
 
-	  crypto_op_setup (is_aead, mb0, op, session, cipher_off, cipher_len,
+	  crypto_op_setup (cs0->is_aead, mb0, op, cs0->session, cipher_off, cipher_len,
 			   0, auth_len, (u8 *) aad, digest, digest_paddr);
 
 #ifdef IPSEC_DEBUG_OUTPUT

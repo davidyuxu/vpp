@@ -147,14 +147,28 @@ typedef struct
 
 typedef struct
 {
+	crypto_alg_t *cipher_alg;
+	crypto_alg_t *auth_alg;	
+	struct rte_cryptodev_sym_session *session;
+
+	u8 is_aead;
+
+	u32 index;
+	u32 sa_index;
+} crypto_session_t;
+
+typedef struct
+{
   crypto_worker_main_t *workers_main;
-  struct rte_cryptodev_sym_session **sa_session;
+  crypto_session_t *sa_session;
+	u32 *sa_session_index;
   crypto_dev_t *dev;
   crypto_resource_t *resource;
   crypto_alg_t *cipher_algs;
   crypto_alg_t *auth_algs;
   crypto_data_t *per_numa_data;
   crypto_drv_t *drv;
+
   u64 session_timeout;		/* nsec */
   u8 enabled;
 } dpdk_crypto_main_t;
@@ -166,9 +180,6 @@ static const u8 pad_data[] =
 
 void crypto_auto_placement (void);
 
-clib_error_t *create_sym_session (struct rte_cryptodev_sym_session **session,
-				  u32 sa_idx, crypto_resource_t * res,
-				  crypto_worker_main_t * cwm, u8 is_outbound);
 
 static_always_inline u32
 crypto_op_len (void)
@@ -198,44 +209,11 @@ crypto_op_get_priv (struct rte_crypto_op * op)
   return (dpdk_op_priv_t *) (((u8 *) op) + crypto_op_get_priv_offset ());
 }
 
-/* XXX this requires 64 bit builds so hash_xxx macros use u64 key */
-typedef union
-{
-  u64 val;
-  struct
-  {
-    u32 drv_id;
-    u32 sa_idx;
-  };
-} crypto_session_key_t;
+i32 crypto_make_session (crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * res, crypto_worker_main_t * cwm, u8 is_outbound);
 
-static_always_inline clib_error_t *
-crypto_get_session (struct rte_cryptodev_sym_session **session,
-		    u32 sa_idx,
-		    crypto_resource_t * res,
-		    crypto_worker_main_t * cwm, u8 is_outbound)
-{
-  dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
-  crypto_data_t *data;
-  uword *val;
-  crypto_session_key_t key = { 0 };
-
-  key.drv_id = res->drv_id;
-  key.sa_idx = sa_idx;
-
-  data = vec_elt_at_index (dcm->per_numa_data, res->numa);
-  val = hash_get (data->session_by_drv_id_and_sa_index, key.val);
-
-  if (PREDICT_FALSE (!val))
-    return create_sym_session (session, sa_idx, res, cwm, is_outbound);
-
-  session[0] = (struct rte_cryptodev_sym_session *) val[0];
-
-  return NULL;
-}
 
 static_always_inline u16
-get_resource (crypto_worker_main_t * cwm, ipsec_sa_t * sa)
+crypto_get_resource (crypto_worker_main_t * cwm, ipsec_sa_t * sa)
 {
   u16 cipher_res = cwm->cipher_resource_idx[sa->crypto_alg];
   u16 auth_res = cwm->auth_resource_idx[sa->integ_alg];
@@ -368,6 +346,18 @@ crypto_op_setup (u8 is_aead, struct rte_mbuf *mb0,
       sym_op->auth.digest.phys_addr = digest_paddr;
     }
 }
+
+static_always_inline crypto_session_t *
+crypto_session_from_sa_index (dpdk_crypto_main_t *dcm, u32 sa_index)
+{
+	u32 index = vec_elt (dcm->sa_session_index, sa_index);
+
+	if (PREDICT_FALSE(index == (u32)~0))
+		return NULL;
+	
+	return pool_elt_at_index (dcm->sa_session, index);
+}
+
 
 #endif /* __DPDK_IPSEC_H__ */
 

@@ -98,11 +98,10 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_resource_t *res = 0;
   ipsec_sa_t *sa0 = 0;
-  crypto_alg_t *cipher_alg = 0, *auth_alg = 0;
-  struct rte_cryptodev_sym_session *session = 0;
-  u32 ret, last_sa_index = ~0;
+	crypto_session_t *cs0 = 0;
+
   u8 numa = rte_socket_id ();
-  u8 is_aead = 0;
+	
   crypto_worker_main_t *cwm = vec_elt_at_index (dcm->workers_main, thread_idx);
   struct rte_crypto_op **ops = cwm->ops;
 
@@ -112,14 +111,14 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
   from = vlib_frame_vector_args (from_frame);
   n_left_from = from_frame->n_vectors;
 
-  ret = crypto_alloc_ops (numa, ops, n_left_from);
+  int ret = crypto_alloc_ops (numa, ops, n_left_from);
   if (ret)
-    {
-      vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
-				   ESP_DECRYPT_ERROR_DISCARD, 1);
-      /* Discard whole frame */
-      return n_left_from;
-    }
+  {
+    vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
+			   ESP_DECRYPT_ERROR_DISCARD, 1);
+    /* Discard whole frame */
+    return n_left_from;
+  }
 
   next_index = ESP_DECRYPT_NEXT_DROP;
 
@@ -131,7 +130,6 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 
       while (n_left_from > 0 && n_left_to_next > 0)
 	{
-	  clib_error_t *error;
 	  u32 bi0, sa_index0, seq, iv_size;
 	  u8 trunc_size;
 	  vlib_buffer_t *b0;
@@ -170,51 +168,45 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 
 	  dpdk_op_priv_t *priv = crypto_op_get_priv (op);
 
-	  u16 op_len =
-	    sizeof (op[0]) + sizeof (op[0].sym[0]) + sizeof (priv[0]);
+	  u16 op_len = sizeof (op[0]) + sizeof (op[0].sym[0]) + sizeof (priv[0]);
+		
 	  CLIB_PREFETCH (op, op_len, STORE);
 
 	  sa_index0 = vnet_buffer(b0)->ipsec.sad_index;
 
-	  if (sa_index0 != last_sa_index)
-	    {
-	      sa0 = pool_elt_at_index (im->sad, sa_index0);
+    sa0 = pool_elt_at_index (im->sad, sa_index0);
+		cs0 = crypto_session_from_sa_index (dcm, sa_index0);			
 
-	      cipher_alg = vec_elt_at_index (dcm->cipher_algs, sa0->crypto_alg);
-	      auth_alg = vec_elt_at_index (dcm->auth_algs, sa0->integ_alg);
-
-	      is_aead = (cipher_alg->type == RTE_CRYPTO_SYM_XFORM_AEAD);
-	      if (is_aead)
-		auth_alg = cipher_alg;
-
-	      res_idx = get_resource (cwm, sa0);
-
-	      if (PREDICT_FALSE (res_idx == (u16) ~0))
+		res_idx = crypto_get_resource (cwm, sa0);
+    if (PREDICT_FALSE (res_idx == (u16) ~ 0))
 		{
 		  clib_warning ("unsupported SA by thread index %u", thread_idx);
-		  vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
+		  vlib_node_increment_counter (vm,
+					       dpdk_esp_decrypt_node.index,
 					       ESP_DECRYPT_ERROR_NOSUP, 1);
 		  to_next[0] = bi0;
 		  to_next += 1;
 		  n_left_to_next -= 1;
 		  goto trace;
 		}
-	      res = vec_elt_at_index (dcm->resource, res_idx);
+			
+		res = vec_elt_at_index (dcm->resource, res_idx);
 
-	      error = crypto_get_session (&session, sa_index0, res, cwm, 0);
-	      if (PREDICT_FALSE (error || !session))
+		if (PREDICT_FALSE (cs0->session == NULL))
 		{
-		  clib_warning ("failed to get crypto session");
-		  vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
-					       ESP_DECRYPT_ERROR_SESSION, 1);
-		  to_next[0] = bi0;
-		  to_next += 1;
-		  n_left_to_next -= 1;
-		  goto trace;
+      ret = crypto_make_session (cs0, sa0, res, cwm, 0);
+      if (PREDICT_FALSE (!ret))
+			{
+			  clib_warning ("failed to create crypto session");
+			  vlib_node_increment_counter (vm,
+						       dpdk_esp_decrypt_node.index,
+						       ESP_DECRYPT_ERROR_SESSION, 1);
+			  to_next[0] = bi0;
+			  to_next += 1;
+			  n_left_to_next -= 1;
+			  goto trace;
+			}
 		}
-
-	      last_sa_index = sa_index0;
-	    }
 
 	  /* anti-replay check */
 	  if (sa0->use_anti_replay)
@@ -254,8 +246,8 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	  mb0->pkt_len = b0->current_length;
 	  mb0->data_off = RTE_PKTMBUF_HEADROOM + b0->current_data;
 
-	  trunc_size = auth_alg->trunc_size;
-	  iv_size = cipher_alg->iv_len;
+	  trunc_size = cs0->auth_alg->trunc_size;
+	  iv_size = cs0->cipher_alg->iv_len;
 
 	  /* Outer IP header has already been stripped */
 	  u16 payload_len =
@@ -263,10 +255,9 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 
 	  ASSERT (payload_len >= 4);
 
-	  if (payload_len & (cipher_alg->boundary - 1))
+	  if (payload_len & (cs0->cipher_alg->boundary - 1))
 	    {
-	      clib_warning ("payload %u not multiple of %d\n",
-			    payload_len, cipher_alg->boundary);
+	      clib_warning ("payload %u not multiple of %d\n", payload_len, cs0->cipher_alg->boundary);
 	      vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
 					   ESP_DECRYPT_ERROR_BAD_LEN, 1);
 	      res->n_ops -= 1;
@@ -291,9 +282,9 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	  u64 digest_paddr =
 	    mb0->buf_physaddr + digest - ((u8 *) mb0->buf_addr);
 
-	  if (!is_aead && (cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC 
-				|| cipher_alg->alg == RTE_CRYPTO_CIPHER_DES_CBC
-				|| cipher_alg->alg == RTE_CRYPTO_CIPHER_3DES_CBC))
+	  if (!cs0->is_aead && (cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC 
+				|| cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_DES_CBC
+				|| cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_3DES_CBC))
 	    clib_memcpy(icb, iv, iv_size);
 	  else /* CTR/GCM */
 	    {
@@ -302,7 +293,7 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	      crypto_set_icb (icb, sa0->salt, _iv[0], _iv[1]);
 	    }
 
-          if (is_aead)
+          if (cs0->is_aead)
             {
               aad = priv->aad;
 	      u32 * _aad = (u32 *) aad;
@@ -331,7 +322,7 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
                 }
             }
 
-	  crypto_op_setup (is_aead, mb0, op, session, cipher_off, cipher_len,
+	  crypto_op_setup (cs0->is_aead, mb0, op, cs0->session, cipher_off, cipher_len,
 			   0, auth_len, aad, digest, digest_paddr);
 trace:
 	  if (PREDICT_FALSE(b0->flags & VLIB_BUFFER_IS_TRACED))
