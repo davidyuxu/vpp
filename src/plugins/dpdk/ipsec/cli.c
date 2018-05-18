@@ -184,8 +184,8 @@ format_crypto_worker (u8 * s, va_list * args)
     {
       ind = "  ";
       res = vec_elt_at_index (dcm->resource, res_idx[0]);
-      s = format (s, "%s%-20s dev-id %2u inbound-queue %2u outbound-queue %2u\n",
-		  ind, vec_elt_at_index (dcm->dev, res->dev_id)->name,
+      s = format (s, "%s%-20s res-idx %3u dev-id %2u inbound-queue %2u outbound-queue %2u\n",
+		  ind, vec_elt_at_index (dcm->dev, res->dev_id)->name, res_idx[0],
 		  res->dev_id, res->qp_id, res->qp_id + 1);
 
       ind = "    ";
