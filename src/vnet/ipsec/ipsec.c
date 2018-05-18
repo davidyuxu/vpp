@@ -633,6 +633,8 @@ ipsec_init (vlib_main_t * vm)
 
   ipsec_proto_init ();
 
+	im->debug_fformat = 1;
+
   if ((error = ikev2_init (vm)))
     return error;
 
