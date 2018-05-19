@@ -420,7 +420,6 @@ ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add,
   ipsec_sa_t *sa = 0;
   uword *p;
   u32 sa_index;
-  clib_error_t *err;
 
   clib_warning ("id %u spi %u", new_sa->id, new_sa->spi);
 
@@ -431,40 +430,34 @@ ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add,
     return VNET_API_ERROR_SYSCALL_ERROR_1;
 
   if (!is_add)			/* delete */
-    {
-      sa_index = p[0];
-      sa = pool_elt_at_index (im->sad, sa_index);
-      if (ipsec_is_sa_used (sa_index))
-	{
-	  clib_warning ("sa_id %u used in policy", sa->id);
-	  return VNET_API_ERROR_SYSCALL_ERROR_1;	/* sa used in policy */
-	}
-      hash_unset (im->sa_index_by_sa_id, sa->id);
-      if (im->cb.add_del_sa_sess_cb)
-	{
-	  err = im->cb.add_del_sa_sess_cb (sa_index, 0);
-	  if (err)
-	    return VNET_API_ERROR_SYSCALL_ERROR_1;
-	}
-			ipsec_delete_sa_contexts (sa);
-      pool_put (im->sad, sa);
-    }
-  else				/* create new SA */
-    {
-      pool_get (im->sad, sa);
-      clib_memcpy (sa, new_sa, sizeof (*sa));
-			ipsec_create_sa_contexts (sa);
-			
-      sa_index = sa - im->sad;
-      sa->udp_encap = udp_encap ? 1 : 0;
-      hash_set (im->sa_index_by_sa_id, sa->id, sa_index);
-      if (im->cb.add_del_sa_sess_cb)
-	{
-	  err = im->cb.add_del_sa_sess_cb (sa_index, 1);
-	  if (err)
-	    return VNET_API_ERROR_SYSCALL_ERROR_1;
-	}
-    }
+  {
+    sa_index = p[0];
+    sa = pool_elt_at_index (im->sad, sa_index);
+    if (ipsec_is_sa_used (sa_index))
+		{
+		  clib_warning ("sa_id %u used in policy", sa->id);
+		  return VNET_API_ERROR_SYSCALL_ERROR_1;	/* sa used in policy */
+		}
+    hash_unset (im->sa_index_by_sa_id, sa->id);
+
+    if (im->cb.add_del_sa_sess_cb)
+		  im->cb.add_del_sa_sess_cb (sa_index, 0);
+
+		ipsec_delete_sa_contexts (sa);
+    pool_put (im->sad, sa);
+  }
+	else				/* create new SA */
+  {
+    pool_get (im->sad, sa);
+    sa_index = sa - im->sad;
+		
+    clib_memcpy (sa, new_sa, sizeof (*sa));
+		ipsec_create_sa_contexts (sa);
+    if (im->cb.add_del_sa_sess_cb)
+			im->cb.add_del_sa_sess_cb (sa_index, 1);
+		
+    hash_set (im->sa_index_by_sa_id, sa->id, sa_index);
+  }
   return 0;
 }
 

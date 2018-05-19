@@ -18,6 +18,21 @@
 #include <dpdk/ipsec/ipsec.h>
 
 static u8 *
+format_crypto_resource (u8 * s, va_list * args)
+{
+  dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
+	
+	u32 indent = va_arg (*args, u32);
+	u32 res_idx = va_arg (*args, u32);
+
+  crypto_resource_t *res = vec_elt_at_index (dcm->resource ,res_idx);
+	
+  s = format (s, "%U numa %2u thr_id %3d qp %2u/%-2u remove=%1u:\n", format_white_space, indent, res->numa, (i16)res->thread_idx, res->qp_id, res->qp_id + 1, res->remove);  
+
+  return s;
+}
+
+static u8 *
 format_crypto (u8 * s, va_list * args)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
@@ -30,8 +45,6 @@ format_crypto (u8 * s, va_list * args)
   s = format (s, "%-25s%-20s%-10s\n", dev->name, drv->name,
 	      rte_cryptodevs[dev->id].data->dev_started ? "up" : "down");
   s = format (s, "  id %u drv_id %u numa_node %u, max_queues %u, max_nb_sessions %u, max_nb_sessions_per_qp %u \n", dev->id, dev->drv_id, dev->numa, dev->max_qp, dev->max_nb_sessions, dev->max_nb_sessions_per_qp);
-  s = format (s, "  free_resources %u, used_resources %u\n",
-	      vec_len (dev->free_resources), vec_len (dev->used_resources));
 
   if (dev->features)
     {
@@ -74,6 +87,26 @@ format_crypto (u8 * s, va_list * args)
 
   s = format (s, "  enqueue %-10lu dequeue %-10lu enqueue_err %-10lu dequeue_err %-10lu \n", 
 							stats.enqueued_count, stats.dequeued_count, stats.enqueue_err_count, stats.dequeue_err_count);
+
+  /* *INDENT-OFF* */
+	u16 *res_idx;
+  s = format (s, "  free_resources %u : ", vec_len (dev->free_resources));
+
+	u32 indent = format_get_indent (s);
+
+  s = format (s, "\n");
+
+  vec_foreach (res_idx, dev->free_resources)
+    format (s, "%U", format_crypto_resource, indent, res_idx[0]);
+
+  s = format (s, "  used_resources %u : ", vec_len (dev->used_resources));
+	indent = format_get_indent (s);
+
+  s = format (s, "\n");
+
+  vec_foreach (res_idx, dev->used_resources)
+    format (s, "%U", format_crypto_resource, indent, res_idx[0]);
+  /* *INDENT-ON* */
 
   s = format (s, "\n");
 

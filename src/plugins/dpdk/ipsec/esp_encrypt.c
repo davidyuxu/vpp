@@ -204,7 +204,7 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 		res_idx = crypto_get_resource (cwm, sa0);
     if (PREDICT_FALSE (res_idx == (u16) ~ 0))
 		{
-		  clib_warning ("No resource for thread %u", thread_idx);
+		  //clib_warning ("No resource for thread %u", thread_idx);
 		  vlib_node_increment_counter (vm,
 					       dpdk_esp_encrypt_node.index,
 					       ESP_ENCRYPT_ERROR_NOSUP, 1);
@@ -221,7 +221,7 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
       ret = crypto_make_session (cs0, sa0, res, cwm, 1);
       if (PREDICT_FALSE (!ret))
 			{
-			  clib_warning ("failed to create crypto session");
+			  //clib_warning ("failed to create crypto session");
 			  vlib_node_increment_counter (vm,
 						       dpdk_esp_encrypt_node.index,
 						       ESP_ENCRYPT_ERROR_SESSION, 1);
@@ -234,7 +234,7 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 
 	  if (PREDICT_FALSE (esp_seq_advance (sa0)))
 	    {
-	      clib_warning ("sequence number counter has cycled SPI %u", sa0->spi);
+	      //clib_warning ("sequence number counter has cycled SPI %u", sa0->spi);
 	      vlib_node_increment_counter (vm, dpdk_esp_encrypt_node.index,
 					   ESP_ENCRYPT_ERROR_SEQ_CYCLED, 1);
 	      //TODO: rekey SA

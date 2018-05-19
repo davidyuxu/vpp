@@ -180,7 +180,7 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 		res_idx = crypto_get_resource (cwm, sa0);
     if (PREDICT_FALSE (res_idx == (u16) ~ 0))
 		{
-		  clib_warning ("unsupported SA by thread index %u", thread_idx);
+		  //clib_warning ("unsupported SA by thread index %u", thread_idx);
 		  vlib_node_increment_counter (vm,
 					       dpdk_esp_decrypt_node.index,
 					       ESP_DECRYPT_ERROR_NOSUP, 1);
@@ -197,7 +197,7 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
       ret = crypto_make_session (cs0, sa0, res, cwm, 0);
       if (PREDICT_FALSE (!ret))
 			{
-			  clib_warning ("failed to create crypto session");
+			  //clib_warning ("failed to create crypto session");
 			  vlib_node_increment_counter (vm,
 						       dpdk_esp_decrypt_node.index,
 						       ESP_DECRYPT_ERROR_SESSION, 1);
@@ -222,7 +222,7 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 
 	      if (PREDICT_FALSE (rv))
 		{
-		  clib_warning ("failed anti-replay check");
+		  //clib_warning ("failed anti-replay check");
 		  vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
 					       ESP_DECRYPT_ERROR_REPLAY, 1);
 		  to_next[0] = bi0;
@@ -257,7 +257,7 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 
 	  if (payload_len & (cs0->cipher_alg->boundary - 1))
 	    {
-	      clib_warning ("payload %u not multiple of %d\n", payload_len, cs0->cipher_alg->boundary);
+	      //clib_warning ("payload %u not multiple of %d\n", payload_len, cs0->cipher_alg->boundary);
 	      vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
 					   ESP_DECRYPT_ERROR_BAD_LEN, 1);
 	      res->n_ops -= 1;
@@ -504,7 +504,7 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 	  const u8 *padding = vlib_buffer_get_tail (b0);
 	  if (PREDICT_FALSE (memcmp (padding, pad_data, f0->pad_length)))
 	    {
-	      clib_warning("bad padding");
+	      //clib_warning("bad padding");
 	      vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
 					   ESP_DECRYPT_ERROR_DECRYPTION_FAILED,
 					   1);
@@ -519,7 +519,7 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 		next0 = ESP_DECRYPT_NEXT_IP6_INPUT;
 	      else
 		{
-		  clib_warning("next header: 0x%x", f0->next_header);
+		  //clib_warning("next header: 0x%x", f0->next_header);
 		  vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
 					       ESP_DECRYPT_ERROR_DECRYPTION_FAILED,
 					       1);
@@ -554,7 +554,7 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 		}
 	      else
 		{
-		  clib_warning("next header: 0x%x", f0->next_header);
+		  //clib_warning("next header: 0x%x", f0->next_header);
 		  vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
 					       ESP_DECRYPT_ERROR_DECRYPTION_FAILED,
 					       1);
