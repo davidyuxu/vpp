@@ -61,27 +61,7 @@ ipsec_admin_up_down_function (vnet_main_t * vnm, u32 hw_if_index, u32 flags)
 
       err = im->cb.check_support_cb (sa);
       if (err)
-	return err;
-
-      if (im->cb.add_del_sa_sess_cb)
-	{
-	  err = im->cb.add_del_sa_sess_cb (t->input_sa_index, 1);
-	  if (err)
-	    return err;
-	}
-
-      sa = pool_elt_at_index (im->sad, t->output_sa_index);
-
-      err = im->cb.check_support_cb (sa);
-      if (err)
-	return err;
-
-      if (im->cb.add_del_sa_sess_cb)
-	{
-	  err = im->cb.add_del_sa_sess_cb (t->output_sa_index, 1);
-	  if (err)
-	    return err;
-	}
+				return err;
 
       vnet_hw_interface_set_flags (vnm, hw_if_index,
 				   VNET_HW_INTERFACE_FLAG_LINK_UP);
@@ -89,24 +69,6 @@ ipsec_admin_up_down_function (vnet_main_t * vnm, u32 hw_if_index, u32 flags)
   else
     {
       vnet_hw_interface_set_flags (vnm, hw_if_index, 0 /* down */ );
-
-      sa = pool_elt_at_index (im->sad, t->input_sa_index);
-
-      if (im->cb.add_del_sa_sess_cb)
-	{
-	  err = im->cb.add_del_sa_sess_cb (t->input_sa_index, 0);
-	  if (err)
-	    return err;
-	}
-
-      sa = pool_elt_at_index (im->sad, t->output_sa_index);
-
-      if (im->cb.add_del_sa_sess_cb)
-	{
-	  err = im->cb.add_del_sa_sess_cb (t->output_sa_index, 0);
-	  if (err)
-	    return err;
-	}
     }
 
   return /* no error */ 0;
@@ -302,6 +264,8 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
 	}
 			/* kingwel, initialize encrypt & hmac context */
 			ipsec_create_sa_contexts (sa);
+			if (im->cb.add_del_sa_sess_cb)
+				im->cb.add_del_sa_sess_cb (t->input_sa_index, 1);
 
       pool_get (im->sad, sa);
       memset (sa, 0, sizeof (*sa));
@@ -328,6 +292,8 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
 	}
 			/* kingwel, initialize encrypt & hmac context */
 			ipsec_create_sa_contexts (sa);
+			if (im->cb.add_del_sa_sess_cb)
+				im->cb.add_del_sa_sess_cb (t->output_sa_index, 1);
 
       hash_set (im->ipsec_if_pool_index_by_key, key,
 		t - im->tunnel_interfaces);
@@ -381,11 +347,15 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       /* delete input and output SA */
       sa = pool_elt_at_index (im->sad, t->input_sa_index);
 			ipsec_delete_sa_contexts (sa);
+			if (im->cb.add_del_sa_sess_cb)
+				im->cb.add_del_sa_sess_cb (t->input_sa_index, 0);
 
       pool_put (im->sad, sa);
 
       sa = pool_elt_at_index (im->sad, t->output_sa_index);
 			ipsec_delete_sa_contexts (sa);
+			if (im->cb.add_del_sa_sess_cb)
+				im->cb.add_del_sa_sess_cb (t->output_sa_index, 0);
 
       pool_put (im->sad, sa);
 
@@ -517,7 +487,7 @@ ipsec_set_interface_key (vnet_main_t * vnm, u32 hw_if_index,
   else
     return VNET_API_ERROR_INVALID_VALUE;
 
-  if (im->cb.update_sa_sess_cb)
+  if (t && im->cb.update_sa_sess_cb)
 	{
 		clib_error_t *e;
 
@@ -604,12 +574,7 @@ ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
     hash_unset (im->sa_index_by_sa_id, old_sa->id);
 
   if (im->cb.add_del_sa_sess_cb)
-  {
-    clib_error_t *err;
-    err = im->cb.add_del_sa_sess_cb (old_sa_index, 0);
-    if (err)
-			return VNET_API_ERROR_SYSCALL_ERROR_1;
-  }
+    im->cb.add_del_sa_sess_cb (old_sa_index, 0);
 
 	ipsec_delete_sa_contexts (old_sa);
 
