@@ -27,7 +27,7 @@ format_crypto_resource (u8 * s, va_list * args)
 
   crypto_resource_t *res = vec_elt_at_index (dcm->resource ,res_idx);
 	
-  s = format (s, "%U numa %2u thr_id %3d qp %2u/%-2u remove=%1u:\n", format_white_space, indent, res->numa, (i16)res->thread_idx, res->qp_id, res->qp_id + 1, res->remove);  
+  s = format (s, "%U numa %2u thr_id %3d qp %2u/%-2u inflight %2u/%-2u\n", format_white_space, indent, res->numa, (i16)res->thread_idx, res->qp_id, res->qp_id + 1, res->inflights[0], res->inflights[1]);  
 
   return s;
 }
@@ -90,7 +90,7 @@ format_crypto (u8 * s, va_list * args)
 
   /* *INDENT-OFF* */
 	u16 *res_idx;
-  s = format (s, "  free_resources %u : ", vec_len (dev->free_resources));
+  s = format (s, "  free_resources %u :", vec_len (dev->free_resources));
 
 	u32 indent = format_get_indent (s);
 
@@ -99,7 +99,7 @@ format_crypto (u8 * s, va_list * args)
   vec_foreach (res_idx, dev->free_resources)
     format (s, "%U", format_crypto_resource, indent, res_idx[0]);
 
-  s = format (s, "  used_resources %u : ", vec_len (dev->used_resources));
+  s = format (s, "  used_resources %u :", vec_len (dev->used_resources));
 	indent = format_get_indent (s);
 
   s = format (s, "\n");
@@ -612,6 +612,8 @@ show_dpdk_crypto_pools_fn (vlib_main_t * vm,
       vlib_cli_output (vm, "%U\n", format_dpdk_mempool, data->session_h);
     if (data->session_drv)
       vlib_cli_output (vm, "%U\n", format_dpdk_mempool, data->session_drv);
+
+		vlib_cli_output (vm, " sess-fail %10u drv-fail %10u\n", data->session_h_failed, data->session_drv_failed);
   }
   /* *INDENT-ON* */
 

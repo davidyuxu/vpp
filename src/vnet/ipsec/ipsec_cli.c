@@ -72,7 +72,6 @@ ipsec_sa_add_del_command_fn (vlib_main_t * vm,
 			     unformat_input_t * input,
 			     vlib_cli_command_t * cmd)
 {
-  ipsec_main_t *im = &ipsec_main;
   unformat_input_t _line_input, *line_input = &_line_input;
   ipsec_sa_t sa;
   int is_add = ~0;
@@ -167,14 +166,6 @@ ipsec_sa_add_del_command_fn (vlib_main_t * vm,
 
   if (ik)
     strncpy ((char *) sa.integ_key, (char *) ik, sa.integ_key_len);
-
-  if (is_add)
-    {
-      ASSERT (im->cb.check_support_cb);
-      error = im->cb.check_support_cb (&sa);
-      if (error)
-	goto done;
-    }
 
   ipsec_add_del_sa (vm, &sa, is_add);
 

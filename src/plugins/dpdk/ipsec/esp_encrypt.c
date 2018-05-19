@@ -186,14 +186,11 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	  CLIB_PREFETCH (mb0, CLIB_CACHE_LINE_BYTES, STORE);
 
 	  op = ops[0];
-	  ops += 1;
 	  ASSERT (op->status == RTE_CRYPTO_OP_STATUS_NOT_PROCESSED);
 
 	  dpdk_op_priv_t *priv = crypto_op_get_priv (op);
 
-	  u16 op_len =
-	    sizeof (op[0]) + sizeof (op[0].sym[0]) + sizeof (priv[0]);
-	  CLIB_PREFETCH (op, op_len, STORE);
+	  CLIB_PREFETCH (op, crypto_op_len(), STORE);
 
 	  sa_index0 = vnet_buffer (b0)->ipsec.sad_index;
 
@@ -201,7 +198,7 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 		cs0 = crypto_session_from_sa_index (dcm, sa_index0);				
 
 		/* figure out res_idx to use */
-		res_idx = crypto_get_resource (cwm, sa0);
+		res_idx = crypto_get_resource (cwm, sa0, cs0);
     if (PREDICT_FALSE (res_idx == (u16) ~ 0))
 		{
 		  //clib_warning ("No resource for thread %u", thread_idx);
@@ -233,25 +230,21 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 		}
 
 	  if (PREDICT_FALSE (esp_seq_advance (sa0)))
-	    {
-	      //clib_warning ("sequence number counter has cycled SPI %u", sa0->spi);
-	      vlib_node_increment_counter (vm, dpdk_esp_encrypt_node.index,
-					   ESP_ENCRYPT_ERROR_SEQ_CYCLED, 1);
-	      //TODO: rekey SA
-	      to_next[0] = bi0;
-	      to_next += 1;
-	      n_left_to_next -= 1;
-	      goto trace;
-	    }
+    {
+      //clib_warning ("sequence number counter has cycled SPI %u", sa0->spi);
+      vlib_node_increment_counter (vm, dpdk_esp_encrypt_node.index,
+				   ESP_ENCRYPT_ERROR_SEQ_CYCLED, 1);
+      //TODO: rekey SA
+      to_next[0] = bi0;
+      to_next += 1;
+      n_left_to_next -= 1;
+      goto trace;
+    }
 
 	  orig_sz = b0->current_length;
 
 	  /* TODO multi-seg support - total_length_not_including_first_buffer */
 	  sa0->total_data_size += b0->current_length;
-
-	  res->ops[res->n_ops] = op;
-	  res->bi[res->n_ops] = bi0;
-	  res->n_ops += 1;
 
 	  is_ipv6 = (ih0->ip4.ip_version_and_header_length & 0xF0) == 0x60;
 
@@ -417,53 +410,58 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	  if (!cs0->is_aead && (cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC 
 				|| cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_DES_CBC 
 				|| cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_3DES_CBC))
-	    {
-	    	RAND_bytes ((void *) &priv->cb, iv_size);
+    {
+    	RAND_bytes ((void *) &priv->cb, iv_size);
 
-	    	u8 *esp_iv = (u8 *) (esp0 + 1);
-				clib_memcpy (esp_iv, &priv->cb, iv_size);
-				
-	      cipher_off = sizeof (esp_header_t) + iv_size;
-	      cipher_len = pad_payload_len;
-	    }
+    	u8 *esp_iv = (u8 *) (esp0 + 1);
+			clib_memcpy (esp_iv, &priv->cb, iv_size);
+			
+      cipher_off = sizeof (esp_header_t) + iv_size;
+      cipher_len = pad_payload_len;
+    }
 	  else			/* CTR/GCM */
-	    {			
-				crypto_set_icb (&priv->cb, sa0->salt, sa0->seq, sa0->seq_hi);
+    {			
+			crypto_set_icb (&priv->cb, sa0->salt, sa0->seq, sa0->seq_hi);
 
-	      u32 *esp_iv = (u32 *) (esp0 + 1);
+      u32 *esp_iv = (u32 *) (esp0 + 1);
 
-				clib_memcpy (esp_iv, &priv->cb.iv, iv_size);
+			clib_memcpy (esp_iv, &priv->cb.iv, iv_size);
 
-	      cipher_off = sizeof (esp_header_t) + iv_size;
-	      cipher_len = pad_payload_len;
-	    }
+      cipher_off = sizeof (esp_header_t) + iv_size;
+      cipher_len = pad_payload_len;
+    }
 
 	  if (cs0->is_aead)
-	    {
-	      aad = (u32 *) priv->aad;
-	      aad[0] = clib_host_to_net_u32 (sa0->spi);
-	      aad[1] = clib_host_to_net_u32 (sa0->seq);
+    {
+      aad = (u32 *) priv->aad;
+      aad[0] = clib_host_to_net_u32 (sa0->spi);
+      aad[1] = clib_host_to_net_u32 (sa0->seq);
 
-	      /* aad[3] should always be 0 */
-	      if (PREDICT_FALSE (sa0->use_esn))
-		aad[2] = clib_host_to_net_u32 (sa0->seq_hi);
-	      else
-		aad[2] = 0;
-	    }
+      /* aad[3] should always be 0 */
+      if (PREDICT_FALSE (sa0->use_esn))
+				aad[2] = clib_host_to_net_u32 (sa0->seq_hi);
+      else
+				aad[2] = 0;
+    }
 	  else
-	    {
-	      auth_len =
-		vlib_buffer_get_tail (b0) - ((u8 *) esp0) - trunc_size;
-	      if (sa0->use_esn)
-		{
-		  u32 *_digest = (u32 *) digest;
-		  _digest[0] = clib_host_to_net_u32 (sa0->seq_hi);
-		  auth_len += 4;
-		}
-	    }
+    {
+      auth_len = vlib_buffer_get_tail (b0) - ((u8 *) esp0) - trunc_size;
+      if (sa0->use_esn)
+			{
+			  u32 *_digest = (u32 *) digest;
+			  _digest[0] = clib_host_to_net_u32 (sa0->seq_hi);
+			  auth_len += 4;
+			}
+    }
 
 	  crypto_op_setup (cs0->is_aead, mb0, op, cs0->session, cipher_off, cipher_len,
 			   0, auth_len, (u8 *) aad, digest, digest_paddr);
+
+		/* op done, put it into resource queue */
+		res->ops[res->n_ops] = op;
+		res->bi[res->n_ops] = bi0;
+		res->n_ops += 1;
+		ops += 1;
 
 #ifdef IPSEC_DEBUG_OUTPUT
 		if (PREDICT_FALSE (im->debug_fformat))
@@ -485,13 +483,12 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	}
       vlib_put_next_frame (vm, node, next_index, n_left_to_next);
     }
-  vlib_node_increment_counter (vm, dpdk_esp_encrypt_node.index,
-			       ESP_ENCRYPT_ERROR_RX_PKTS,
-			       from_frame->n_vectors);
 
-  crypto_enqueue_ops (vm, cwm, 1, dpdk_esp_encrypt_node.index,
-		      ESP_ENCRYPT_ERROR_ENQ_FAIL, numa);
+  vlib_node_increment_counter (vm, dpdk_esp_encrypt_node.index, ESP_ENCRYPT_ERROR_RX_PKTS, from_frame->n_vectors);
 
+  crypto_enqueue_ops (vm, cwm, 1, dpdk_esp_encrypt_node.index, ESP_ENCRYPT_ERROR_ENQ_FAIL, numa);
+
+	/* free all unused ops */
   crypto_free_ops (numa, ops, cwm->ops + from_frame->n_vectors - ops);
 
   return from_frame->n_vectors;

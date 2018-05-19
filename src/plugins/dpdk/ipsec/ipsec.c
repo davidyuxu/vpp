@@ -369,20 +369,22 @@ crypto_make_session (crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * r
 		}
   }
 
-	cs->session = rte_cryptodev_sym_session_create (data->session_h);
-
-	if (!cs->session)
+	struct rte_cryptodev_sym_session *s = rte_cryptodev_sym_session_create (data->session_h);
+	if (!s)
 	{
 	  data->session_h_failed += 1;
 	  return 0;
 	}
 
-  i32 ret = rte_cryptodev_sym_session_init (res->dev_id, cs->session, xfs, data->session_drv);
+  i32 ret = rte_cryptodev_sym_session_init (res->dev_id, s, xfs, data->session_drv);
   if (ret)
   {
+	  rte_cryptodev_sym_session_free (s);
     data->session_drv_failed += 1;
     return 0;
   }
+
+	cs->session = s;
 
   return 1;
 }
@@ -391,7 +393,7 @@ static clib_error_t *
 dpdk_crypto_session_disposal (u64 ts)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
-  crypto_session_disposal_t *s;
+  crypto_session_disposal_t *s = 0;
   i32 ret;
 
   /* *INDENT-OFF* */
@@ -406,18 +408,42 @@ dpdk_crypto_session_disposal (u64 ts)
 		{
 			/* first clear driver based session private data */
 			ret = rte_cryptodev_sym_session_clear (index, s->session);
-			ASSERT (!ret);
 		}
 
     ret = rte_cryptodev_sym_session_free (s->session);
+
+		clib_warning ("free session %p rv=%d", s->session, ret);
+		
     ASSERT (!ret);
   }
   /* *INDENT-ON* */
 
-  if (s < vec_end (dcm->session_disposal))
+  if (s && s <= vec_end (dcm->session_disposal))
     vec_delete (dcm->session_disposal, s - dcm->session_disposal, 0);
 
   return 0;
+}
+
+static void 
+dpdk_crypto_defer_clear_session (struct rte_cryptodev_sym_session *session)
+{
+  dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
+
+	/* defer to remove all */
+  u64 ts = unix_time_now_nsec ();
+  dpdk_crypto_session_disposal (ts);
+
+	if (!session)
+		return;
+
+	/* add to disposal queue */
+  crypto_session_disposal_t sd;
+  sd.ts = ts;
+  sd.session = session;
+
+  vec_add1 (dcm->session_disposal, sd);
+	
+	clib_warning ("add session %p to disposal list", session);
 }
 
 static clib_error_t *
@@ -463,15 +489,7 @@ add_del_sa_session (u32 sa_index, u8 is_add)
 
 	session = pool_elt_at_index (dcm->sa_session, cs_index);
 
-	/* defer to remove all */
-  u64 ts = unix_time_now_nsec ();
-  dpdk_crypto_session_disposal (ts);
-
-  crypto_session_disposal_t sd;
-  sd.ts = ts;
-  sd.session = session->session;
-
-  vec_add1 (dcm->session_disposal, sd);
+	dpdk_crypto_defer_clear_session (session->session);
 
 	/* return it back to pool */
 	pool_put (dcm->sa_session, session);
@@ -503,22 +521,14 @@ update_sa_session (u32 sa_index)
 	if (session->is_aead)
 		session->auth_alg = session->cipher_alg;
 
-	/* clear rte_session, then it will be re-created by workers */
-	u64 ts = unix_time_now_nsec ();
-	dpdk_crypto_session_disposal (ts);
-	
-	crypto_session_disposal_t sd;
-	sd.ts = ts;
-	sd.session = session->session;
-	
-	vec_add1 (dcm->session_disposal, sd);
-	
+	dpdk_crypto_defer_clear_session (session->session);
+
 	session->session = NULL;
 
 	return 0;
 }
 
-
+#if 0
 static clib_error_t *
 dpdk_ipsec_check_support (ipsec_sa_t * sa)
 {
@@ -550,6 +560,7 @@ dpdk_ipsec_check_support (ipsec_sa_t * sa)
 			      format_ipsec_integ_alg, sa->integ_alg);
   return NULL;
 }
+#endif
 
 static void
 crypto_parse_capabilities (crypto_dev_t * dev,
@@ -1057,7 +1068,6 @@ dpdk_ipsec_process (vlib_main_t * vm, vlib_node_runtime_t * rt,
   im->esp_decrypt_next_index =
     vlib_node_add_next (vm, node->index, next_node->index);
 
-  im->cb.check_support_cb = dpdk_ipsec_check_support;
   im->cb.add_del_sa_sess_cb = add_del_sa_session;
   im->cb.update_sa_sess_cb = update_sa_session;
 
