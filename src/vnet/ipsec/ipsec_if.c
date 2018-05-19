@@ -47,32 +47,14 @@ dummy_interface_tx (vlib_main_t * vm,
 static clib_error_t *
 ipsec_admin_up_down_function (vnet_main_t * vnm, u32 hw_if_index, u32 flags)
 {
-  ipsec_main_t *im = &ipsec_main;
-  clib_error_t *err = 0;
-  ipsec_tunnel_if_t *t;
-  vnet_hw_interface_t *hi;
-  ipsec_sa_t *sa;
-
-  hi = vnet_get_hw_interface (vnm, hw_if_index);
-  t = pool_elt_at_index (im->tunnel_interfaces, hi->hw_instance);
-
   if (flags & VNET_SW_INTERFACE_FLAG_ADMIN_UP)
-    {
-      ASSERT (im->cb.check_support_cb);
-
-      sa = pool_elt_at_index (im->sad, t->input_sa_index);
-
-      err = im->cb.check_support_cb (sa);
-      if (err)
-				return err;
-
-      vnet_hw_interface_set_flags (vnm, hw_if_index,
-				   VNET_HW_INTERFACE_FLAG_LINK_UP);
-    }
+  {
+    vnet_hw_interface_set_flags (vnm, hw_if_index, VNET_HW_INTERFACE_FLAG_LINK_UP);
+  }
   else
-    {
-      vnet_hw_interface_set_flags (vnm, hw_if_index, 0 /* down */ );
-    }
+  {
+    vnet_hw_interface_set_flags (vnm, hw_if_index, 0 /* down */ );
+  }
 
   return /* no error */ 0;
 }

@@ -292,7 +292,6 @@ typedef struct
 typedef struct
 {
   clib_error_t *(*add_del_sa_sess_cb) (u32 sa_index, u8 is_add);
-  clib_error_t *(*check_support_cb) (ipsec_sa_t * sa);
   clib_error_t *(*update_sa_sess_cb) (u32 sa_index);
 } ipsec_main_callbacks_t;
 

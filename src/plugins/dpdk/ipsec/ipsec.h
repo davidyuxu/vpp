@@ -145,7 +145,6 @@ typedef struct
   struct rte_mempool *crypto_op;
   struct rte_mempool *session_h;
   struct rte_mempool *session_drv;
-  u64 crypto_op_get_failed;
   u64 session_h_failed;
   u64 session_drv_failed;
 } crypto_data_t;
@@ -155,11 +154,9 @@ typedef struct
 	crypto_alg_t *cipher_alg;
 	crypto_alg_t *auth_alg;	
 	struct rte_cryptodev_sym_session *session;
-
-	u8 is_aead;
-
 	u32 index;
 	u32 sa_index;
+	u8 is_aead;
 } crypto_session_t;
 
 typedef struct
@@ -187,13 +184,14 @@ static const u8 pad_data[] =
 
 void crypto_auto_placement (void);
 
+i32 crypto_make_session (crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * res, crypto_worker_main_t * cwm, u8 is_outbound);
+
 
 static_always_inline u32
 crypto_op_len (void)
 {
-  const u32 align = 4;
-  u32 op_size =
-    sizeof (struct rte_crypto_op) + sizeof (struct rte_crypto_sym_op);
+  const u32 align = 16;
+  u32 op_size = sizeof (struct rte_crypto_op) + sizeof (struct rte_crypto_sym_op);
 
   return ((op_size + align - 1) & ~(align - 1)) + sizeof (dpdk_op_priv_t);
 }
@@ -216,29 +214,16 @@ crypto_op_get_priv (struct rte_crypto_op * op)
   return (dpdk_op_priv_t *) (((u8 *) op) + crypto_op_get_priv_offset ());
 }
 
-i32 crypto_make_session (crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * res, crypto_worker_main_t * cwm, u8 is_outbound);
-
-
 static_always_inline u16
-crypto_get_resource (crypto_worker_main_t * cwm, ipsec_sa_t * sa)
+crypto_get_resource (crypto_worker_main_t * cwm, ipsec_sa_t * sa, crypto_session_t * cs)
 {
   u16 cipher_res = cwm->cipher_resource_idx[sa->crypto_alg];
   u16 auth_res = cwm->auth_resource_idx[sa->integ_alg];
-  u8 is_aead;
-
-  /* Not allowed to setup SA with no-aead-cipher/NULL or NULL/NULL */
-
-  is_aead = ((sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_128) ||
-	     (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_192) ||
-	     (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_256));
-
-  if (sa->crypto_alg == IPSEC_CRYPTO_ALG_NONE)
-    return auth_res;
 
   if (cipher_res == auth_res)
     return cipher_res;
 
-  if (is_aead)
+  if (cs->is_aead)
     return cipher_res;
 
   return (u16) ~ 0;
@@ -252,11 +237,6 @@ crypto_alloc_ops (u8 numa, struct rte_crypto_op ** ops, u32 n)
   i32 ret;
 
   ret = rte_mempool_get_bulk (data->crypto_op, (void **) ops, n);
-
-  /* *INDENT-OFF* */
-  data->crypto_op_get_failed += ! !ret;
-  /* *INDENT-ON* */
-
   return ret;
 }
 
@@ -287,20 +267,18 @@ crypto_enqueue_ops (vlib_main_t * vm, crypto_worker_main_t * cwm, u8 outbound,
       res = vec_elt_at_index (dcm->resource, res_idx[0]);
 
       if (!res->n_ops)
-	continue;
+				continue;
 
       enq = rte_cryptodev_enqueue_burst (res->dev_id, res->qp_id + outbound,
 					 res->ops, res->n_ops);
       res->inflights[outbound] += enq;
 
       if (PREDICT_FALSE (enq < res->n_ops))
-	{
-	  crypto_free_ops (numa, &res->ops[enq], res->n_ops - enq);
-	  vlib_buffer_free (vm, &res->bi[enq], res->n_ops - enq);
-
-          vlib_node_increment_counter (vm, node_index, error,
-				       res->n_ops - enq);
-        }
+			{
+			  crypto_free_ops (numa, &res->ops[enq], res->n_ops - enq);
+			  vlib_buffer_free (vm, &res->bi[enq], res->n_ops - enq);
+        vlib_node_increment_counter (vm, node_index, error, res->n_ops - enq);
+      }
       res->n_ops = 0;
     }
   /* *INDENT-ON* */

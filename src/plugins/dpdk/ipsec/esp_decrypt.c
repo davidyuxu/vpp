@@ -163,21 +163,18 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	  CLIB_PREFETCH (mb0, CLIB_CACHE_LINE_BYTES, STORE);
 
 	  op = ops[0];
-	  ops += 1;
 	  ASSERT (op->status == RTE_CRYPTO_OP_STATUS_NOT_PROCESSED);
 
 	  dpdk_op_priv_t *priv = crypto_op_get_priv (op);
 
-	  u16 op_len = sizeof (op[0]) + sizeof (op[0].sym[0]) + sizeof (priv[0]);
-		
-	  CLIB_PREFETCH (op, op_len, STORE);
+	  CLIB_PREFETCH (op, crypto_op_len(), STORE);
 
 	  sa_index0 = vnet_buffer(b0)->ipsec.sad_index;
 
     sa0 = pool_elt_at_index (im->sad, sa_index0);
 		cs0 = crypto_session_from_sa_index (dcm, sa_index0);			
 
-		res_idx = crypto_get_resource (cwm, sa0);
+		res_idx = crypto_get_resource (cwm, sa0, cs0);
     if (PREDICT_FALSE (res_idx == (u16) ~ 0))
 		{
 		  //clib_warning ("unsupported SA by thread index %u", thread_idx);
@@ -210,36 +207,32 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 
 	  /* anti-replay check */
 	  if (sa0->use_anti_replay)
-	    {
-	      int rv = 0;
+    {
+      int rv = 0;
 
-	      seq = clib_net_to_host_u32 (esp0->seq);
+      seq = clib_net_to_host_u32 (esp0->seq);
 
-	      if (PREDICT_TRUE(sa0->use_esn))
-		rv = esp_replay_check_esn (sa0, seq);
-	      else
-		rv = esp_replay_check (sa0, seq);
+      if (PREDICT_TRUE(sa0->use_esn))
+				rv = esp_replay_check_esn (sa0, seq);
+      else
+				rv = esp_replay_check (sa0, seq);
 
-	      if (PREDICT_FALSE (rv))
-		{
-		  //clib_warning ("failed anti-replay check");
-		  vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
-					       ESP_DECRYPT_ERROR_REPLAY, 1);
-		  to_next[0] = bi0;
-		  to_next += 1;
-		  n_left_to_next -= 1;
-		  goto trace;
-		}
-	    }
+      if (PREDICT_FALSE (rv))
+			{
+			  //clib_warning ("failed anti-replay check");
+			  vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
+						       ESP_DECRYPT_ERROR_REPLAY, 1);
+			  to_next[0] = bi0;
+			  to_next += 1;
+			  n_left_to_next -= 1;
+			  goto trace;
+			}
+    }
 
 	  priv->next = DPDK_CRYPTO_INPUT_NEXT_DECRYPT_POST;
 
 	  /* FIXME multi-seg */
 	  sa0->total_data_size += b0->current_length;
-
-	  res->ops[res->n_ops] = op;
-	  res->bi[res->n_ops] = bi0;
-	  res->n_ops += 1;
 
 	  /* Convert vlib buffer to mbuf */
 	  mb0->data_len = b0->current_length;
@@ -250,100 +243,100 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	  iv_size = cs0->cipher_alg->iv_len;
 
 	  /* Outer IP header has already been stripped */
-	  u16 payload_len =
-	    b0->current_length - sizeof (esp_header_t) - iv_size - trunc_size;
+	  u16 payload_len = b0->current_length - sizeof (esp_header_t) - iv_size - trunc_size;
 
 	  ASSERT (payload_len >= 4);
 
 	  if (payload_len & (cs0->cipher_alg->boundary - 1))
-	    {
-	      //clib_warning ("payload %u not multiple of %d\n", payload_len, cs0->cipher_alg->boundary);
-	      vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
-					   ESP_DECRYPT_ERROR_BAD_LEN, 1);
-	      res->n_ops -= 1;
-	      to_next[0] = bi0;
-	      to_next += 1;
-	      n_left_to_next -= 1;
-	      goto trace;
-	    }
+    {
+      //clib_warning ("payload %u not multiple of %d\n", payload_len, cs0->cipher_alg->boundary);
+      vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
+				   ESP_DECRYPT_ERROR_BAD_LEN, 1);
+      res->n_ops -= 1;
+      to_next[0] = bi0;
+      to_next += 1;
+      n_left_to_next -= 1;
+      goto trace;
+    }
 
 	  u32 cipher_off, cipher_len;
 	  u32 auth_len = 0;
 	  u8 *aad = NULL;
+    u8 *iv = (u8 *) (esp0 + 1);
 
-          u8 *iv = (u8 *) (esp0 + 1);
-
-          dpdk_gcm_cnt_blk *icb = &priv->cb;
+    dpdk_gcm_cnt_blk *icb = &priv->cb;
 
 	  cipher_off = sizeof (esp_header_t) + iv_size;
 	  cipher_len = payload_len;
 
-          u8 *digest = vlib_buffer_get_tail (b0) - trunc_size;
-	  u64 digest_paddr =
-	    mb0->buf_physaddr + digest - ((u8 *) mb0->buf_addr);
+		u8 *digest = vlib_buffer_get_tail (b0) - trunc_size;
+	  u64 digest_paddr = mb0->buf_physaddr + digest - ((u8 *) mb0->buf_addr);
 
 	  if (!cs0->is_aead && (cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_AES_CBC 
 				|| cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_DES_CBC
 				|| cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_3DES_CBC))
 	    clib_memcpy(icb, iv, iv_size);
 	  else /* CTR/GCM */
-	    {
-	      u32 *_iv = (u32 *) iv;
+    {
+      u32 *_iv = (u32 *) iv;
+      crypto_set_icb (icb, sa0->salt, _iv[0], _iv[1]);
+    }
 
-	      crypto_set_icb (icb, sa0->salt, _iv[0], _iv[1]);
-	    }
+    if (cs0->is_aead)
+    {
+      aad = priv->aad;
+			u32 * _aad = (u32 *) aad;
+      clib_memcpy (aad, esp0, 8);
 
-          if (cs0->is_aead)
-            {
-              aad = priv->aad;
-	      u32 * _aad = (u32 *) aad;
-              clib_memcpy (aad, esp0, 8);
+			/* _aad[3] should always be 0 */
+      if (PREDICT_FALSE (sa0->use_esn))
+				_aad[2] = clib_host_to_net_u32 (sa0->seq_hi);
+			else
+				_aad[2] = 0;
+    }
+    else
+    {
+			auth_len = sizeof(esp_header_t) + iv_size + payload_len;
 
-	      /* _aad[3] should always be 0 */
-              if (PREDICT_FALSE (sa0->use_esn))
-		_aad[2] = clib_host_to_net_u32 (sa0->seq_hi);
-	      else
-		_aad[2] = 0;
-            }
-          else
-            {
-	      auth_len = sizeof(esp_header_t) + iv_size + payload_len;
+      if (sa0->use_esn)
+      {
+        clib_memcpy (priv->icv, digest, trunc_size);
+				u32 *_digest = (u32 *) digest;
+				_digest[0] = clib_host_to_net_u32 (sa0->seq_hi);
+				auth_len += sizeof(sa0->seq_hi);
+        digest = priv->icv;
+				digest_paddr = op->phys_addr + (uintptr_t) priv->icv - (uintptr_t) op;
+      }
+    }
 
-              if (sa0->use_esn)
-                {
-                  clib_memcpy (priv->icv, digest, trunc_size);
-		  u32 *_digest = (u32 *) digest;
-                  _digest[0] = clib_host_to_net_u32 (sa0->seq_hi);
-		  auth_len += sizeof(sa0->seq_hi);
-
-                  digest = priv->icv;
-		  digest_paddr =
-		    op->phys_addr + (uintptr_t) priv->icv - (uintptr_t) op;
-                }
-            }
-
+		/* setup op */
 	  crypto_op_setup (cs0->is_aead, mb0, op, cs0->session, cipher_off, cipher_len,
 			   0, auth_len, aad, digest, digest_paddr);
+
+		/* enqueue resource */
+		res->ops[res->n_ops] = op;
+		res->bi[res->n_ops] = bi0;
+		res->n_ops += 1;
+		ops += 1;
+		
 trace:
 	  if (PREDICT_FALSE(b0->flags & VLIB_BUFFER_IS_TRACED))
-	    {
-	      esp_decrypt_trace_t *tr = vlib_add_trace (vm, node, b0, sizeof (*tr));
-	      tr->crypto_alg = sa0->crypto_alg;
-	      tr->integ_alg = sa0->integ_alg;
-	      clib_memcpy (tr->packet_data, vlib_buffer_get_current (b0),
-			   sizeof (esp_header_t));
-	    }
+    {
+      esp_decrypt_trace_t *tr = vlib_add_trace (vm, node, b0, sizeof (*tr));
+      tr->crypto_alg = sa0->crypto_alg;
+      tr->integ_alg = sa0->integ_alg;
+      clib_memcpy (tr->packet_data, vlib_buffer_get_current (b0),
+		   sizeof (esp_header_t));
+    }
 	}
       vlib_put_next_frame (vm, node, next_index, n_left_to_next);
     }
 
-  vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
-			       ESP_DECRYPT_ERROR_RX_PKTS,
-			       from_frame->n_vectors);
+  vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index, ESP_DECRYPT_ERROR_RX_PKTS, from_frame->n_vectors);
 
-  crypto_enqueue_ops (vm, cwm, 0, dpdk_esp_decrypt_node.index,
-		      ESP_DECRYPT_ERROR_ENQ_FAIL, numa);
+  crypto_enqueue_ops (vm, cwm, 0, dpdk_esp_decrypt_node.index, ESP_DECRYPT_ERROR_ENQ_FAIL, numa);
 
+	/* free all unused ops */
   crypto_free_ops (numa, ops, cwm->ops + from_frame->n_vectors - ops);
 
   return from_frame->n_vectors;

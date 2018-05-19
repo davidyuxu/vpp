@@ -558,18 +558,6 @@ ipsec_rand_seed (void)
 }
 
 static clib_error_t *
-ipsec_check_support (ipsec_sa_t * sa)
-{
-#if 0 // kingwel
-  if (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_128)
-    return clib_error_return (0, "unsupported aes-gcm-128 crypto-alg");
-  if (sa->integ_alg == IPSEC_INTEG_ALG_NONE)
-    return clib_error_return (0, "unsupported none integ-alg");
-#endif
-  return 0;
-}
-
-static clib_error_t *
 ipsec_init (vlib_main_t * vm)
 {
   clib_error_t *error;
@@ -616,8 +604,6 @@ ipsec_init (vlib_main_t * vm)
   im->ah_encrypt_next_index = IPSEC_OUTPUT_NEXT_AH_ENCRYPT;
   im->ah_decrypt_next_index = IPSEC_INPUT_NEXT_AH_DECRYPT;
 
-  im->cb.check_support_cb = ipsec_check_support;
-
   if ((error = vlib_call_init_function (vm, ipsec_cli_init)))
     return error;
 
@@ -631,9 +617,7 @@ ipsec_init (vlib_main_t * vm)
   if ((error = ikev2_init (vm)))
     return error;
 
-
   im->ipsec_if_pool_index_by_key = hash_create (0, sizeof (uword));
-
   
   if (vm->max_capacity) {
   	pool_init_aligned (im->sad, vm->max_capacity * 2, CLIB_CACHE_LINE_BYTES);
