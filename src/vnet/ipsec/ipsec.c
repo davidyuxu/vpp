@@ -452,7 +452,6 @@ ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add,
   {
     pool_get (im->sad, sa);
     sa_index = sa - im->sad;
-		
     clib_memcpy (sa, new_sa, sizeof (*sa));
 		ipsec_create_sa_contexts (sa);
     if (im->cb.add_del_sa_sess_cb)

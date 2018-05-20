@@ -147,6 +147,10 @@ ipsec_sa_add_del_command_fn (vlib_main_t * vm,
 	  sa.is_tunnel = 1;
 	  sa.is_tunnel_ip6 = 1;
 	}
+			else if (unformat (line_input, "udp-encap"))
+	{
+		sa.udp_encap = 1;
+	}
       else
 	{
 	  error = clib_error_return (0, "parse error: '%U'",
@@ -749,6 +753,8 @@ create_ipsec_tunnel_command_fn (vlib_main_t * vm,
 	num_m_args++;
       else if (unformat (line_input, "instance %u", &a.show_instance))
 	a.renumber = 1;
+			else if (unformat (line_input, "udp-encap"))
+	a.udp_encap = 1;
       else if (unformat (line_input, "del"))
 	a.is_add = 0;
       else

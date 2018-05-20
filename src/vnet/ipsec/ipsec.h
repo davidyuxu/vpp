@@ -212,6 +212,7 @@ typedef struct
 typedef struct
 {
   u8 is_add;
+  u8 udp_encap;
   u8 esn;
   u8 anti_replay;
   ip4_address_t local_ip, remote_ip;

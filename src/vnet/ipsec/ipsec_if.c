@@ -216,6 +216,7 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       sa->tunnel_src_addr.ip4.as_u32 = args->remote_ip.as_u32;
       sa->tunnel_dst_addr.ip4.as_u32 = args->local_ip.as_u32;
       sa->is_tunnel = 1;
+      sa->udp_encap = args->udp_encap;
       sa->use_esn = args->esn;
       sa->use_anti_replay = args->anti_replay;
       sa->integ_alg = args->integ_alg;
@@ -244,6 +245,7 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       sa->tunnel_src_addr.ip4.as_u32 = args->local_ip.as_u32;
       sa->tunnel_dst_addr.ip4.as_u32 = args->remote_ip.as_u32;
       sa->is_tunnel = 1;
+      sa->udp_encap = args->udp_encap;
       sa->use_esn = args->esn;
       sa->use_anti_replay = args->anti_replay;
       sa->integ_alg = args->integ_alg;
@@ -546,7 +548,11 @@ ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
 clib_error_t *
 ipsec_tunnel_if_init (vlib_main_t * vm)
 {
-  //ipsec_main_t *im = &ipsec_main;
+  ipsec_main_t *im = &ipsec_main;
+
+  im->ipsec_if_pool_index_by_key = hash_create (0, sizeof (uword));
+  im->ipsec_if_real_dev_by_show_dev = hash_create (0, sizeof (uword));
+
   return 0;
 }
 
