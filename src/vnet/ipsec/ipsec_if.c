@@ -96,74 +96,60 @@ ipsec_add_del_tunnel_if (ipsec_add_del_tunnel_args_t * args)
   return 0;
 }
 
+
 void
 ipsec_create_sa_contexts (ipsec_sa_t *sa)
 {
   vlib_thread_main_t *tm = vlib_get_thread_main ();
 
 	vec_validate_aligned (sa->context, tm->n_vlib_mains - 1, CLIB_CACHE_LINE_BYTES);
-
-	for (int thread_id = 0; thread_id < tm->n_vlib_mains; thread_id++)
-		{
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-			sa->context[thread_id].hmac_ctx = HMAC_CTX_new ();
-			sa->context[thread_id].cipher_ctx = EVP_CIPHER_CTX_new ();
-#else
-			HMAC_CTX_init (&(sa->context[thread_id].hmac_ctx));
-			EVP_CIPHER_CTX_init (&(sa->context[thread_id].cipher_ctx));
-#endif
-		sa->context[thread_id].cmac_ctx = CMAC_CTX_new ();
-
-		sa->context[thread_id].cipher_initialized = 0;
-		}
+	vec_zero (sa->context);
 
 	ipsec_set_sa_contexts_integ_key (sa);
 	ipsec_set_sa_contexts_crypto_key (sa);
+
+	/* worker will create the ctx when traffix hit */
 }
+
+//sa->context[thread_id].cmac_ctx = CMAC_CTX_new ();
+
+static void
+ipsec_cleanup_sa_contexts (ipsec_sa_t *sa)
+{
+	ipsec_sa_per_thread_data_t *context;
+
+	/* workers will have it initialized if need */
+	vec_foreach (context, sa->context)
+		context->ctx_initialized = 0;
+}
+
 
 void
 ipsec_delete_sa_contexts (ipsec_sa_t *sa)
 {
-  vlib_thread_main_t *tm = vlib_get_thread_main ();
+	ipsec_sa_per_thread_data_t *context;
+	vec_foreach (context, sa->context)
+	{
+		if (!context->ctx_initialized)
+			continue;
+		
+		HMAC_CTX_free (context->hmac_ctx);
+		EVP_CIPHER_CTX_free (context->cipher_ctx);
+		CMAC_CTX_free (context->cmac_ctx);
+	}
 
-	for (int thread_id = 0; thread_id < tm->n_vlib_mains; thread_id++)
-		{
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-			HMAC_CTX_free (sa->context[thread_id].hmac_ctx);
-			EVP_CIPHER_CTX_free (sa->context[thread_id].cipher_ctx);
-#else
-#endif
-		}
 	vec_free (sa->context);
 }
 
 void
 ipsec_set_sa_contexts_integ_key (ipsec_sa_t *sa)
 {
-  vlib_thread_main_t *tm = vlib_get_thread_main ();
-
-	ipsec_proto_main_t *em = &ipsec_proto_main;
-	
-	const EVP_MD *md = em->ipsec_proto_main_integ_algs[sa->integ_alg].md;
-	
-	for (int thread_id = 0; thread_id < tm->n_vlib_mains; thread_id++)
-		{
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-			HMAC_Init_ex (sa->context[thread_id].hmac_ctx, sa->integ_key, sa->integ_key_len, md, NULL);
-#else
-			HMAC_Init_ex (&sa->context[thread_id].hmac_ctx, sa->integ_key, sa->integ_key_len, md, NULL);
-#endif
-			CMAC_Init (sa->context[thread_id].cmac_ctx, sa->integ_key, 16, EVP_aes_128_cbc(), NULL);
-		}
+	ipsec_cleanup_sa_contexts (sa);
 }
 
 void
 ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa)
 {
-  vlib_thread_main_t *tm = vlib_get_thread_main ();
-
-	ipsec_proto_main_t *em = &ipsec_proto_main;
-
 	/* update the salt */
 	switch (sa->crypto_alg)
 	{
@@ -178,25 +164,8 @@ ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa)
 		default:
 			sa->salt = 0;
 	}
-	
-	const EVP_CIPHER *cipher = em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
 
-	for (int thread_id = 0; thread_id < tm->n_vlib_mains; thread_id++)
-		{
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-			EVP_CipherInit_ex (sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, 1);
-
-			EVP_CIPHER_CTX_set_padding(sa->context[thread_id].cipher_ctx, 0);
-
-			//if (set_iv_len)
-				//EVP_CIPHER_CTX_ctrl (sa->context[thread_id].cipher_ctx, EVP_CTRL_GCM_SET_IVLEN, 8, NULL);
-#else
-			EVP_CipherInit_ex (&sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, 1);
-
-			EVP_CIPHER_CTX_set_padding(&sa->context[thread_id].cipher_ctx, 0);
-#endif
-			sa->context[thread_id].cipher_initialized = 0;
-		}
+	ipsec_cleanup_sa_contexts (sa);
 }
 
 

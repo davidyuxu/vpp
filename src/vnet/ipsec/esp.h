@@ -57,37 +57,6 @@ typedef CLIB_PACKED (struct {
 }) ip6_and_esp_header_t;
 /* *INDENT-ON* */
 
-typedef struct
-{
-  const EVP_CIPHER *type;
-  u8 iv_size;
-  u8 block_size;
-} ipsec_proto_main_crypto_alg_t;
-
-typedef struct
-{
-  const EVP_MD *md;
-  u32 mac_size;
-	u32 trunc_size;
-} ipsec_proto_main_integ_alg_t;
-
-typedef struct
-{
-  ipsec_proto_main_crypto_alg_t *ipsec_proto_main_crypto_algs;
-  ipsec_proto_main_integ_alg_t *ipsec_proto_main_integ_algs;
-
-	xoshiro256starstar_t *rand_state;
-
-	struct {
-		CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
-		struct random_data data;		
-		i8 buf[32];
-	} * rand_data;
-	
-} ipsec_proto_main_t;
-
-
-extern ipsec_proto_main_t ipsec_proto_main;
 
 #define ESP_WINDOW_SIZE		(64)
 #define ESP_SEQ_MAX 		(4294967295UL)
@@ -376,19 +345,12 @@ ipsec_proto_init ()
   i->trunc_size = 4;
 }
 
-typedef unsigned int (* MAC_FUNC) (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature);
+typedef void (* MAC_FUNC) (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature);
 
-
-always_inline unsigned int
+always_inline void
 hmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature)
 {
-  ipsec_proto_main_t *em = &ipsec_proto_main;
-
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
   HMAC_CTX *ctx = sa->context[thread_index].hmac_ctx;
-#else
-  HMAC_CTX *ctx = &(sa->context[thread_index].hmac_ctx);
-#endif
 
   unsigned int len;
 
@@ -404,15 +366,11 @@ hmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signa
   HMAC_Final (ctx, signature, &len);
 
 	//fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
-
-  return em->ipsec_proto_main_integ_algs[sa->integ_alg].trunc_size;
 }
 
-always_inline unsigned int
+always_inline void
 cmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature)
 {
-  ipsec_proto_main_t *em = &ipsec_proto_main;
-
   CMAC_CTX *ctx = sa->context[thread_index].cmac_ctx;
 
   size_t len;
@@ -430,8 +388,6 @@ cmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signa
   CMAC_Final (ctx, signature, &len);
 
 	//fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
-
-  return em->ipsec_proto_main_integ_algs[sa->integ_alg].trunc_size;
 }
 
 always_inline void 

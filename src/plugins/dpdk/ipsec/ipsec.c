@@ -500,6 +500,8 @@ add_del_sa_session (u32 sa_index, u8 is_add)
 
 	dpdk_crypto_defer_clear_session (session->sessions);
 
+	vec_free (session->sessions);
+
 	/* return it back to pool */
 	pool_put (dcm->sa_session, session);
 	/* clear sa session */
