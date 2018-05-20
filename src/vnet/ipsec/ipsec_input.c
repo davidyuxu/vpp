@@ -207,6 +207,8 @@ ipsec_input_ip4_node_fn (vlib_main_t * vm,
 	  n_left_to_next -= 1;
 
 	  b0 = vlib_get_buffer (vm, bi0);
+	  b0->flags |= VNET_BUFFER_F_IS_IP4;
+	  b0->flags &= ~VNET_BUFFER_F_IS_IP6;
 	  c0 =
 	    vnet_feature_next_with_data (vnet_buffer (b0)->sw_if_index
 					 [VLIB_RX], &next0, b0,
@@ -216,7 +218,9 @@ ipsec_input_ip4_node_fn (vlib_main_t * vm,
 
 	  ip0 = vlib_buffer_get_current (b0);
 
-	  if (PREDICT_TRUE (ip0->protocol == IP_PROTOCOL_IPSEC_ESP))
+	  if (PREDICT_TRUE
+	      (ip0->protocol == IP_PROTOCOL_IPSEC_ESP
+	       || ip0->protocol == IP_PROTOCOL_UDP))
 	    {
 #if 0
 	      clib_warning
@@ -228,6 +232,13 @@ ipsec_input_ip4_node_fn (vlib_main_t * vm,
 #endif
 
 	      esp0 = (esp_header_t *) ((u8 *) ip0 + ip4_header_bytes (ip0));
+	      if (PREDICT_FALSE (ip0->protocol == IP_PROTOCOL_UDP))
+		{
+		  esp0 =
+		    (esp_header_t *) ((u8 *) esp0 + sizeof (udp_header_t));
+		}
+	      /* FIXME TODO missing check whether there is enough data inside
+	       * IP/UDP to contain ESP header & stuff ? */
 	      p0 = ipsec_input_protect_policy_match (spd0,
 						     clib_net_to_host_u32
 						     (ip0->src_address.
@@ -254,7 +265,8 @@ ipsec_input_ip4_node_fn (vlib_main_t * vm,
 		{
 		  ipsec_input_trace_t *tr =
 		    vlib_add_trace (vm, node, b0, sizeof (*tr));
-		  if (ip0->protocol == IP_PROTOCOL_IPSEC_ESP)
+		  if (ip0->protocol == IP_PROTOCOL_IPSEC_ESP ||
+		      ip0->protocol == IP_PROTOCOL_UDP)
 		    {
 		      if (p0)
 			tr->sa_id = p0->sa_id;
@@ -378,6 +390,8 @@ VLIB_NODE_FUNCTION_MULTIARCH (ipsec_input_ip4_node, ipsec_input_ip4_node_fn)
 	  n_left_to_next -= 1;
 
 	  b0 = vlib_get_buffer (vm, bi0);
+	  b0->flags |= VNET_BUFFER_F_IS_IP6;
+	  b0->flags &= ~VNET_BUFFER_F_IS_IP4;
 	  c0 =
 	    vnet_feature_next_with_data (vnet_buffer (b0)->sw_if_index
 					 [VLIB_RX], &next0, b0,

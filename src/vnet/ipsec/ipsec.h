@@ -182,6 +182,7 @@ typedef struct
 
   u8 is_tunnel;
   u8 is_tunnel_ip6;
+  u8 udp_encap;
   ip46_address_t tunnel_src_addr;
   ip46_address_t tunnel_dst_addr;
 
@@ -211,6 +212,7 @@ typedef struct
 typedef struct
 {
   u8 is_add;
+  u8 udp_encap;
   u8 esn;
   u8 anti_replay;
   ip4_address_t local_ip, remote_ip;
@@ -226,6 +228,8 @@ typedef struct
   u8 local_integ_key[128];
   u8 remote_integ_key_len;
   u8 remote_integ_key[128];
+  u8 renumber;
+  u32 show_instance;
 } ipsec_add_del_tunnel_args_t;
 
 typedef struct
@@ -295,9 +299,12 @@ typedef struct
 
 typedef struct
 {
+  /* Required for pool_get_aligned */
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
   u32 input_sa_index;
   u32 output_sa_index;
   u32 hw_if_index;
+  u32 show_instance;
 } ipsec_tunnel_if_t;
 
 typedef struct
@@ -330,6 +337,7 @@ typedef struct
   uword *spd_index_by_sw_if_index;
   uword *sa_index_by_sa_id;
   uword *ipsec_if_pool_index_by_key;
+  uword *ipsec_if_real_dev_by_show_dev;
 
   /* node indeces */
   u32 error_drop_node_index;

@@ -191,7 +191,7 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
 
   sa.id = ntohl (mp->sad_id);
   sa.spi = ntohl (mp->spi);
-  sa.protocol = mp->protocol;
+  sa.protocol = mp->protocol;	
   /* check for unsupported crypto-alg */
   if (mp->crypto_algorithm < IPSEC_CRYPTO_ALG_NONE ||
       mp->crypto_algorithm >= IPSEC_CRYPTO_N_ALG)
@@ -219,6 +219,7 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
   sa.use_esn = mp->use_extended_sequence_number;
   sa.is_tunnel = mp->is_tunnel;
   sa.is_tunnel_ip6 = mp->is_tunnel_ipv6;
+	sa.udp_encap = mp->udp_encap;
   if (sa.is_tunnel_ip6)
     {
       clib_memcpy (&sa.tunnel_src_addr, mp->tunnel_src_address, 16);
@@ -375,6 +376,8 @@ vl_api_ipsec_tunnel_if_add_del_t_handler (vl_api_ipsec_tunnel_if_add_del_t *
 	  mp->local_integ_key_len);
   memcpy (&tun.remote_integ_key, &mp->remote_integ_key,
 	  mp->remote_integ_key_len);
+  tun.renumber = mp->renumber;
+  tun.show_instance = ntohl (mp->show_instance);
 
   rv = ipsec_add_del_tunnel_if_internal (vnm, &tun, &sw_if_index);
 
@@ -445,6 +448,7 @@ send_ipsec_sa_details (ipsec_sa_t * sa, vl_api_registration_t * reg,
   if (sa->use_anti_replay)
     mp->replay_window = clib_host_to_net_u64 (sa->replay_window);
   mp->total_data_size = clib_host_to_net_u64 (sa->total_data_size);
+  mp->udp_encap = sa->udp_encap;
 
   vl_api_send_msg (reg, (u8 *) mp);
 }

@@ -28,7 +28,10 @@ static u8 *
 format_ipsec_name (u8 * s, va_list * args)
 {
   u32 dev_instance = va_arg (*args, u32);
-  return format (s, "ipsec%d", dev_instance);
+  ipsec_main_t *im = &ipsec_main;
+  ipsec_tunnel_if_t *t = im->tunnel_interfaces + dev_instance;
+
+  return format (s, "ipsec%d", t->show_instance);
 }
 
 #if 0
@@ -177,6 +180,7 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
   u32 hw_if_index = ~0;
   uword *p;
   ipsec_sa_t *sa;
+  u32 dev_instance;
 
   u64 key = (u64) args->remote_ip.as_u32 << 32 | (u64) args->remote_spi;
   p = hash_get (im->ipsec_if_pool_index_by_key, key);
@@ -190,6 +194,21 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       pool_get_aligned (im->tunnel_interfaces, t, CLIB_CACHE_LINE_BYTES);
       memset (t, 0, sizeof (*t));
 
+      dev_instance = t - im->tunnel_interfaces;
+      if (args->renumber)
+	t->show_instance = args->show_instance;
+      else
+	t->show_instance = dev_instance;
+
+      if (hash_get (im->ipsec_if_real_dev_by_show_dev, t->show_instance))
+	{
+	  pool_put (im->tunnel_interfaces, t);
+	  return VNET_API_ERROR_INSTANCE_IN_USE;
+	}
+
+      hash_set (im->ipsec_if_real_dev_by_show_dev, t->show_instance,
+		dev_instance);
+
       pool_get (im->sad, sa);
       memset (sa, 0, sizeof (*sa));
       t->input_sa_index = sa - im->sad;
@@ -197,6 +216,7 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       sa->tunnel_src_addr.ip4.as_u32 = args->remote_ip.as_u32;
       sa->tunnel_dst_addr.ip4.as_u32 = args->local_ip.as_u32;
       sa->is_tunnel = 1;
+      sa->udp_encap = args->udp_encap;
       sa->use_esn = args->esn;
       sa->use_anti_replay = args->anti_replay;
       sa->integ_alg = args->integ_alg;
@@ -225,6 +245,7 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       sa->tunnel_src_addr.ip4.as_u32 = args->local_ip.as_u32;
       sa->tunnel_dst_addr.ip4.as_u32 = args->remote_ip.as_u32;
       sa->is_tunnel = 1;
+      sa->udp_encap = args->udp_encap;
       sa->use_esn = args->esn;
       sa->use_anti_replay = args->anti_replay;
       sa->integ_alg = args->integ_alg;
@@ -249,25 +270,17 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       hash_set (im->ipsec_if_pool_index_by_key, key,
 		t - im->tunnel_interfaces);
 
-      if (vec_len (im->free_tunnel_if_indices) > 0)
-	{
-	  hw_if_index =
-	    im->free_tunnel_if_indices[vec_len (im->free_tunnel_if_indices) -
-				       1];
-	  _vec_len (im->free_tunnel_if_indices) -= 1;
-	}
-      else
-	{
-	  hw_if_index =
-	    vnet_register_interface (vnm, ipsec_device_class.index,
-				     t - im->tunnel_interfaces,
-				     ipsec_hw_class.index,
-				     t - im->tunnel_interfaces);
-	}
+      hw_if_index = vnet_register_interface (vnm, ipsec_device_class.index,
+					     t - im->tunnel_interfaces,
+					     ipsec_hw_class.index,
+					     t - im->tunnel_interfaces);
 
       hi = vnet_get_hw_interface (vnm, hw_if_index);
       hi->output_node_index = ipsec_if_output_node.index;
       t->hw_if_index = hw_if_index;
+
+      vnet_feature_enable_disable ("interface-output", "ipsec-if-output",
+				   hi->sw_if_index, 1, 0, 0);
 
       /*1st interface, register protocol */
       if (pool_elts (im->tunnel_interfaces) == 1)
@@ -277,8 +290,6 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
     }
   else
     {
-      vnet_interface_main_t *vim = &vnm->interface_main;
-
       /* check if exists */
       if (!p)
 	return VNET_API_ERROR_INVALID_VALUE;
@@ -286,14 +297,11 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       t = pool_elt_at_index (im->tunnel_interfaces, p[0]);
       hi = vnet_get_hw_interface (vnm, t->hw_if_index);
       vnet_sw_interface_set_flags (vnm, hi->sw_if_index, 0);	/* admin down */
-      vec_add1 (im->free_tunnel_if_indices, t->hw_if_index);
 
-      vnet_interface_counter_lock (vim);
-      vlib_zero_combined_counter (vim->combined_sw_if_counters +
-				  VNET_INTERFACE_COUNTER_TX, hi->sw_if_index);
-      vlib_zero_combined_counter (vim->combined_sw_if_counters +
-				  VNET_INTERFACE_COUNTER_RX, hi->sw_if_index);
-      vnet_interface_counter_unlock (vim);
+      vnet_feature_enable_disable ("interface-output", "ipsec-if-output",
+				   hi->sw_if_index, 0, 0, 0);
+
+      vnet_delete_hw_interface (vnm, t->hw_if_index);
 
       /* delete input and output SA */
       sa = pool_elt_at_index (im->sad, t->input_sa_index);
@@ -311,6 +319,8 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       pool_put (im->sad, sa);
 
       hash_unset (im->ipsec_if_pool_index_by_key, key);
+      hash_unset (im->ipsec_if_real_dev_by_show_dev, t->show_instance);
+
       pool_put (im->tunnel_interfaces, t);
     }
 
@@ -538,7 +548,11 @@ ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
 clib_error_t *
 ipsec_tunnel_if_init (vlib_main_t * vm)
 {
-  //ipsec_main_t *im = &ipsec_main;
+  ipsec_main_t *im = &ipsec_main;
+
+  im->ipsec_if_pool_index_by_key = hash_create (0, sizeof (uword));
+  im->ipsec_if_real_dev_by_show_dev = hash_create (0, sizeof (uword));
+
   return 0;
 }
 

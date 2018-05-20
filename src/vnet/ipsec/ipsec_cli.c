@@ -147,6 +147,10 @@ ipsec_sa_add_del_command_fn (vlib_main_t * vm,
 	  sa.is_tunnel = 1;
 	  sa.is_tunnel_ip6 = 1;
 	}
+			else if (unformat (line_input, "udp-encap"))
+	{
+		sa.udp_encap = 1;
+	}
       else
 	{
 	  error = clib_error_return (0, "parse error: '%U'",
@@ -438,13 +442,16 @@ show_ipsec_command_fn (vlib_main_t * vm,
   u32 *i;
   ipsec_tunnel_if_t *t;
   vnet_hw_interface_t *hi;
+  u8 *protocol = NULL;
+  u8 *policy = NULL;
 
   /* *INDENT-OFF* */
   pool_foreach (sa, im->sad, ({
     if (sa->id) {
-      vlib_cli_output(vm, "sa %u spi %u mode %s protocol %s", sa->id, sa->spi,
+      vlib_cli_output(vm, "sa %u spi %u mode %s protocol %s%s", sa->id, sa->spi,
                       sa->is_tunnel ? "tunnel" : "transport",
-                      sa->protocol ? "esp" : "ah");
+                      sa->protocol ? "esp" : "ah",
+		      sa->udp_encap ? " udp-encap-enabled" : "");
       if (sa->protocol == IPSEC_PROTOCOL_ESP) {
         vlib_cli_output(vm, "  crypto alg %U%s%U integrity alg %U%s%U",
                         format_ipsec_crypto_alg, sa->crypto_alg,
@@ -475,15 +482,20 @@ show_ipsec_command_fn (vlib_main_t * vm,
     vec_foreach(i, spd->ipv4_outbound_policies)
       {
         p = pool_elt_at_index(spd->policies, *i);
-        vlib_cli_output(vm, "  priority %d action %U protocol %s%s",
-                        p->priority,
-                        format_ipsec_policy_action, p->policy,
-                        p->protocol ?
-                          format(0, "%U", format_ip_protocol, p->protocol) :
-                          (u8 *) "any",
-                        p->policy == IPSEC_POLICY_ACTION_PROTECT ?
-                          format(0, " sa %u", p->sa_id) :
-                          (u8 *) "");
+	vec_reset_length(protocol);
+	vec_reset_length(policy);
+	if (p->protocol) {
+	  protocol = format(protocol, "%U", format_ip_protocol, p->protocol);
+	} else {
+	  protocol = format(protocol, "any");
+	}
+	if (p->policy == IPSEC_POLICY_ACTION_PROTECT) {
+	  policy = format(policy, " sa %u", p->sa_id);
+	}
+
+        vlib_cli_output(vm, "  priority %d action %U protocol %v%v",
+                        p->priority, format_ipsec_policy_action, p->policy,
+			protocol, policy);
         vlib_cli_output(vm, "   local addr range %U - %U port range %u - %u",
                         format_ip4_address, &p->laddr.start.ip4,
                         format_ip4_address, &p->laddr.stop.ip4,
@@ -498,15 +510,19 @@ show_ipsec_command_fn (vlib_main_t * vm,
     vec_foreach(i, spd->ipv6_outbound_policies)
       {
         p = pool_elt_at_index(spd->policies, *i);
-        vlib_cli_output(vm, "  priority %d action %U protocol %s%s",
-                        p->priority,
-                        format_ipsec_policy_action, p->policy,
-                        p->protocol ?
-                          format(0, "%U", format_ip_protocol, p->protocol) :
-                          (u8 *) "any",
-                        p->policy == IPSEC_POLICY_ACTION_PROTECT ?
-                          format(0, " sa %u", p->sa_id) :
-                          (u8 *) "");
+	vec_reset_length(protocol);
+	vec_reset_length(policy);
+	if (p->protocol) {
+	  protocol = format(protocol, "%U", format_ip_protocol, p->protocol);
+	} else {
+	  protocol = format(protocol, "any");
+	}
+	if (p->policy == IPSEC_POLICY_ACTION_PROTECT) {
+	  policy = format(policy, " sa %u", p->sa_id);
+	}
+        vlib_cli_output(vm, "  priority %d action %U protocol %v%v",
+                        p->priority, format_ipsec_policy_action, p->policy,
+			protocol, policy);
         vlib_cli_output(vm, "   local addr range %U - %U port range %u - %u",
                         format_ip6_address, &p->laddr.start.ip6,
                         format_ip6_address, &p->laddr.stop.ip6,
@@ -522,15 +538,19 @@ show_ipsec_command_fn (vlib_main_t * vm,
     vec_foreach(i, spd->ipv4_inbound_protect_policy_indices)
       {
         p = pool_elt_at_index(spd->policies, *i);
-        vlib_cli_output(vm, "  priority %d action %U protocol %s%s",
-                        p->priority,
-                        format_ipsec_policy_action, p->policy,
-                        p->protocol ?
-                          format(0, "%U", format_ip_protocol, p->protocol) :
-                          (u8 *) "any",
-                        p->policy == IPSEC_POLICY_ACTION_PROTECT ?
-                          format(0, " sa %u", p->sa_id) :
-                          (u8 *) "");
+	vec_reset_length(protocol);
+	vec_reset_length(policy);
+	if (p->protocol) {
+	  protocol = format(protocol, "%U", format_ip_protocol, p->protocol);
+	} else {
+	  protocol = format(protocol, "any");
+	}
+	if (p->policy == IPSEC_POLICY_ACTION_PROTECT) {
+	  policy = format(policy, " sa %u", p->sa_id);
+	}
+        vlib_cli_output(vm, "  priority %d action %U protocol %v%v",
+                        p->priority, format_ipsec_policy_action, p->policy,
+			protocol, policy);
         vlib_cli_output(vm, "   local addr range %U - %U port range %u - %u",
                         format_ip4_address, &p->laddr.start.ip4,
                         format_ip4_address, &p->laddr.stop.ip4,
@@ -545,15 +565,19 @@ show_ipsec_command_fn (vlib_main_t * vm,
     vec_foreach(i, spd->ipv4_inbound_policy_discard_and_bypass_indices)
       {
         p = pool_elt_at_index(spd->policies, *i);
-        vlib_cli_output(vm, "  priority %d action %U protocol %s%s",
-                        p->priority,
-                        format_ipsec_policy_action, p->policy,
-                        p->protocol ?
-                          format(0, "%U", format_ip_protocol, p->protocol) :
-                          (u8 *) "any",
-                        p->policy == IPSEC_POLICY_ACTION_PROTECT ?
-                          format(0, " sa %u", p->sa_id) :
-                          (u8 *) "");
+	vec_reset_length(protocol);
+	vec_reset_length(policy);
+	if (p->protocol) {
+	  protocol = format(protocol, "%U", format_ip_protocol, p->protocol);
+	} else {
+	  protocol = format(protocol, "any");
+	}
+	if (p->policy == IPSEC_POLICY_ACTION_PROTECT) {
+	  policy = format(policy, " sa %u", p->sa_id);
+	}
+        vlib_cli_output(vm, "  priority %d action %U protocol %v%v",
+                        p->priority, format_ipsec_policy_action, p->policy,
+			protocol, policy);
         vlib_cli_output(vm, "   local addr range %U - %U port range %u - %u",
                         format_ip4_address, &p->laddr.start.ip4,
                         format_ip4_address, &p->laddr.stop.ip4,
@@ -568,15 +592,19 @@ show_ipsec_command_fn (vlib_main_t * vm,
     vec_foreach(i, spd->ipv6_inbound_protect_policy_indices)
       {
         p = pool_elt_at_index(spd->policies, *i);
-        vlib_cli_output(vm, "  priority %d action %U protocol %s%s",
-                        p->priority,
-                        format_ipsec_policy_action, p->policy,
-                        p->protocol ?
-                          format(0, "%U", format_ip_protocol, p->protocol) :
-                          (u8 *) "any",
-                        p->policy == IPSEC_POLICY_ACTION_PROTECT ?
-                          format(0, " sa %u", p->sa_id) :
-                          (u8 *) "");
+	vec_reset_length(protocol);
+	vec_reset_length(policy);
+	if (p->protocol) {
+	  protocol = format(protocol, "%U", format_ip_protocol, p->protocol);
+	} else {
+	  protocol = format(protocol, "any");
+	}
+	if (p->policy == IPSEC_POLICY_ACTION_PROTECT) {
+	  policy = format(policy, " sa %u", p->sa_id);
+	}
+        vlib_cli_output(vm, "  priority %d action %U protocol %v%v",
+                        p->priority, format_ipsec_policy_action, p->policy,
+			protocol, policy);
         vlib_cli_output(vm, "   local addr range %U - %U port range %u - %u",
                         format_ip6_address, &p->laddr.start.ip6,
                         format_ip6_address, &p->laddr.stop.ip6,
@@ -591,15 +619,19 @@ show_ipsec_command_fn (vlib_main_t * vm,
     vec_foreach(i, spd->ipv6_inbound_policy_discard_and_bypass_indices)
       {
         p = pool_elt_at_index(spd->policies, *i);
-        vlib_cli_output(vm, "  priority %d action %U protocol %s%s",
-                        p->priority,
-                        format_ipsec_policy_action, p->policy,
-                        p->protocol ?
-                          format(0, "%U", format_ip_protocol, p->protocol) :
-                          (u8 *) "any",
-                        p->policy == IPSEC_POLICY_ACTION_PROTECT ?
-                          format(0, " sa %u", p->sa_id) :
-                          (u8 *) "");
+	vec_reset_length(protocol);
+	vec_reset_length(policy);
+	if (p->protocol) {
+	  protocol = format(protocol, "%U", format_ip_protocol, p->protocol);
+	} else {
+	  protocol = format(protocol, "any");
+	}
+	if (p->policy == IPSEC_POLICY_ACTION_PROTECT) {
+	  policy = format(policy, " sa %u", p->sa_id);
+	}
+        vlib_cli_output(vm, "  priority %d action %U protocol %v%v",
+                        p->priority, format_ipsec_policy_action, p->policy,
+			protocol, policy);
         vlib_cli_output(vm, "   local addr range %U - %U port range %u - %u",
                         format_ip6_address, &p->laddr.start.ip6,
                         format_ip6_address, &p->laddr.stop.ip6,
@@ -646,6 +678,8 @@ show_ipsec_command_fn (vlib_main_t * vm,
                     format_ipsec_integ_alg, sa->integ_alg,
                     format_hex_bytes, sa->integ_key, sa->integ_key_len);
   }));
+  vec_free(policy);
+  vec_free(protocol);
   /* *INDENT-ON* */
   return 0;
 }
@@ -717,6 +751,10 @@ create_ipsec_tunnel_command_fn (vlib_main_t * vm,
 	num_m_args++;
       else if (unformat (line_input, "remote-spi %u", &a.remote_spi))
 	num_m_args++;
+      else if (unformat (line_input, "instance %u", &a.show_instance))
+	a.renumber = 1;
+			else if (unformat (line_input, "udp-encap"))
+	a.udp_encap = 1;
       else if (unformat (line_input, "del"))
 	a.is_add = 0;
       else
@@ -761,7 +799,7 @@ done:
 /* *INDENT-OFF* */
 VLIB_CLI_COMMAND (create_ipsec_tunnel_command, static) = {
   .path = "create ipsec tunnel",
-  .short_help = "create ipsec tunnel local-ip <addr> local-spi <spi> remote-ip <addr> remote-spi <spi>",
+  .short_help = "create ipsec tunnel local-ip <addr> local-spi <spi> remote-ip <addr> remote-spi <spi> [instance <inst_num>]",
   .function = create_ipsec_tunnel_command_fn,
 };
 /* *INDENT-ON* */
