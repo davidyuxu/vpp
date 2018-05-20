@@ -84,17 +84,7 @@ format_esp_decrypt_trace (u8 * s, va_list * args)
 always_inline void
 esp_decrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * iv)
 {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-		EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
-#else
-		EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
-#endif
-
-	if (PREDICT_FALSE (!sa->context[thread_index].cipher_initialized))
-	{
-		sa->context[thread_index].cipher_initialized = 1;
-		EVP_CipherInit_ex (ctx, NULL, NULL, sa->crypto_key, iv, 0);
-	}
+	EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
 
 	int out_len;
 
@@ -123,17 +113,7 @@ esp_decrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 always_inline int
 esp_decrypt_gcm (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * iv, u8 * aad, size_t aad_len, u8 * tag)
 {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-		EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
-#else
-		EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
-#endif
-
-	if (PREDICT_FALSE (!sa->context[thread_index].cipher_initialized))
-	{
-		sa->context[thread_index].cipher_initialized = 1;
-		EVP_CipherInit_ex (ctx, NULL, NULL, sa->crypto_key, iv, 0);
-	}
+	EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
 
 	int out_len;
 
@@ -221,6 +201,9 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 
 		  sa_index0 = vnet_buffer (i_b0)->ipsec.sad_index;
 		  sa0 = pool_elt_at_index (im->sad, sa_index0);
+
+			/* make sure we have sa context initialized */
+			ipsec_make_sa_contexts(thread_id, sa0, 0);
 
 			const int BLOCK_SIZE = em->ipsec_proto_main_crypto_algs[sa0->crypto_alg].block_size;;
 			const int IV_SIZE = em->ipsec_proto_main_crypto_algs[sa0->crypto_alg].iv_size;

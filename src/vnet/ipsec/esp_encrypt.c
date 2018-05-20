@@ -22,8 +22,6 @@
 #include <vnet/ipsec/ipsec.h>
 #include <vnet/ipsec/esp.h>
 
-ipsec_proto_main_t ipsec_proto_main;
-
 #define foreach_esp_encrypt_next                   \
 _(DROP, "error-drop")                              \
 _(IP4_LOOKUP, "ip4-lookup")                        \
@@ -86,11 +84,7 @@ format_esp_encrypt_trace (u8 * s, va_list * args)
 always_inline void
 esp_encrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * iv)
 {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
   EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
-#else
-  EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
-#endif
 
   int out_len;
 
@@ -119,11 +113,7 @@ esp_encrypt_cbc (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * 
 always_inline void
 esp_encrypt_gcm (ipsec_sa_t *sa, int thread_index, u8 * in, size_t in_len, u8 * aad, size_t aad_len, u8 * iv, u8 * tag)
 {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
   EVP_CIPHER_CTX *ctx = sa->context[thread_index].cipher_ctx;
-#else
-  EVP_CIPHER_CTX *ctx = &(sa->context[thread_index].cipher_ctx);
-#endif
 
 	//fformat (stdout, "CLEAR: %U \n", format_hexdump, in, in_len);
 
@@ -202,6 +192,9 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 	  i_b0 = vlib_get_buffer (vm, i_bi0);
 	  sa_index0 = vnet_buffer (i_b0)->ipsec.sad_index;
 	  sa0 = pool_elt_at_index (im->sad, sa_index0);
+
+		/* make sure we have sa context initialized */
+		ipsec_make_sa_contexts(thread_id, sa0, 1);		
 
 		const int BLOCK_SIZE = em->ipsec_proto_main_crypto_algs[sa0->crypto_alg].block_size;
 		const int IV_SIZE = em->ipsec_proto_main_crypto_algs[sa0->crypto_alg].iv_size;
@@ -439,8 +432,8 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 		if (PREDICT_TRUE (mac != 0))
 		{
-			i_b0->current_length += mac (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0) + ip_hdr_size, 
-																i_b0->current_length - ip_hdr_size, vlib_buffer_get_tail (i_b0));
+			mac (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0) + ip_hdr_size,  i_b0->current_length - ip_hdr_size, vlib_buffer_get_tail (i_b0));
+			i_b0->current_length += em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
 		}		
 			
 		// dont have to change 
