@@ -554,13 +554,13 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 
 	trace:
 	  if (PREDICT_FALSE(b0->flags & VLIB_BUFFER_IS_TRACED))
-	    {
-	      esp_decrypt_trace_t *tr = vlib_add_trace (vm, node, b0, sizeof (*tr));
-	      tr->crypto_alg = sa0->crypto_alg;
-	      tr->integ_alg = sa0->integ_alg;
-	      ih4 = vlib_buffer_get_current (b0);
-	      clib_memcpy (tr->packet_data, ih4, sizeof (ip6_header_t));
-	    }
+    {
+      esp_decrypt_trace_t *tr = vlib_add_trace (vm, node, b0, sizeof (*tr));
+      tr->crypto_alg = sa0->crypto_alg;
+      tr->integ_alg = sa0->integ_alg;
+      ih4 = vlib_buffer_get_current (b0);
+      clib_memcpy (tr->packet_data, ih4, sizeof (ip6_header_t));
+    }
 
 	  vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
 					   to_next, n_left_to_next, bi0, next0);
@@ -568,9 +568,7 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
       vlib_put_next_frame (vm, node, next_index, n_left_to_next);
     }
 
-  vlib_node_increment_counter (vm, dpdk_esp_decrypt_post_node.index,
-			       ESP_DECRYPT_POST_ERROR_PKTS,
-			       from_frame->n_vectors);
+  vlib_node_increment_counter (vm, dpdk_esp_decrypt_post_node.index, ESP_DECRYPT_POST_ERROR_PKTS, from_frame->n_vectors);
 
   return from_frame->n_vectors;
 }
