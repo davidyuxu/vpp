@@ -336,7 +336,7 @@ crypto_set_auth_xform (struct rte_crypto_sym_xform *xform, crypto_alg_t *a, ipse
 }
 
 i32
-crypto_make_session (crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * res, crypto_worker_main_t * cwm, u8 is_outbound)
+crypto_make_session (u8 thread_idx, crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * res, crypto_worker_main_t * cwm, u8 is_outbound)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_data_t *data;
@@ -384,7 +384,7 @@ crypto_make_session (crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * r
     return 0;
   }
 
-	cs->session = s;
+	cs->sessions[thread_idx] = s;
 
   return 1;
 }
@@ -425,7 +425,7 @@ dpdk_crypto_session_disposal (u64 ts)
 }
 
 static void 
-dpdk_crypto_defer_clear_session (struct rte_cryptodev_sym_session *session)
+dpdk_crypto_defer_clear_session (struct rte_cryptodev_sym_session **sessions)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
 
@@ -433,17 +433,21 @@ dpdk_crypto_defer_clear_session (struct rte_cryptodev_sym_session *session)
   u64 ts = unix_time_now_nsec ();
   dpdk_crypto_session_disposal (ts);
 
-	if (!session)
-		return;
-
-	/* add to disposal queue */
-  crypto_session_disposal_t sd;
-  sd.ts = ts;
-  sd.session = session;
-
-  vec_add1 (dcm->session_disposal, sd);
+	struct rte_cryptodev_sym_session **s;
+	vec_foreach (s, sessions)
+	{
+		if (!s[0])
+			continue;
 	
-	clib_warning ("add session %p to disposal list", session);
+		/* add to disposal queue */
+		crypto_session_disposal_t sd;
+		sd.ts = ts;
+		sd.session = s[0];
+		
+		vec_add1 (dcm->session_disposal, sd);
+		
+		clib_warning ("add session %p to disposal list", s[0]);
+	}
 }
 
 static clib_error_t *
@@ -469,7 +473,6 @@ add_del_sa_session (u32 sa_index, u8 is_add)
 		memset (session, 0, sizeof (*session));
 		
 		session->sa_index = sa_index;
-		session->index = session - dcm->sa_session;
 
     session->cipher_alg = vec_elt_at_index (dcm->cipher_algs, sa->crypto_alg);
     session->auth_alg = vec_elt_at_index (dcm->auth_algs, sa->integ_alg);
@@ -481,6 +484,12 @@ add_del_sa_session (u32 sa_index, u8 is_add)
 		/* make the mapping */
 		vec_elt (dcm->sa_session_index, sa_index) = session - dcm->sa_session;
 
+		/* make per thread cryptodev sesion */
+		vlib_thread_main_t *tm = vlib_get_thread_main ();
+		u32 n_mains = tm->n_vlib_mains;
+		
+		vec_validate_init_empty_aligned (session->sessions, n_mains - 1, 0, CLIB_CACHE_LINE_BYTES);
+
     return 0;
   }
 
@@ -489,7 +498,7 @@ add_del_sa_session (u32 sa_index, u8 is_add)
 
 	session = pool_elt_at_index (dcm->sa_session, cs_index);
 
-	dpdk_crypto_defer_clear_session (session->session);
+	dpdk_crypto_defer_clear_session (session->sessions);
 
 	/* return it back to pool */
 	pool_put (dcm->sa_session, session);
@@ -521,10 +530,11 @@ update_sa_session (u32 sa_index)
 	if (session->is_aead)
 		session->auth_alg = session->cipher_alg;
 
-	dpdk_crypto_defer_clear_session (session->session);
+	dpdk_crypto_defer_clear_session (session->sessions);
 
-	session->session = NULL;
-
+	/* zero cryptodev sesions */
+	vec_zero (session->sessions);
+	
 	return 0;
 }
 

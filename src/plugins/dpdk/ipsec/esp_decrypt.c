@@ -189,9 +189,9 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 			
 		res = vec_elt_at_index (dcm->resource, res_idx);
 
-		if (PREDICT_FALSE (cs0->session == NULL))
+		if (PREDICT_FALSE (cs0->sessions[thread_idx] == NULL))
 		{
-      ret = crypto_make_session (cs0, sa0, res, cwm, 0);
+      ret = crypto_make_session (thread_idx, cs0, sa0, res, cwm, 0);
       if (PREDICT_FALSE (!ret))
 			{
 			  //clib_warning ("failed to create crypto session");
@@ -310,7 +310,7 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
     }
 
 		/* setup op */
-	  crypto_op_setup (cs0->is_aead, mb0, op, cs0->session, cipher_off, cipher_len,
+	  crypto_op_setup (cs0->is_aead, mb0, op, cs0->sessions[thread_idx], cipher_off, cipher_len,
 			   0, auth_len, aad, digest, digest_paddr);
 
 		/* enqueue resource */
