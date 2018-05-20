@@ -613,7 +613,7 @@ show_dpdk_crypto_pools_fn (vlib_main_t * vm,
     if (data->session_drv)
       vlib_cli_output (vm, "%U\n", format_dpdk_mempool, data->session_drv);
 
-		vlib_cli_output (vm, " sess-fail %10u drv-fail %10u\n", data->session_h_failed, data->session_drv_failed);
+		vlib_cli_output (vm, " sess-fail %10u drv-fail %10u\n\n", data->session_h_failed, data->session_drv_failed);
   }
   /* *INDENT-ON* */
 

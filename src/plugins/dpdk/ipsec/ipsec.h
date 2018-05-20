@@ -145,8 +145,7 @@ typedef struct
 {
 	crypto_alg_t *cipher_alg;
 	crypto_alg_t *auth_alg;	
-	struct rte_cryptodev_sym_session *session;
-	u32 index;
+	struct rte_cryptodev_sym_session **sessions;
 	u32 sa_index;
 	u8 is_aead;
 } crypto_session_t;
@@ -176,7 +175,7 @@ static const u8 pad_data[] =
 
 void crypto_auto_placement (void);
 
-i32 crypto_make_session (crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * res, crypto_worker_main_t * cwm, u8 is_outbound);
+i32 crypto_make_session (u8 thread_idx, crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * res, crypto_worker_main_t * cwm, u8 is_outbound);
 
 
 static_always_inline u32
