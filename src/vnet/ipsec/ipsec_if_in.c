@@ -178,6 +178,7 @@ ipsec_if_input_node_fn (vlib_main_t * vm, vlib_node_runtime_t * node,
 		  vnet_buffer (b0)->ipsec.flags = IPSEC_FLAG_IPSEC_GRE_TUNNEL;
 		}
 
+	      vlib_buffer_advance (b0, ip4_header_bytes (ip0));
 	      next0 = im->esp_decrypt_next_index;
 	    }
 
