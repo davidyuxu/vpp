@@ -256,7 +256,8 @@ ipsec_input_ip4_node_fn (vlib_main_t * vm,
 		  vnet_buffer (b0)->ipsec.sad_index = p0->sa_index;
 		  vnet_buffer (b0)->ipsec.flags = 0;
 		  next0 = im->esp_decrypt_next_index;
-		  goto trace0;
+		  vlib_buffer_advance (b0, ((u8 *) esp0 - (u8 *) ip0));
+			goto trace0;
 		}
 
 	      /* FIXME bypass and discard */

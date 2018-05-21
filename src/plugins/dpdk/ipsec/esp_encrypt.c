@@ -178,10 +178,11 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 
 	  /* ih0/ih6_0 */
 	  CLIB_PREFETCH (ih0, sizeof (ih6_0[0]), LOAD);
+
 	  /* f0 */
 	  CLIB_PREFETCH (vlib_buffer_get_tail (b0), 20, STORE);
 	  /* mb0 */
-	  CLIB_PREFETCH (mb0, CLIB_CACHE_LINE_BYTES, STORE);
+	  //CLIB_PREFETCH (mb0, CLIB_CACHE_LINE_BYTES, STORE);
 
 	  op = ops[0];
 	  ASSERT (op->status == RTE_CRYPTO_OP_STATUS_NOT_PROCESSED);

@@ -150,17 +150,12 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 			fformat (stdout, "DEIN  : %U\n", format_hexdump, vlib_buffer_get_current (b0), b0->current_length);
 #endif
 		
-		/* we start with ip headers */
-		ip4_header_t *ih4 = vlib_buffer_get_current (b0);
-
-		/* step into esp */
-		vlib_buffer_advance (b0, ip4_header_bytes (ih4));
-		esp0 = vlib_buffer_get_current (b0);
+	  /* mb0 */
+	  //CLIB_PREFETCH (mb0, CLIB_CACHE_LINE_BYTES, STORE);
 
 	  /* ih0/ih6_0 */
+		esp0 = vlib_buffer_get_current (b0);
 	  CLIB_PREFETCH (esp0, sizeof (esp0[0]) + 16, LOAD);
-	  /* mb0 */
-	  CLIB_PREFETCH (mb0, CLIB_CACHE_LINE_BYTES, STORE);
 
 	  op = ops[0];
 	  ASSERT (op->status == RTE_CRYPTO_OP_STATUS_NOT_PROCESSED);
@@ -172,7 +167,7 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	  sa_index0 = vnet_buffer(b0)->ipsec.sad_index;
 
     sa0 = pool_elt_at_index (im->sad, sa_index0);
-		cs0 = crypto_session_from_sa_index (dcm, sa_index0);			
+		cs0 = crypto_session_from_sa_index (dcm, sa_index0);
 
 		res_idx = crypto_get_resource (cwm, sa0, cs0);
     if (PREDICT_FALSE (res_idx == (u16) ~ 0))
@@ -434,7 +429,7 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 	  u32 bi0, iv_size, next0;
 	  vlib_buffer_t * b0 = 0;
 	  ip4_header_t *ih4 = 0, *oh4 = 0;
-	  ip6_header_t *ih6 = 0, *oh6 = 0;
+	  ip6_header_t *ih6 = 0;
 	  crypto_alg_t *cipher_alg, *auth_alg;
 	  esp_header_t *esp0;
 	  u8 trunc_size, is_aead;
@@ -480,13 +475,6 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 		esp_replay_advance(sa0, seq);
 	    }
 
-          if (b0->flags & VNET_BUFFER_F_IS_IP4)
-            ih4 =
-               (ip4_header_t *) ((u8 *) esp0 - sizeof (ip4_header_t));
-          else
-            ih4 =
-               (ip4_header_t *) ((u8 *) esp0 - sizeof (ip6_header_t));
-
 	  vlib_buffer_advance (b0, sizeof (esp_header_t) + iv_size);
 
 	  b0->flags |= VLIB_BUFFER_TOTAL_LENGTH_VALID;
@@ -521,29 +509,42 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 	    }
 	  else /* transport mode */
 	    {
-	      if ((ih4->ip_version_and_header_length & 0xF0) == 0x40)
+				int is_ip4 = (b0->flags & VNET_BUFFER_F_IS_IP4) != 0;
+				int is_ip6 = (b0->flags & VNET_BUFFER_F_IS_IP6) != 0;
+				size_t ip_header_size = 0;
+				
+				ASSERT (!(is_ip4 && is_ip6));
+				
+				oh4 = (ip4_header_t *) (b0->data + vnet_buffer (b0)->l3_hdr_offset);
+				//oih6 = (ip6_header_t *) (i_b0->data + vnet_buffer (i_b0)->l3_hdr_offset); 
+				
+				/* restore IP header */
+				if (is_ip4)
+					ip_header_size = ip4_header_bytes (oh4);
+				else
+					ip_header_size = sizeof (ip6_header_t);
+				
+				/* - ip header */
+				vlib_buffer_advance (b0, 0 - ip_header_size);
+				
+				/* locate the new ip header */
+				ih4 = vlib_buffer_get_current (b0);
+				
+				memmove (ih4, oh4, ip_header_size);
+			
+	      if (is_ip4)
 		{
-		  u16 ih4_len = ip4_header_bytes (ih4);
-		  vlib_buffer_advance (b0, - ih4_len);
-		  oh4 = vlib_buffer_get_current (b0);
-		  memmove(oh4, ih4, ih4_len);
-
 		  next0 = ESP_DECRYPT_NEXT_IP4_INPUT;
-		  oh4->protocol = f0->next_header;
-		  oh4->length = clib_host_to_net_u16 (b0->current_length);
-		  oh4->checksum = ip4_header_checksum(oh4);
+		  ih4->protocol = f0->next_header;
+		  ih4->length = clib_host_to_net_u16 (b0->current_length);
+		  ih4->checksum = ip4_header_checksum(oh4);
 		}
-	      else if ((ih4->ip_version_and_header_length & 0xF0) == 0x60)
+	      else if (is_ip6)
 		{
-		  ih6 = (ip6_header_t *) ih4;
-		  vlib_buffer_advance (b0, -sizeof(ip6_header_t));
-		  oh6 = vlib_buffer_get_current (b0);
-		  memmove(oh6, ih6, sizeof(ip6_header_t));
-
 		  next0 = ESP_DECRYPT_NEXT_IP6_INPUT;
-		  oh6->protocol = f0->next_header;
+		  ih6->protocol = f0->next_header;
 		  u16 len = b0->current_length - sizeof (ip6_header_t);
-		  oh6->payload_length = clib_host_to_net_u16 (len);
+		  ih6->payload_length = clib_host_to_net_u16 (len);
 		}
 	      else
 		{

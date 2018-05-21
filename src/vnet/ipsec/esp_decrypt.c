@@ -178,8 +178,6 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 		  ip4_header_t *ih4 = 0;
 		  ip6_header_t *ih6 = 0;
 
-		  ip4_header_t *oih4;
-
 			esp_footer_t *f0;
 
 		  i_bi0 = from[0];
@@ -191,12 +189,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 
 		  i_b0 = vlib_get_buffer (vm, i_bi0);
 
-			/* we start with ip headers */
-			oih4 = vlib_buffer_get_current (i_b0);
-
-			/* step into esp */
-			vlib_buffer_advance (i_b0, ip4_header_bytes (oih4));
-			
+			/* we start with esp headers */
 		  esp0 = vlib_buffer_get_current (i_b0);
 
 		  sa_index0 = vnet_buffer (i_b0)->ipsec.sad_index;
@@ -404,15 +397,31 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 	      /* transport mode */
 	      else
 				{
+					int is_ip4 = (i_b0->flags & VNET_BUFFER_F_IS_IP4) != 0;
+					int is_ip6 = (i_b0->flags & VNET_BUFFER_F_IS_IP6) != 0;
+					size_t ip_header_size = 0;
+					
+					ASSERT (!(is_ip4 && is_ip6));
+					
+					ip4_header_t *oih4 = (ip4_header_t *) (i_b0->data + vnet_buffer (i_b0)->l3_hdr_offset);
+					//oih6 = (ip6_header_t *) (i_b0->data + vnet_buffer (i_b0)->l3_hdr_offset);	
+				
 					/* restore IP header */
-					vlib_buffer_advance (i_b0, 0 - ip4_header_bytes (oih4));
-					/* local the new ip header */
+					if (is_ip4)
+						ip_header_size = ip4_header_bytes (oih4);
+					else
+						ip_header_size = sizeof (ip6_header_t);
+
+					/* - ip header */
+					vlib_buffer_advance (i_b0, 0 - ip_header_size);
+					
+					/* locate the new ip header */
 					ih4 = vlib_buffer_get_current (i_b0);
 
-					memmove (ih4, oih4, ip4_header_bytes (oih4));
+					memmove (ih4, oih4, ip_header_size);
 
 					/* to figure out ipv4 or ipv6 */
-					if (PREDICT_TRUE ((ih4->ip_version_and_header_length & 0xF0) == 0x40))			    
+					if (is_ip4)			    
 		    	{
 			      next0 = ESP_DECRYPT_NEXT_IP4_INPUT;
 						
@@ -422,7 +431,7 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 			      ih4->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0));
 			      ih4->checksum = ip4_header_checksum (ih4);
 		    	}
-					else if (PREDICT_TRUE ((ih4->ip_version_and_header_length & 0xF0) == 0x60))						
+					else if (is_ip6)
 					{ 						
 						ih6 = (ip6_header_t *) ih4;
 
