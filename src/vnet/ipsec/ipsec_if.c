@@ -102,7 +102,7 @@ ipsec_create_sa_contexts (ipsec_sa_t *sa)
 {
   vlib_thread_main_t *tm = vlib_get_thread_main ();
 
-	vec_validate_aligned (sa->context, tm->n_vlib_mains - 1, CLIB_CACHE_LINE_BYTES);
+	vec_validate (sa->context, tm->n_vlib_mains - 1);
 	vec_zero (sa->context);
 
 	ipsec_set_sa_contexts_integ_key (sa);
