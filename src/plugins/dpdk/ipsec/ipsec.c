@@ -488,7 +488,7 @@ add_del_sa_session (u32 sa_index, u8 is_add)
 		vlib_thread_main_t *tm = vlib_get_thread_main ();
 		u32 n_mains = tm->n_vlib_mains;
 		
-		vec_validate_init_empty_aligned (session->sessions, n_mains - 1, 0, CLIB_CACHE_LINE_BYTES);
+		vec_validate_init_empty (session->sessions, n_mains - 1, 0);
 
     return 0;
   }
