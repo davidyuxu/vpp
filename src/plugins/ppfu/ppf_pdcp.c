@@ -437,7 +437,7 @@ ppf_pdcp_eia3_protect (vlib_main_t * vm,vlib_buffer_t * b0, void * security_para
 
 	buf0 = vlib_buffer_get_current (b0);
 	len = vlib_buffer_length_in_chain(vm, b0);
-
+        memset(buf0+len, 0, EIA_MAC_LEN);
         zuc_protect(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
 
 	return ret;
@@ -449,6 +449,7 @@ bool
 ppf_pdcp_eia3_validate (vlib_main_t * vm,vlib_buffer_t * b0, void * security_parameters)
 {
 	u8 mact[MAX_PDCP_KEY_LEN] = {0};
+        u8 rmac[EIA_MAC_LEN]      = {0};
 	u32 len;
 	u8 * buf0;
 	bool ret = true;
@@ -466,9 +467,12 @@ ppf_pdcp_eia3_validate (vlib_main_t * vm,vlib_buffer_t * b0, void * security_par
 	//calculate mac exlucde 4 octs MAC-I
 	len -= EIA_MAC_LEN;	
 
+        memcpy(rmac, buf0+len, EIA_MAC_LEN);
+        memset(buf0+len, 0, EIA_MAC_LEN);
+
         zuc_validate(ctx,sec_para->pdcp_sess->crypto_key,sec_para->count,sec_para->bearer,sec_para->dir,buf0,len,mact);
 
-	ret = (buf0[len+0]== mact[0] && buf0[len+1]== mact[1] && buf0[len+2]== mact[2] && buf0[len+3]== mact[3]);
+	ret = (rmac[0]== mact[0] && rmac[1]== mact[1] && rmac[2]== mact[2] && rmac[3]== mact[3]);
 	//trim 4 octs of MAC 
 	b0->current_length -= EIA_MAC_LEN;
 
