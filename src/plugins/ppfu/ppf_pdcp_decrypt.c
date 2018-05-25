@@ -134,10 +134,10 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           p6 = vlib_get_buffer (vm, from[6]);
           p7 = vlib_get_buffer (vm, from[7]);          
 
-          CLIB_PREFETCH (p4, 128, LOAD);
-          CLIB_PREFETCH (p5, 128, LOAD);
-          CLIB_PREFETCH (p6, 128, LOAD);
-          CLIB_PREFETCH (p7, 128, LOAD);
+          CLIB_PREFETCH (p4, 128, STORE);
+          CLIB_PREFETCH (p5, 128, STORE);
+          CLIB_PREFETCH (p6, 128, STORE);
+          CLIB_PREFETCH (p7, 128, STORE);
           
           CLIB_PREFETCH (p4->data, clib_min (p4->current_data + p4->current_length, 4 * CLIB_CACHE_LINE_BYTES), STORE);
           CLIB_PREFETCH (p5->data, clib_min (p5->current_data + p5->current_length, 4 * CLIB_CACHE_LINE_BYTES), STORE);
