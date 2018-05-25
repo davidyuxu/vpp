@@ -24,7 +24,7 @@
 
 DECLARE_CJ_GLOBAL_LOG;
 
-#define FRAME_QUEUE_NELTS 256 // was 32
+#define FRAME_QUEUE_NELTS 128 // was 32
 
 u32
 vl (void *p)

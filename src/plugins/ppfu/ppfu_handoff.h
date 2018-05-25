@@ -19,7 +19,7 @@
 #include <vlib/vlib.h>
 #include <ppfu/ppf_gtpu.h>
 
-#define PPFU_HANDOFF_QUEUE_HI_THRESHOLD 254
+#define PPFU_HANDOFF_QUEUE_HI_THRESHOLD 126 // was 30
 
 typedef enum
 {

@@ -494,6 +494,14 @@ format_ppf_pdcp_handoff_trace (u8 * s, va_list * args)
   return s;
 }
 
+/* Prefetch buffer header given index. extend version by Jordy */
+#define vlib_prefetch_buffer_with_index_ex(vm,bi,type)	\
+  do {							\
+    vlib_buffer_t * _b = vlib_get_buffer (vm, bi);	\
+    CLIB_PREFETCH (_b, 128, type);		\
+  } while (0)
+
+
 static uword
 ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
 			vlib_node_runtime_t * node, vlib_frame_t * frame)
@@ -505,9 +513,10 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
   u32 n_left_from, *from;
   static __thread vlib_frame_queue_elt_t **ppf_pdcp_handoff_queue_elt_by_wi;
   static __thread vlib_frame_queue_t **congested_ppf_pdcp_handoff_queue_by_wi = 0;
+  static __thread u32 * n_left_to_next_pdcp_worker_by_wi= 0;
   vlib_frame_queue_elt_t *hf = 0;
   int i;
-  u32 n_left_to_next_worker = 0, *to_next_worker = 0, *to_next_drop = 0;
+  u32 *to_next_worker = 0, *to_next_drop = 0;
   u32 next_worker_index = 0;
   u32 current_worker_index = ~0;
   vlib_frame_queue_t *fq;
@@ -517,7 +526,7 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
   if (PREDICT_FALSE (ppf_pdcp_handoff_queue_elt_by_wi == 0))
     {
       vec_validate (ppf_pdcp_handoff_queue_elt_by_wi, tm->n_vlib_mains - 1);
-
+      vec_validate_init_empty (n_left_to_next_pdcp_worker_by_wi, tm->n_vlib_mains - 1, 0);
       vec_validate_init_empty (congested_ppf_pdcp_handoff_queue_by_wi,
 			       hm->first_worker_index + hm->num_workers - 1,
 			       (vlib_frame_queue_t *) (~0));
@@ -542,6 +551,12 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       u32 call_id0 = 0;
       u32 hash = 0;
       u32 index0 = 0;
+
+      if (PREDICT_TRUE (n_left_from > 2))
+      {
+        vlib_prefetch_buffer_with_index_ex (vm, from[1], LOAD);
+        vlib_prefetch_buffer_with_index_ex (vm, from[2], LOAD);
+      }
 
       bi0 = from[0];
       from += 1;
@@ -619,36 +634,33 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       next_worker_index += index0;
 
       if (next_worker_index != current_worker_index) {
-#if 1
-        fq = is_vlib_frame_queue_congested (hm->pdcp_frame_queue_index, next_worker_index,
-                                            PPFU_HANDOFF_QUEUE_HI_THRESHOLD,
-                                            congested_ppf_pdcp_handoff_queue_by_wi);
-#else
-        fq = NULL;
-#endif        
-        if (fq)
-        {
-          /* if this is 1st frame */
-          if (!d)
+        hf = ppf_pdcp_handoff_queue_elt_by_wi[next_worker_index];
+        if (PREDICT_FALSE(0 == hf)) {
+          fq = is_vlib_frame_queue_congested (hm->pdcp_frame_queue_index, next_worker_index,
+                                              PPFU_HANDOFF_QUEUE_HI_THRESHOLD,
+                                              congested_ppf_pdcp_handoff_queue_by_wi);
+          if (fq)
           {
-            d = vlib_get_frame_to_node (vm, hm->error_node_index);
-            to_next_drop = vlib_frame_vector_args (d);
+            /* if this is 1st frame */
+            if (!d)
+            {
+              d = vlib_get_frame_to_node (vm, hm->error_node_index);
+              to_next_drop = vlib_frame_vector_args (d);
+            }
+            
+            to_next_drop[0] = bi0;
+            to_next_drop += 1;
+            d->n_vectors++;
+            goto trace0;
           }
-          
-          to_next_drop[0] = bi0;
-          to_next_drop += 1;
-          d->n_vectors++;
-          goto trace0;
-        }
+
+          hf = vlib_get_worker_handoff_queue_elt (hm->pdcp_frame_queue_index,
+                                                  next_worker_index,
+                                                  ppf_pdcp_handoff_queue_elt_by_wi);          
+        } else
+          hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_pdcp_worker_by_wi[next_worker_index];
         
-        if (hf)
-          hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_worker;
-        
-        hf = vlib_get_worker_handoff_queue_elt (hm->pdcp_frame_queue_index,
-                                                next_worker_index,
-                                                ppf_pdcp_handoff_queue_elt_by_wi);
-        
-        n_left_to_next_worker = VLIB_FRAME_SIZE - hf->n_vectors;
+        n_left_to_next_pdcp_worker_by_wi[next_worker_index] = VLIB_FRAME_SIZE - hf->n_vectors;
         to_next_worker = &hf->buffer_index[hf->n_vectors];
         current_worker_index = next_worker_index;
       }
@@ -656,11 +668,11 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       /* enqueue to correct worker thread */
       to_next_worker[0] = bi0;
       to_next_worker++;
-      n_left_to_next_worker--;
+      n_left_to_next_pdcp_worker_by_wi[next_worker_index]--;
 
       pkts_processed++;
 
-      if (n_left_to_next_worker == 0) {
+      if (n_left_to_next_pdcp_worker_by_wi[next_worker_index] == 0) {
         hf->n_vectors = VLIB_FRAME_SIZE;
         vlib_put_frame_queue_elt (hf);
         current_worker_index = ~0;
@@ -686,9 +698,6 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
     vlib_put_frame_to_node (vm, hm->error_node_index, d);
   }
  
-  if (hf)
-    hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_worker;
- 
   /* Ship frames to the worker nodes */
   for (i = 0; i < vec_len (ppf_pdcp_handoff_queue_elt_by_wi); i++)
     {
@@ -701,8 +710,10 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
          */
         if (1 || hf->n_vectors == hf->last_n_vectors)
           {
+			hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_pdcp_worker_by_wi[i];
             vlib_put_frame_queue_elt (hf);
             ppf_pdcp_handoff_queue_elt_by_wi[i] = 0;
+            n_left_to_next_pdcp_worker_by_wi[i] = 0;
           }
         else
           hf->last_n_vectors = hf->n_vectors;
@@ -953,9 +964,10 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
   u32 n_left_from, *from;
   static __thread vlib_frame_queue_elt_t **ppf_tx_handoff_queue_elt_by_wi;
   static __thread vlib_frame_queue_t **congested_ppf_tx_handoff_queue_by_wi = 0;
+  static __thread u32 * n_left_to_next_tx_worker_by_wi = 0;
   vlib_frame_queue_elt_t *hf = 0;
   int i;
-  u32 n_left_to_next_worker = 0, *to_next_worker = 0, *to_next_drop = 0;
+  u32 *to_next_worker = 0, *to_next_drop = 0;
   u32 next_worker_index = 0;
   u32 current_worker_index = ~0;
   CLIB_UNUSED(vlib_frame_queue_t *fq) = NULL;
@@ -964,7 +976,7 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
   if (PREDICT_FALSE (ppf_tx_handoff_queue_elt_by_wi == 0))
     {
       vec_validate (ppf_tx_handoff_queue_elt_by_wi, tm->n_vlib_mains - 1);
-
+      vec_validate_init_empty (n_left_to_next_tx_worker_by_wi, tm->n_vlib_mains - 1, 0);
       vec_validate_init_empty (congested_ppf_tx_handoff_queue_by_wi,
 			       hm->first_worker_index + hm->num_workers - 1,
 			       (vlib_frame_queue_t *) (~0));
@@ -990,6 +1002,12 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
       ppf_callline_t * c0 = NULL;
       u32 hash = 0;
       u32 index0 = 0;
+
+      if (PREDICT_TRUE (n_left_from > 2))
+      {
+        vlib_prefetch_buffer_with_index_ex (vm, from[1], LOAD);
+        vlib_prefetch_buffer_with_index_ex (vm, from[2], LOAD);
+      }
 
       bi0 = from[0];
       from += 1;
@@ -1086,35 +1104,15 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
       next_worker_index += index0;
 
       if (next_worker_index != current_worker_index) {
-        #if 0 /* Always send when handoff pdcp to tx */
-        fq = is_vlib_frame_queue_congested (hm->tx_frame_queue_index, next_worker_index,
-                                            PPFU_HANDOFF_QUEUE_HI_THRESHOLD,
-                                            congested_ppf_tx_handoff_queue_by_wi);
+        hf = ppf_tx_handoff_queue_elt_by_wi[next_worker_index];
+        if (PREDICT_FALSE (0 == hf)) {
+          hf = vlib_get_worker_handoff_queue_elt (hm->tx_frame_queue_index,
+                                                  next_worker_index,
+                                                  ppf_tx_handoff_queue_elt_by_wi);
+        } else
+          hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_tx_worker_by_wi[next_worker_index];
         
-        if (fq)
-        {
-          /* if this is 1st frame */
-          if (!d)
-          {
-            d = vlib_get_frame_to_node (vm, hm->error_node_index);
-            to_next_drop = vlib_frame_vector_args (d);
-          }
-          
-          to_next_drop[0] = bi0;
-          to_next_drop += 1;
-          d->n_vectors++;
-          goto trace0;
-        }
-        #endif
-        
-        if (hf)
-          hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_worker;
-        
-        hf = vlib_get_worker_handoff_queue_elt (hm->tx_frame_queue_index,
-                                                next_worker_index,
-                                                ppf_tx_handoff_queue_elt_by_wi);
-        
-        n_left_to_next_worker = VLIB_FRAME_SIZE - hf->n_vectors;
+        n_left_to_next_tx_worker_by_wi[next_worker_index] = VLIB_FRAME_SIZE - hf->n_vectors;
         to_next_worker = &hf->buffer_index[hf->n_vectors];
         current_worker_index = next_worker_index;
       }
@@ -1122,9 +1120,9 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
       /* enqueue to correct worker thread */
       to_next_worker[0] = bi0;
       to_next_worker++;
-      n_left_to_next_worker--;
+      n_left_to_next_tx_worker_by_wi[next_worker_index]--;
 
-      if (n_left_to_next_worker == 0) {
+      if (n_left_to_next_tx_worker_by_wi[next_worker_index] == 0) {
         hf->n_vectors = VLIB_FRAME_SIZE;
         vlib_put_frame_queue_elt (hf);
         current_worker_index = ~0;
@@ -1147,10 +1145,6 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
 
   if (d)
     vlib_put_frame_to_node (vm, hm->error_node_index, d);
-
- 
-  if (hf)
-    hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_worker;
  
   /* Ship frames to the worker nodes */
   for (i = 0; i < vec_len (ppf_tx_handoff_queue_elt_by_wi); i++)
@@ -1164,8 +1158,10 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
          */
         if (1 || hf->n_vectors == hf->last_n_vectors)
           {
+			hf->n_vectors = VLIB_FRAME_SIZE - n_left_to_next_tx_worker_by_wi[i];
             vlib_put_frame_queue_elt (hf);
             ppf_tx_handoff_queue_elt_by_wi[i] = 0;
+            n_left_to_next_tx_worker_by_wi[i] = 0;
           }
         else
           hf->last_n_vectors = hf->n_vectors;
@@ -1516,18 +1512,18 @@ ppfu_handoff_set_command_fn (vlib_main_t * vm,
     ppfu_handoff_main_t *hm = &ppfu_handoff_main;
     u32 **vectors = 0;
     if (trace) {
-      vec_validate_init_empty_aligned (hm->pdcp_trace_index, hm->num_workers - 1, 0,
+      vec_validate_init_empty_aligned (hm->pdcp_trace_index, hm->num_workers, 0,
                                        CLIB_CACHE_LINE_BYTES);
-      vec_validate_aligned (hm->pdcp_vectors_trace, hm->num_workers - 1,
+      vec_validate_aligned (hm->pdcp_vectors_trace, hm->num_workers,
                             CLIB_CACHE_LINE_BYTES);
       vec_foreach (vectors, hm->pdcp_vectors_trace)
       {
         vec_validate_init_empty (*vectors, MAX_TRACES - 1, ~0);
       }
       
-      vec_validate_init_empty_aligned (hm->tx_trace_index, hm->num_workers - 1, 0,
+      vec_validate_init_empty_aligned (hm->tx_trace_index, hm->num_workers, 0,
                                        CLIB_CACHE_LINE_BYTES);
-      vec_validate_aligned (hm->tx_vectors_trace, hm->num_workers - 1,
+      vec_validate_aligned (hm->tx_vectors_trace, hm->num_workers,
                             CLIB_CACHE_LINE_BYTES);
       vec_foreach (vectors, hm->tx_vectors_trace)
       {
