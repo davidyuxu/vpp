@@ -81,45 +81,29 @@ autoreply define want_gtpu_events
 };
 
 
-/** \brief dump gtpu path error
+/** \brief dump gtpu error
     @param dst_address - GTPU tunnel's destination address.
+	@param teid - Local Tunnel Endpoint Identifier
+	@param code - Error code
 	--- add by anhua
 */
 
-define gtpu_path_error_dump
+define gtpu_error_indication_dump
 {
   u32 client_index;
   u32 context;
   u32 dst_address[16];
-};
-
-define gtpu_path_error_details
-{
-  u32 context;
-  u32 dst_address[16];
-};
-
-
-/** \brief dump tunnel error
-    @param dst_address - GTPU tunnel's destination address.
-    @param teid - Local Tunnel Endpoint Identifier
-	--- add by anhua
-*/
-
-define gtpu_tunnel_error_dump
-{ 
-  u32 client_index;
-  u32 context;
-  u32 tunnel_index;
-};
-
-define gtpu_tunnel_error_details
-{
-  u32 context;
-  u8 dst_address[16];
   u32 teid;
+  u32 code;
 };
 
+define gtpu_error_indication_details
+{
+  u32 context;
+  u32 dst_address[16];
+  u32 teid;
+  u32 code;
+};
 
 /** \brief dump details of an GTPU tunnel
     @param context - sender context, to match reply w/ request
@@ -263,3 +247,4 @@ define gtpu_add_del_tunnel_v2_reply
  * eval: (c-set-style "gnu")
  * End:
  */
+

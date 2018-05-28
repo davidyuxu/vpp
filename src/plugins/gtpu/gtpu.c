@@ -75,11 +75,11 @@ format_gtpu_tunnel (u8 * s, va_list * args)
   gtpu_tunnel_t *t = va_arg (*args, gtpu_tunnel_t *);
   gtpu_main_t *ngm = &gtpu_main;
 
-  s = format (s, "[%d] src %U dst %U teid %d fib-idx %d sw-if-idx %d ",
+  s = format (s, "[%d] src %U dst %U teid %d  oteid %d fib-idx %d sw-if-idx %d ",
 	      t - ngm->tunnels,
 	      format_ip46_address, &t->src, IP46_TYPE_ANY,
 	      format_ip46_address, &t->dst, IP46_TYPE_ANY,
-	      t->teid,  t->encap_fib_index, t->sw_if_index);
+	      t->teid, t->oteid, t->encap_fib_index, t->sw_if_index);
 
   s = format (s, "encap-dpo-idx %d ", t->next_dpo.dpoi_index);
   s = format (s, "decap-next-%U ", format_decap_next, t->decap_next_index);
@@ -203,9 +203,10 @@ const static fib_node_vft_t gtpu_vft = {
   .fnv_back_walk = gtpu_tunnel_back_walk,
 };
 
-
+/* xftony add the oteid*/
 #define foreach_copy_field                      \
 _(teid)                                          \
+_(oteid) 										 \
 _(mcast_sw_if_index)                            \
 _(encap_fib_index)                              \
 _(decap_next_index)                             \
@@ -244,6 +245,10 @@ ip_udp_gtpu_rewrite (gtpu_tunnel_t * t, bool is_ip6)
 
       /* we fix up the ip4 header length and checksum after-the-fact */
       ip->checksum = ip4_header_checksum (ip);
+
+      /* UDP header, randomize src port on something, maybe? */
+      udp->src_port = clib_host_to_net_u16 (GTPU_UDP_SRC_DEFAULT_PORT);
+      udp->dst_port = clib_host_to_net_u16 (GTPU_UDP_DST_PORT);
     }
   else
     {
@@ -257,16 +262,17 @@ ip_udp_gtpu_rewrite (gtpu_tunnel_t * t, bool is_ip6)
 
       ip->src_address = t->src.ip6;
       ip->dst_address = t->dst.ip6;
+      
+      /* UDP header, randomize src port on something, maybe? */
+      udp->src_port = clib_host_to_net_u16 (GTPU6_UDP_SRC_DEFAULT_PORT);
+      udp->dst_port = clib_host_to_net_u16 (GTPU6_UDP_DST_PORT);
     }
-
-  /* UDP header, randomize src port on something, maybe? */
-  udp->src_port = clib_host_to_net_u16 (2152);
-  udp->dst_port = clib_host_to_net_u16 (UDP_DST_PORT_GTPU);
 
   /* GTPU header */
   gtpu->ver_flags = GTPU_V1_VER | GTPU_PT_GTP;
   gtpu->type = GTPU_TYPE_GTPU;
-  gtpu->teid = clib_host_to_net_u32 (t->teid);
+  /* xftony: for the rewrite use the oteid*/
+  gtpu->teid = clib_host_to_net_u32 (t->oteid);
 
   t->rewrite = r.rw;
   /* Now only support 8-byte gtpu header. TBD */
@@ -711,6 +717,7 @@ gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
   u32 mcast_sw_if_index = ~0;
   u32 decap_next_index = GTPU_INPUT_NEXT_L2_INPUT;
   u32 teid = 0;
+  u32 oteid = 0;
   u32 tmp;
   int rv;
   vnet_gtpu_add_del_tunnel_args_t _a, *a = &_a;
@@ -785,6 +792,8 @@ gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 			 &decap_next_index, ipv4_set))
 	;
       else if (unformat (line_input, "teid %d", &teid))
+	;
+	  else if (unformat (line_input, "oteid %d", &oteid))
 	;
       else
 	{
@@ -906,7 +915,7 @@ VLIB_CLI_COMMAND (create_gtpu_tunnel_command, static) = {
   .path = "create gtpu tunnel",
   .short_help =
   "create gtpu tunnel src <local-vtep-addr>"
-  " {dst <remote-vtep-addr>|group <mcast-vtep-addr> <intf-name>} teid <nn>"
+  " {dst <remote-vtep-addr>|group <mcast-vtep-addr> <intf-name>} teid <nn> oteid <nn>"
   " [encap-vrf-id <nn>] [decap-next [l2|ip4|ip6|node <name>]] [del]",
   .function = gtpu_add_del_tunnel_command_fn,
 };
@@ -1146,6 +1155,7 @@ gtpu_tunnels_init()
   u32 mcast_sw_if_index = ~0;
   u32 decap_next_index = GTPU_INPUT_NEXT_IP4_INPUT;
   u32 teid = gtm->start_teid;
+  u32 oteid = gtm->start_oteid;
   int rv;
   vnet_gtpu_add_del_tunnel_args_t _a, *a = &_a;
   u32 tunnel_sw_if_index;
@@ -1236,6 +1246,8 @@ gtpu_config (vlib_main_t * vm, unformat_input_t * input)
         {
         }
       else if (unformat (input, "teid %d", &gtm->start_teid))
+        ;
+	  else if (unformat (input, "oteid %d", &gtm->start_oteid))
         ;
       else if (unformat (input, "capacity %d", &gtm->prealloc_tunnels))
         ;
@@ -1476,3 +1488,4 @@ VLIB_PLUGIN_REGISTER () = {
  * eval: (c-set-style "gnu")
  * End:
  */
+
