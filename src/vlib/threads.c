@@ -24,7 +24,7 @@
 
 DECLARE_CJ_GLOBAL_LOG;
 
-#define FRAME_QUEUE_NELTS 128 // was 32
+#define FRAME_QUEUE_NELTS 128	// was 32
 
 u32
 vl (void *p)
@@ -1095,7 +1095,7 @@ vlib_worker_thread_node_refork (void)
 	       sizeof (vm->error_main));
   j = vec_len (vm->error_main.counters) - 1;
 
-	vec_validate_aligned (old_counters, j, CLIB_CACHE_LINE_BYTES);
+  vec_validate_aligned (old_counters, j, CLIB_CACHE_LINE_BYTES);
   vec_validate (old_counters_all_clear, j);
   vec_validate (old_rate_counters, j);
   vm_clone->error_main.counters = old_counters;

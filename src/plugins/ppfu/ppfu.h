@@ -45,21 +45,23 @@ _(PPF_PDCP_DECRYPT, "ppf_pdcp_decrypt")    \
 _(PPF_PDCP_HANDOFF, "ppf_pdcp_handoff")
 
 
-typedef enum {
-    PPF_PDCP_INPUT_NEXT_DROP,
-    PPF_PDCP_INPUT_NEXT_PPF_PDCP_DECRYPT,
-    PPF_PDCP_INPUT_NEXT_PPF_PDCP_HANDOFF,
-    PPF_PDCP_INPUT_N_NEXT,
+typedef enum
+{
+  PPF_PDCP_INPUT_NEXT_DROP,
+  PPF_PDCP_INPUT_NEXT_PPF_PDCP_DECRYPT,
+  PPF_PDCP_INPUT_NEXT_PPF_PDCP_HANDOFF,
+  PPF_PDCP_INPUT_N_NEXT,
 } ppf_pdcp_input_next_t;
 
 #define foreach_ppf_pdcp_decrypt_next        \
 _(DROP, "error-drop")                        \
 _(REORDER, "ppf_pdcp_reorder")
 
-typedef enum {
-    PPF_PDCP_DECRYPT_NEXT_DROP,
-    PPF_PDCP_DECRYPT_NEXT_REORDER,
-    PPF_PDCP_DECRYPT_N_NEXT,
+typedef enum
+{
+  PPF_PDCP_DECRYPT_NEXT_DROP,
+  PPF_PDCP_DECRYPT_NEXT_REORDER,
+  PPF_PDCP_DECRYPT_N_NEXT,
 } ppf_pdcp_decrypt_next_t;
 
 #define foreach_ppf_pdcp_reorder_next        \
@@ -71,15 +73,16 @@ _(PPF_GTPU6_ENCAP, "ppf_gtpu6-encap") 	     \
 _(PPF_SRB_NB_TX, "ppf_srb_nb_tx")            \
 _(PPF_TX_HANDOFF, "ppf_tx_handoff")
 
-typedef enum {
-    PPF_PDCP_REORDER_NEXT_DROP,
-    PPF_PDCP_REORDER_NEXT_IP4_LOOKUP,
-    PPF_PDCP_REORDER_NEXT_IP6_LOOKUP,
-    PPF_PDCP_REORDER_NEXT_PPF_GTPU4_ENCAP,
-    PPF_PDCP_REORDER_NEXT_PPF_GTPU6_ENCAP,
-    PPF_PDCP_REORDER_NEXT_PPF_SRB_NB_TX,
-    PPF_PDCP_REORDER_NEXT_PPF_TX_HANDOFF,
-    PPF_PDCP_REORDER_N_NEXT,
+typedef enum
+{
+  PPF_PDCP_REORDER_NEXT_DROP,
+  PPF_PDCP_REORDER_NEXT_IP4_LOOKUP,
+  PPF_PDCP_REORDER_NEXT_IP6_LOOKUP,
+  PPF_PDCP_REORDER_NEXT_PPF_GTPU4_ENCAP,
+  PPF_PDCP_REORDER_NEXT_PPF_GTPU6_ENCAP,
+  PPF_PDCP_REORDER_NEXT_PPF_SRB_NB_TX,
+  PPF_PDCP_REORDER_NEXT_PPF_TX_HANDOFF,
+  PPF_PDCP_REORDER_N_NEXT,
 } ppf_pdcp_reorder_next_t;
 
 
@@ -90,12 +93,13 @@ _(PPF_GTPU6_ENCAP, "ppf_gtpu6-encap")        \
 _(PPF_TX_HANDOFF, "ppf_tx_handoff")
 
 
-typedef enum {
-    PPF_PDCP_ENCRYPT_NEXT_DROP,
-    PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU4_ENCAP,
-    PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU6_ENCAP,
-    PPF_PDCP_ENCRYPT_NEXT_PPF_TX_HANDOFF,
-    PPF_PDCP_ENCRYPT_N_NEXT,
+typedef enum
+{
+  PPF_PDCP_ENCRYPT_NEXT_DROP,
+  PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU4_ENCAP,
+  PPF_PDCP_ENCRYPT_NEXT_PPF_GTPU6_ENCAP,
+  PPF_PDCP_ENCRYPT_NEXT_PPF_TX_HANDOFF,
+  PPF_PDCP_ENCRYPT_N_NEXT,
 } ppf_pdcp_encrypt_next_t;
 
 #define foreach_ppf_sb_path_lb_next        \
@@ -103,11 +107,12 @@ _(DROP, "error-drop")                      \
 _(PPF_PDCP_ENCRYPT, "ppf_pdcp_encrypt")    \
 _(PPF_PDCP_HANDOFF, "ppf_pdcp_handoff")
 
-typedef enum {
-    PPF_SB_PATH_LB_NEXT_DROP,
-    PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT,
-    PPF_SB_PATH_LB_NEXT_PPF_PDCP_HANDOFF,
-    PPF_SB_PATH_LB_N_NEXT,
+typedef enum
+{
+  PPF_SB_PATH_LB_NEXT_DROP,
+  PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT,
+  PPF_SB_PATH_LB_NEXT_PPF_PDCP_HANDOFF,
+  PPF_SB_PATH_LB_N_NEXT,
 } ppf_sb_path_lb_next_t;
 
 
@@ -115,40 +120,43 @@ typedef enum {
 _(DROP, "error-drop")                      \
 _(SB_PATH_LB, "ppf_sb_path_lb")
 
-typedef enum {
-    PPF_LBO_INPUT_NEXT_DROP,
-    PPF_LBO_INPUT_NEXT_SB_PATH_LB,
-    PPF_LBO_INPUT_N_NEXT,
+typedef enum
+{
+  PPF_LBO_INPUT_NEXT_DROP,
+  PPF_LBO_INPUT_NEXT_SB_PATH_LB,
+  PPF_LBO_INPUT_N_NEXT,
 } ppf_lbo_input_next_t;
 
 
 #define foreach_ppf_srb_nb_rx_next        \
 _(DROP, "error-drop")   		  \
 _(PPF_PDCP_ENCRYPT, "ppf_pdcp_encrypt")   \
-_(PPF_SB_PATH_LB, "ppf_sb_path_lb")  
-  
-typedef enum {
-    PPF_SRB_NB_RX_NEXT_DROP,
-    PPF_SRB_NB_RX_NEXT_PPF_PDCP_ENCRYPT,
-    PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB,
-    PPF_SRB_NB_RX_N_NEXT,
+_(PPF_SB_PATH_LB, "ppf_sb_path_lb")
+
+typedef enum
+{
+  PPF_SRB_NB_RX_NEXT_DROP,
+  PPF_SRB_NB_RX_NEXT_PPF_PDCP_ENCRYPT,
+  PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB,
+  PPF_SRB_NB_RX_N_NEXT,
 } ppf_srb_nb_rx_next_t;
 
 #define foreach_ppf_srb_nb_tx_next        \
  _(DROP, "error-drop")	 		\
 _(IP4_LOOKUP, "ip4-lookup")
 
- typedef enum {
-    PPF_SRB_NB_TX_NEXT_DROP,
-    PPF_SRB_NB_TX_NEXT_IP4_LOOKUP,
-    PPF_SRB_NB_TX_N_NEXT,
+typedef enum
+{
+  PPF_SRB_NB_TX_NEXT_DROP,
+  PPF_SRB_NB_TX_NEXT_IP4_LOOKUP,
+  PPF_SRB_NB_TX_N_NEXT,
 } ppf_srb_nb_tx_next_t;
 
-#define EIA2_IV_LEN              8    /* 64 bits */
-#define EIA_MAC_LEN              4    /* 32 bits */
+#define EIA2_IV_LEN              8	/* 64 bits */
+#define EIA_MAC_LEN              4	/* 32 bits */
 
 
-#define MAX_PDCP_KEY_LEN              16    /* 128 bits */
+#define MAX_PDCP_KEY_LEN              16	/* 128 bits */
 #define PDCP_REPLAY_WINDOW_SIZE(l)    (1 << ((l) - 1))
 #define PDCP_DEF_REORDER_WINDOW_SIZE  64
 #define PDCP_MAX_REORDER_WINDOW_SIZE  1024
@@ -185,53 +193,61 @@ do {                                                    \
 
 
 always_inline void
-__bitmap_advance__(uword * bitmap, u32 old, u32 new, u32 window)
+__bitmap_advance__ (uword * bitmap, u32 old, u32 new, u32 window)
 {
-	u32 index, index2, index_cur, id;
-	u32 diff;
-	u32 max_bit = ~0;
-	u32 old_max = old + window;
-	u32 new_max = new + window;
-	
+  u32 index, index2, index_cur, id;
+  u32 diff;
+  u32 max_bit = ~0;
+  u32 old_max = old + window;
+  u32 new_max = new + window;
+
 	/**
 	 * now update the bit
 	 */
-	index = BITMAP_WORD_INDEX (bitmap, new_max);
-	
+  index = BITMAP_WORD_INDEX (bitmap, new_max);
+
 	/**
 	 * first check if the sequence number is in the range
 	 */
-		
-	if (new_max > old_max) {
-		index_cur = BITMAP_WORD_INDEX (bitmap, old_max);
-		diff = index - index_cur;
-		if (diff > BITMAP_LEN(bitmap)) {  /* something unusual in this case */
-			diff = BITMAP_LEN(bitmap);
-		}
 
-		for (id = 0; id < diff; ++id) {
-			bitmap[(id + index_cur + 1) & BITMAP_WORD_INDEX_MASK(bitmap)] = 0;
-		}	
-	} else {
-		index2 = BITMAP_WORD_INDEX (bitmap, max_bit);
-		index_cur = BITMAP_WORD_INDEX (bitmap, old_max);
-
-		/* lastseq -> max_seq */
-		diff = index2 - index_cur;
-		if (diff > BITMAP_LEN(bitmap)) {  /* something unusual in this case */
-			diff = BITMAP_LEN(bitmap);
-		}
-		
-		for (id = 0; id < diff; ++id) {
-			bitmap[(id + index_cur + 1) & BITMAP_WORD_INDEX_MASK(bitmap)] = 0;
-		}
-
-		/* 0 -> sequence */
-		diff = index;
-		for (id = 0; id <= diff; ++id) {
-			bitmap[(id) & BITMAP_WORD_INDEX_MASK(bitmap)] = 0;
-		}
+  if (new_max > old_max)
+    {
+      index_cur = BITMAP_WORD_INDEX (bitmap, old_max);
+      diff = index - index_cur;
+      if (diff > BITMAP_LEN (bitmap))
+	{			/* something unusual in this case */
+	  diff = BITMAP_LEN (bitmap);
 	}
+
+      for (id = 0; id < diff; ++id)
+	{
+	  bitmap[(id + index_cur + 1) & BITMAP_WORD_INDEX_MASK (bitmap)] = 0;
+	}
+    }
+  else
+    {
+      index2 = BITMAP_WORD_INDEX (bitmap, max_bit);
+      index_cur = BITMAP_WORD_INDEX (bitmap, old_max);
+
+      /* lastseq -> max_seq */
+      diff = index2 - index_cur;
+      if (diff > BITMAP_LEN (bitmap))
+	{			/* something unusual in this case */
+	  diff = BITMAP_LEN (bitmap);
+	}
+
+      for (id = 0; id < diff; ++id)
+	{
+	  bitmap[(id + index_cur + 1) & BITMAP_WORD_INDEX_MASK (bitmap)] = 0;
+	}
+
+      /* 0 -> sequence */
+      diff = index;
+      for (id = 0; id <= diff; ++id)
+	{
+	  bitmap[(id) & BITMAP_WORD_INDEX_MASK (bitmap)] = 0;
+	}
+    }
 }
 
 #define	BITMAP_ON(bm, bit)             (BITMAP_WORD(bm, bit) & BITMAP_BIT(bm, bit))
@@ -246,21 +262,21 @@ __bitmap_advance__(uword * bitmap, u32 old, u32 new, u32 window)
 #define VEC_ELT_EQ(v, i, e)  ((e) == VEC_AT(v, i))
 
 
-enum pdcp_security_alg_t 
-{ 
-  PDCP_NONE_SECURITY    = 0x00,
-  PDCP_NULL_CIPHERING   = 0x01,
+enum pdcp_security_alg_t
+{
+  PDCP_NONE_SECURITY = 0x00,
+  PDCP_NULL_CIPHERING = 0x01,
   PDCP_SNOW3G_CIPHERING = 0x02,
-  PDCP_AES_CIPHERING    = 0x04,
-  PDCP_ZUC_CIPHERING    = 0x08,
-  PDCP_NULL_INTEGRITY   = 0x10,
+  PDCP_AES_CIPHERING = 0x04,
+  PDCP_ZUC_CIPHERING = 0x08,
+  PDCP_NULL_INTEGRITY = 0x10,
   PDCP_SNOW3G_INTEGRITY = 0x20,
-  PDCP_AES_INTEGRITY    = 0x40,
-  PDCP_ZUC_INTEGRITY    = 0x80
+  PDCP_AES_INTEGRITY = 0x40,
+  PDCP_ZUC_INTEGRITY = 0x80
 };
 
-enum pdcp_integrity_alg_t 
-{ 
+enum pdcp_integrity_alg_t
+{
   PDCP_EIA_NONE,
   PDCP_EIA0,
   PDCP_EIA1,
@@ -268,16 +284,17 @@ enum pdcp_integrity_alg_t
   PDCP_EIA3
 };
 
-enum pdcp_crypt_alg_t 
+enum pdcp_crypt_alg_t
 {
-  PDCP_EEA_NONE =0, 
+  PDCP_EEA_NONE = 0,
   PDCP_EEA0,
   PDCP_EEA1,
   PDCP_EEA2,
   PDCP_EEA3
 };
 
-enum _config_flags_{
+enum _config_flags_
+{
   INTEGRITY_KEY_VALID = 0x1,
   CRYPTO_KEY_VALID = 0x2,
   INTEGRITY_ALG_VALID = 0x4,
@@ -287,56 +304,61 @@ enum _config_flags_{
 typedef struct _ppf_pdcp_config_t_
 {
   u16 flags;
-  u8  integrity_key[MAX_PDCP_KEY_LEN];
-  u8  crypto_key[MAX_PDCP_KEY_LEN];
-  u8  integrity_algorithm;
-  u8  crypto_algorithm;
+  u8 integrity_key[MAX_PDCP_KEY_LEN];
+  u8 crypto_key[MAX_PDCP_KEY_LEN];
+  u8 integrity_algorithm;
+  u8 crypto_algorithm;
   //u8 valid_paths;
   //u8 removed_paths;
   //PathContext paths[MAX_PATHS];
 } ppf_pdcp_config_t;
 
 
-enum {
-//33.401	 DIRECTION bit shall be 0 for uplink(DEC) and 1 for downlink(ENC)
+enum
+{
+//33.401         DIRECTION bit shall be 0 for uplink(DEC) and 1 for downlink(ENC)
 
   PPF_PDCP_DIR_DEC = 0,
   PPF_PDCP_DIR_ENC = 1
 };
 
-typedef u32 (*pdcp_security_handler)(u8 * /* in */, u8 * /* out */, u32 /* len */, void * /* security parameters */);
+typedef u32 (*pdcp_security_handler) (u8 * /* in */ , u8 * /* out */ ,
+				      u32 /* len */ ,
+				      void * /* security parameters */ );
 
-typedef bool (*pdcp_intergity_handler)(vlib_main_t * /* in */, vlib_buffer_t * /* in */, void * /* security parameters */);
+typedef bool (*pdcp_intergity_handler) (vlib_main_t * /* in */ ,
+					vlib_buffer_t * /* in */ ,
+					void * /* security parameters */ );
 
 
 
 
 typedef struct
 {
-	/* LFSR */
-	u32 LFSR_S0;
-	u32 LFSR_S1;
-	u32 LFSR_S2;
-	u32 LFSR_S3;
-	u32 LFSR_S4;
-	u32 LFSR_S5;
-	u32 LFSR_S6;
-	u32 LFSR_S7;
-	u32 LFSR_S8;
-	u32 LFSR_S9;
-	u32 LFSR_S10;
-	u32 LFSR_S11;
-	u32 LFSR_S12;
-	u32 LFSR_S13;
-	u32 LFSR_S14;
-	u32 LFSR_S15;
-	/* FSM */
-	
-	u32 FSM_R1;
-	u32 FSM_R2;
-	u32 FSM_R3;
+  /* LFSR */
+  u32 LFSR_S0;
+  u32 LFSR_S1;
+  u32 LFSR_S2;
+  u32 LFSR_S3;
+  u32 LFSR_S4;
+  u32 LFSR_S5;
+  u32 LFSR_S6;
+  u32 LFSR_S7;
+  u32 LFSR_S8;
+  u32 LFSR_S9;
+  u32 LFSR_S10;
+  u32 LFSR_S11;
+  u32 LFSR_S12;
+  u32 LFSR_S13;
+  u32 LFSR_S14;
+  u32 LFSR_S15;
+  /* FSM */
 
-}snow3g_ctx_t;
+  u32 FSM_R1;
+  u32 FSM_R2;
+  u32 FSM_R3;
+
+} snow3g_ctx_t;
 
 
 typedef struct _ppf_pdcp_sa_t_
@@ -347,7 +369,7 @@ typedef struct _ppf_pdcp_sa_t_
 #else
   EVP_CIPHER_CTX cypher_ctx;
 #endif
-  CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
+    CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
   CMAC_CTX *integrity_ctx;
 } ppf_pdcp_aes_sa_t;
 
@@ -358,52 +380,52 @@ typedef struct
   ppf_pdcp_aes_sa_t down_sa;
   ppf_pdcp_aes_sa_t up_sa;
 
-  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+    CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
 
-  u8  security_algorithms;
-  u8  sn_length;
-  u8  header_length;
-  u8  mac_length;
+  u8 security_algorithms;
+  u8 sn_length;
+  u8 header_length;
+  u8 mac_length;
   u32 tx_hfn;
   u32 tx_next_sn;
-  void (*encap_header)(u8 *, u8, u32);
+  void (*encap_header) (u8 *, u8, u32);
   pdcp_intergity_handler protect;
   pdcp_security_handler encrypt;
 
-  CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
+    CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
 
   u32 rx_hfn;
   u32 rx_next_expected_sn;
   u32 rx_last_forwarded_sn;
   u32 replay_window;
   u64 in_flight_limit;
-  uword * rx_replay_bitmap;  /* bitmap of rx sn */
-  u32 * rx_reorder_buffers;  /* rx reordering vector*/
-  void (*decap_header)(u8 *, u8 *, u32 *);
+  uword *rx_replay_bitmap;	/* bitmap of rx sn */
+  u32 *rx_reorder_buffers;	/* rx reordering vector */
+  void (*decap_header) (u8 *, u8 *, u32 *);
   pdcp_intergity_handler validate;
   pdcp_security_handler decrypt;
 
-  CLIB_CACHE_LINE_ALIGN_MARK (cacheline2);
+    CLIB_CACHE_LINE_ALIGN_MARK (cacheline2);
 
   //snow 3g ctx
-  snow3g_ctx_t  snow3g_ctx;
+  snow3g_ctx_t snow3g_ctx;
 
-  u8  integrity_key[MAX_PDCP_KEY_LEN];
-  u8  crypto_key[MAX_PDCP_KEY_LEN];
+  u8 integrity_key[MAX_PDCP_KEY_LEN];
+  u8 crypto_key[MAX_PDCP_KEY_LEN];
 } ppf_pdcp_session_t;
 
 typedef struct
 {
-  ppf_pdcp_session_t * pdcp_sess;
+  ppf_pdcp_session_t *pdcp_sess;
   u32 count;
-  u8  bearer;
-  u8  dir;
+  u8 bearer;
+  u8 dir;
 } ppf_pdcp_security_param_t;
 
 typedef struct
 {
-  ppf_pdcp_session_t * sessions;
-  
+  ppf_pdcp_session_t *sessions;
+
   u32 pdcp_input_next_index;
   u32 pdcp_decrypt_next_index;
   u32 pdcp_encrypt_next_index;
@@ -430,7 +452,7 @@ extern ppf_pdcp_main_t ppf_pdcp_main;
 typedef struct
 {
   u8 *rewrite;
-  
+
   /* tunnel src (vpp) and dst (cp) addresses, ipv4 is enough */
   u32 src;
   u32 dst;
@@ -438,7 +460,7 @@ typedef struct
   u32 want_feedback;
 
   u32 srb_rx_next_index;
-  u32 sb_lb_next_index;  
+  u32 sb_lb_next_index;
 
   /* API message ID base */
   u16 msg_id_base;
@@ -460,7 +482,7 @@ typedef struct
 
 typedef enum
 {
-  PPF_GTPU_SB = 0, 			//The DRB SB GTP tunnel
+  PPF_GTPU_SB = 0,		//The DRB SB GTP tunnel
   PPF_GTPU_NB,			//The DRB NB GTP tunnel
   PPF_GTPU_LBO,			//The GTP tunnel for PPF LBO
   PPF_GTPU_SRB,			//The GTP SRB SB GTP tunnel
@@ -469,14 +491,14 @@ typedef enum
 
 typedef enum
 {
-   PPF_SRB_CALL = 0,
-   PPF_DRB_CALL
+  PPF_SRB_CALL = 0,
+  PPF_DRB_CALL
 } ppf_calline_type_t;
 
- typedef enum
+typedef enum
 {
-   PPF_TUNNEL_MODE = 0,
-   PPF_LBO_MODE
+  PPF_TUNNEL_MODE = 0,
+  PPF_LBO_MODE
 } ppf_calline_mode_t;
 
 typedef struct
@@ -485,8 +507,10 @@ typedef struct
   u32 tunnel_id;
 } ppf_gtpu_tunnel_id_type_t;
 
-typedef union {
-  struct {
+typedef union
+{
+  struct
+  {
     u32 transaction_id;
     u32 request_id;
   };
@@ -495,12 +519,12 @@ typedef union {
 
 typedef struct
 {
-  u64 *nb_out_msg_by_sn;   /* hash <PDCP SN> -> <transaction-id + request-id> */
+  u64 *nb_out_msg_by_sn;	/* hash <PDCP SN> -> <transaction-id + request-id> */
   ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_CALL];
 } ppf_srb_callline_t;
 
 typedef struct
-{	
+{
   ppf_gtpu_tunnel_id_type_t nb_tunnel;
   ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_CALL];
 } ppf_drb_callline_t;
@@ -510,26 +534,27 @@ typedef struct
   u32 session_id;
 } ppf_pdcp_callline_t;
 
-#define PPF_SB_COUNT_MASK             (0x03) // pow2_mask(max_log2(MAX_SB_PER_CALL))
-#define PPF_SB_PATH_MASK              (0x07) // pow2_mask(MAX_SB_PER_CALL)
+#define PPF_SB_COUNT_MASK             (0x03)	// pow2_mask(max_log2(MAX_SB_PER_CALL))
+#define PPF_SB_PATH_MASK              (0x07)	// pow2_mask(MAX_SB_PER_CALL)
 #define PPF_SB_PATH_GET_VALID(mp, i)  ((mp) & (i))
 #define PPF_SB_PATH_SET_VALID(mp, i)  ((mp) |= (1 << ((i) + 2)))
 #define PPF_SB_COUNT(mp)              ((mp) & PPF_SB_COUNT_MASK)
 #define PPF_SB_VALID_PATH(mp)         min_log2(((mp) >> 2) & PPF_SB_PATH_MASK)
 
-typedef struct 
-{	
+typedef struct
+{
   u32 call_index;
-  ppf_calline_type_t call_type; 
-  union {
+  ppf_calline_type_t call_type;
+  union
+  {
     ppf_drb_callline_t drb;
     ppf_srb_callline_t srb;
   } rb;
   ppf_pdcp_callline_t pdcp;
-  u8  sb_multi_path;
-  u8  sb_policy;
-  u8  lbo_mode;
-  u8  ue_mode;
+  u8 sb_multi_path;
+  u8 sb_policy;
+  u8 lbo_mode;
+  u8 ue_mode;
   u32 ue_bearer_id;
   u32 sw_if_index;
   u32 inner_vrf_id;
@@ -548,20 +573,21 @@ typedef struct
   u32 ue_mode;
 } vnet_ppf_add_callline_args_t;
 
-enum {
+enum
+{
   PPF_IO_MODE_SHARED = 0,
   PPF_IO_MODE_DEDICATED
 };
 
 typedef struct
 {
-  ppf_callline_t * ppf_calline_table;
-  
+  ppf_callline_t *ppf_calline_table;
+
   u32 handoff_enable;
   u32 io_mode;
   u32 max_capacity;
   u32 **buffers_duplicated_per_thread;
-  
+
   u16 msg_id_base;
 } ppf_main_t;
 
@@ -596,10 +622,10 @@ typedef struct
 typedef struct _ppf_srb_out_msg_
 {
   u32 request_id;
-  u8  sb_id[3];
-  u8  sb_num;
+  u8 sb_id[3];
+  u8 sb_num;
   u32 data_l;
-  u8  data[0];
+  u8 data[0];
 } ppf_srb_out_msg_t;
 
 typedef struct _ppf_srb_in_msg_
@@ -607,15 +633,16 @@ typedef struct _ppf_srb_in_msg_
   u32 request_id;
   u32 integrity_status;
   u32 data_l;
-  u8  data[0];
+  u8 data[0];
 } ppf_srb_in_msg_t;
 
 typedef struct _ppf_srb_header_t_
 {
-  u32 call_id;  // instead of ue_bearer_id
+  u32 call_id;			// instead of ue_bearer_id
   u32 transaction_id;
-  union {
-    ppf_srb_in_msg_t  in;
+  union
+  {
+    ppf_srb_in_msg_t in;
     ppf_srb_out_msg_t out;
   } msg;
 } ppf_srb_header_t;
@@ -629,21 +656,23 @@ typedef CLIB_PACKED(struct
 }) ip4_srb_header_t;
 /* *INDENT-ON* */
 
-int vnet_ppf_del_callline (u32 call_id) ;
+int vnet_ppf_del_callline (u32 call_id);
 
-int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t *c);
+int vnet_ppf_add_callline (vnet_ppf_add_callline_args_t * c);
 
 
 u8 *format_ppf_call_type (u8 * s, va_list * va);
 u8 *format_ppf_pdcp_session (u8 * s, va_list * va);
 u8 *format_ppf_callline (u8 * s, va_list * va);
 
-u32 ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count, u32 in_flight_limit);
-u32 ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess, ppf_pdcp_config_t * config);
+u32 ppf_pdcp_create_session (u8 sn_length, u32 rx_count, u32 tx_count,
+			     u32 in_flight_limit);
+u32 ppf_pdcp_session_update_as_security (ppf_pdcp_session_t * pdcp_sess,
+					 ppf_pdcp_config_t * config);
 u32 ppf_pdcp_clear_session (ppf_pdcp_session_t * pdcp_sess);
 
-void ppf_reset_calline (u32 call_id) ;
-void ppf_init_calline (u32 call_id, ppf_calline_type_t call_type) ;
+void ppf_reset_calline (u32 call_id);
+void ppf_init_calline (u32 call_id, ppf_calline_type_t call_type);
 
 void ppf_init_callline_intf (u32 call_id);
 void ppf_reset_callline_intf (u32 call_id);

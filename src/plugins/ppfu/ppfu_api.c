@@ -80,12 +80,12 @@ _(PPFU_PLUGIN_GET_VERSION, ppfu_plugin_get_version)   				\
 _(PPFU_PLUGIN_BEARER_INSTALL, ppfu_plugin_bearer_install) 	\
 _(PPFU_PLUGIN_BEARER_UPDATE, ppfu_plugin_bearer_update) 	\
 _(PPFU_PLUGIN_BEARER_RELEASE, ppfu_plugin_bearer_release)		\
-_(PPFU_PLUGIN_SYSTEM_RESET, ppfu_plugin_system_reset)			
+_(PPFU_PLUGIN_SYSTEM_RESET, ppfu_plugin_system_reset)
 
 
 static void
-vl_api_ppfu_plugin_get_version_t_handler 
-(vl_api_ppfu_plugin_get_version_t * mp)
+  vl_api_ppfu_plugin_get_version_t_handler
+  (vl_api_ppfu_plugin_get_version_t * mp)
 {
   vl_api_registration_t *reg;
 
@@ -96,8 +96,8 @@ vl_api_ppfu_plugin_get_version_t_handler
 
 
 static void
-vl_api_ppfu_plugin_bearer_install_t_handler 
-(vl_api_ppfu_plugin_bearer_install_t * mp)
+  vl_api_ppfu_plugin_bearer_install_t_handler
+  (vl_api_ppfu_plugin_bearer_install_t * mp)
 {
   vl_api_ppfu_plugin_bearer_install_reply_t *rmp;
   int rv = 0;
@@ -111,198 +111,226 @@ vl_api_ppfu_plugin_bearer_install_t_handler
 
   ppf_callline_t *callline = NULL;
   ppf_gtpu_tunnel_type_t tunnel_type;
-  u32 nb_tunnel_added = 0, sb_tunnel_added[MAX_SB_PER_CALL] = {0};         //mark which tunnel has been added
-  u32 nb_in_teid = 0, sb_in_teid[MAX_SB_PER_CALL] = {0};	     //mark return teid
-  u32 nb_tunnel_id, sb_tunnel_id[MAX_SB_PER_CALL] = {0};
+  u32 nb_tunnel_added = 0, sb_tunnel_added[MAX_SB_PER_CALL] = { 0 };	//mark which tunnel has been added
+  u32 nb_in_teid = 0, sb_in_teid[MAX_SB_PER_CALL] = { 0 };	//mark return teid
+  u32 nb_tunnel_id, sb_tunnel_id[MAX_SB_PER_CALL] = { 0 };
   u32 sw_if_index = ~0;
   u32 tunnel_id = ~0;
-  ppf_calline_type_t call_type; 
+  ppf_calline_type_t call_type;
   u32 call_line_inited = 0;
-  u32 call_id ;
+  u32 call_id;
 
   int i = 0;
 
-  call_id = clib_net_to_host_u32(mp->call_id);
+  call_id = clib_net_to_host_u32 (mp->call_id);
 
   if (call_id >= ppfm->max_capacity)
-  {
-	rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
-	goto out;
-  }
-  
+    {
+      rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+      goto out;
+    }
+
   callline = &(ppfm->ppf_calline_table[call_id]);
 
-  if (callline->call_index != ~0) 
-  {
-	rv = VNET_API_ERROR_CALLLNE_IN_USE;
-	goto out;
-  }
+  if (callline->call_index != ~0)
+    {
+      rv = VNET_API_ERROR_CALLLNE_IN_USE;
+      goto out;
+    }
 
   nb = &(mp->nb);
 
-  if (clib_net_to_host_u32(nb->protocol_configuration) != 1 /*INTERNAL_DATA_RELAY = 1*/)
-  	call_type = PPF_DRB_CALL;
-  else 
-  	call_type = PPF_SRB_CALL;
+  if (clib_net_to_host_u32 (nb->protocol_configuration) !=
+      1 /*INTERNAL_DATA_RELAY = 1 */ )
+    call_type = PPF_DRB_CALL;
+  else
+    call_type = PPF_SRB_CALL;
 
   ppf_init_calline (call_id, call_type);
   call_line_inited = 1;
 
-  callline->lbo_mode = clib_net_to_host_u32(mp->mode);
+  callline->lbo_mode = clib_net_to_host_u32 (mp->mode);
   callline->ue_mode = 0;
-  if (clib_net_to_host_u32(nb->type) == 2 /* NB_TYPE_DEV */) {
-    callline->lbo_mode = PPF_LBO_MODE;
-    callline->ue_mode = 1;
-  }
+  if (clib_net_to_host_u32 (nb->type) == 2 /* NB_TYPE_DEV */ )
+    {
+      callline->lbo_mode = PPF_LBO_MODE;
+      callline->ue_mode = 1;
+    }
 
-  callline->inner_vrf_id = clib_net_to_host_u32(mp->inner_vrf_id);
+  callline->inner_vrf_id = clib_net_to_host_u32 (mp->inner_vrf_id);
 
   ppf_init_callline_intf (callline->call_index);
 
   /* Create pdcp session */
   pdcp = &mp->entity;
-  callline->pdcp.session_id = ppf_pdcp_create_session (clib_net_to_host_u32(pdcp->sn_length),
-                                                       clib_net_to_host_u32(pdcp->initial_uplink_count),
-                                                       clib_net_to_host_u32(pdcp->initial_downlink_count),
-                                                       clib_net_to_host_u32(pdcp->fc_in_flight_limit));
-  if (~0 != callline->pdcp.session_id) {
+  callline->pdcp.session_id =
+    ppf_pdcp_create_session (clib_net_to_host_u32 (pdcp->sn_length),
+			     clib_net_to_host_u32
+			     (pdcp->initial_uplink_count),
+			     clib_net_to_host_u32
+			     (pdcp->initial_downlink_count),
+			     clib_net_to_host_u32 (pdcp->fc_in_flight_limit));
+  if (~0 != callline->pdcp.session_id)
+    {
       pdcp_sec_para = &mp->secparam;
-	  if (pdcp_sec_para->valid_parameters > 0) {
-        ppf_pdcp_config_t pdcp_config;
+      if (pdcp_sec_para->valid_parameters > 0)
+	{
+	  ppf_pdcp_config_t pdcp_config;
 
-        pdcp_config.flags = clib_net_to_host_u16(pdcp_sec_para->valid_parameters);
-        pdcp_config.integrity_algorithm = pdcp_sec_para->integrity_algorithm;
-        pdcp_config.crypto_algorithm = pdcp_sec_para->confidentiality_algorithm;
-        clib_memcpy (pdcp_config.integrity_key, pdcp_sec_para->integrity_key, sizeof(pdcp_config.integrity_key));
-        clib_memcpy (pdcp_config.crypto_key, pdcp_sec_para->confidentiality_key, sizeof(pdcp_config.crypto_key));
-        ppf_pdcp_session_update_as_security (pool_elt_at_index(ppf_pdcp_main.sessions, callline->pdcp.session_id), &pdcp_config);
-      }
-  }
+	  pdcp_config.flags =
+	    clib_net_to_host_u16 (pdcp_sec_para->valid_parameters);
+	  pdcp_config.integrity_algorithm =
+	    pdcp_sec_para->integrity_algorithm;
+	  pdcp_config.crypto_algorithm =
+	    pdcp_sec_para->confidentiality_algorithm;
+	  clib_memcpy (pdcp_config.integrity_key,
+		       pdcp_sec_para->integrity_key,
+		       sizeof (pdcp_config.integrity_key));
+	  clib_memcpy (pdcp_config.crypto_key,
+		       pdcp_sec_para->confidentiality_key,
+		       sizeof (pdcp_config.crypto_key));
+	  ppf_pdcp_session_update_as_security (pool_elt_at_index
+					       (ppf_pdcp_main.sessions,
+						callline->pdcp.session_id),
+					       &pdcp_config);
+	}
+    }
 
-  if (callline->lbo_mode == PPF_LBO_MODE) 
-  {
-  	rv = ip_table_bind (FIB_PROTOCOL_IP4, callline->sw_if_index, callline->inner_vrf_id, 0);
-	if (rv != 0)
-	  goto out;
-	goto create_sb_tunnels;
+  if (callline->lbo_mode == PPF_LBO_MODE)
+    {
+      rv =
+	ip_table_bind (FIB_PROTOCOL_IP4, callline->sw_if_index,
+		       callline->inner_vrf_id, 0);
+      if (rv != 0)
+	goto out;
+      goto create_sb_tunnels;
 
-  }
+    }
 
   if (callline->call_type == PPF_DRB_CALL)
-  {
-	  uword *p = hash_get (im->fib_index_by_table_id, clib_net_to_host_u32(nb->encap_vrf_id));
-	  if (!p)
-	  {
-		rv = VNET_API_ERROR_NO_SUCH_FIB;
-		goto out;
-	  }
+    {
+      uword *p = hash_get (im->fib_index_by_table_id,
+			   clib_net_to_host_u32 (nb->encap_vrf_id));
+      if (!p)
+	{
+	  rv = VNET_API_ERROR_NO_SUCH_FIB;
+	  goto out;
+	}
 
-	  tunnel_type = PPF_GTPU_NB;
-	  nb_in_teid = clib_net_to_host_u32(mp->ue_bearer_id);
-  
-	  vnet_ppf_gtpu_add_del_tunnel_args_t nb_tunnel = {
-	    .is_ip6 = 0,
-	    .mcast_sw_if_index = 0,		//to be delete	    
-	    .decap_next_index = 0,		//to be delete
-	    .encap_fib_index = clib_net_to_host_u32(nb->encap_vrf_id),
-	    .in_teid = nb_in_teid,
-	    .out_teid = clib_net_to_host_u32(nb->out_teid),
-	    .dst = to_ip46 (0, nb->dst_ip_address),
-	    .src = to_ip46 (0, nb->src_ip_address),
-	    .call_id = call_id,
-	    .tunnel_type = tunnel_type,
-	    .sb_id = 0,				//only valid for sb
-	    .dst_port = clib_net_to_host_u32(nb->port),
-	    .dscp = clib_net_to_host_u32(nb->dscp),
-	    .protocol_config = clib_net_to_host_u32(nb->protocol_configuration),
-	    .type = clib_net_to_host_u32(nb->type),
-	  };
+      tunnel_type = PPF_GTPU_NB;
+      nb_in_teid = clib_net_to_host_u32 (mp->ue_bearer_id);
 
-	  /* Check src & dst are different */
-	  if (ip46_address_cmp (&nb_tunnel.dst, &nb_tunnel.src) == 0)
-	    {
-		rv = VNET_API_ERROR_SAME_SRC_DST;
-		goto out;
-	    }
+      vnet_ppf_gtpu_add_del_tunnel_args_t nb_tunnel = {
+	.is_ip6 = 0,
+	.mcast_sw_if_index = 0,	//to be delete
+	.decap_next_index = 0,	//to be delete
+	.encap_fib_index = clib_net_to_host_u32 (nb->encap_vrf_id),
+	.in_teid = nb_in_teid,
+	.out_teid = clib_net_to_host_u32 (nb->out_teid),
+	.dst = to_ip46 (0, nb->dst_ip_address),
+	.src = to_ip46 (0, nb->src_ip_address),
+	.call_id = call_id,
+	.tunnel_type = tunnel_type,
+	.sb_id = 0,		//only valid for sb
+	.dst_port = clib_net_to_host_u32 (nb->port),
+	.dscp = clib_net_to_host_u32 (nb->dscp),
+	.protocol_config = clib_net_to_host_u32 (nb->protocol_configuration),
+	.type = clib_net_to_host_u32 (nb->type),
+      };
 
-	  sw_if_index = ~0;
-	  tunnel_id = ~0;
-	  rv = vnet_ppf_gtpu_add_tunnel (&nb_tunnel, &sw_if_index, &tunnel_id);
+      /* Check src & dst are different */
+      if (ip46_address_cmp (&nb_tunnel.dst, &nb_tunnel.src) == 0)
+	{
+	  rv = VNET_API_ERROR_SAME_SRC_DST;
+	  goto out;
+	}
 
-	  if (rv == 0) {
-	  	nb_tunnel_added = 1;
-	  	nb_tunnel_id = tunnel_id;
-	  } else {
-	  	goto out;
-	  }
+      sw_if_index = ~0;
+      tunnel_id = ~0;
+      rv = vnet_ppf_gtpu_add_tunnel (&nb_tunnel, &sw_if_index, &tunnel_id);
 
-  }
+      if (rv == 0)
+	{
+	  nb_tunnel_added = 1;
+	  nb_tunnel_id = tunnel_id;
+	}
+      else
+	{
+	  goto out;
+	}
+
+    }
 
 create_sb_tunnels:
 
-  for (i = 0; i< MAX_SB_PER_CALL; i++)
-  {
-  	  sb = &(mp->sb[i]);
+  for (i = 0; i < MAX_SB_PER_CALL; i++)
+    {
+      sb = &(mp->sb[i]);
 
-  	  if (sb->src_ip_address[0] == 0) 
-		continue;
+      if (sb->src_ip_address[0] == 0)
+	continue;
 
-	  uword *p = hash_get (im->fib_index_by_table_id, clib_net_to_host_u32(sb->encap_vrf_id));
-	  if (!p)
-	  {
-		rv = VNET_API_ERROR_NO_SUCH_FIB;
-		goto out;
-	  }
+      uword *p = hash_get (im->fib_index_by_table_id,
+			   clib_net_to_host_u32 (sb->encap_vrf_id));
+      if (!p)
+	{
+	  rv = VNET_API_ERROR_NO_SUCH_FIB;
+	  goto out;
+	}
 
-        if (callline->call_type == PPF_DRB_CALL)
-	  	tunnel_type = PPF_GTPU_SB;
-	  else 
-	  	tunnel_type = PPF_GTPU_SRB;
-	  	
-	  sb_in_teid [i] = (((i + 1) << 30) |clib_net_to_host_u32(mp->ue_bearer_id));
+      if (callline->call_type == PPF_DRB_CALL)
+	tunnel_type = PPF_GTPU_SB;
+      else
+	tunnel_type = PPF_GTPU_SRB;
 
-	  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
-	    .is_ip6 = 0,
-	    .mcast_sw_if_index = 0,
-	    .encap_fib_index = clib_net_to_host_u32(sb->encap_vrf_id),
-	    .decap_next_index = 0,
-	    .in_teid = sb_in_teid[i],
-	    .out_teid = clib_net_to_host_u32(sb->pri_out_teid),
-	    .dst = to_ip46 (0, sb->pri_ip_address),
-	    .src = to_ip46 (0, sb->src_ip_address),
-	    .call_id =call_id,
-	    .tunnel_type = tunnel_type,
-	    .sb_id = i,
-	    .dst_port = clib_net_to_host_u32(sb->pri_port),
-	    .dscp = clib_net_to_host_u32(sb->pri_dscp),
-	    .protocol_config = clib_net_to_host_u32(sb->protocol_configuration),
-	    .ep_weight = clib_net_to_host_u32(sb->ep_weight),
-	    .traffic_state = clib_net_to_host_u32(sb->traffic_state),
-	  };
+      sb_in_teid[i] =
+	(((i + 1) << 30) | clib_net_to_host_u32 (mp->ue_bearer_id));
 
-	  /* Check src & dst are different */
-	  if (ip46_address_cmp (&(sb_tunnel.dst), &(sb_tunnel.src)) == 0)
-	    {
-		rv = VNET_API_ERROR_SAME_SRC_DST;
-		goto out;
-	    }
+      vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
+	.is_ip6 = 0,
+	.mcast_sw_if_index = 0,
+	.encap_fib_index = clib_net_to_host_u32 (sb->encap_vrf_id),
+	.decap_next_index = 0,
+	.in_teid = sb_in_teid[i],
+	.out_teid = clib_net_to_host_u32 (sb->pri_out_teid),
+	.dst = to_ip46 (0, sb->pri_ip_address),
+	.src = to_ip46 (0, sb->src_ip_address),
+	.call_id = call_id,
+	.tunnel_type = tunnel_type,
+	.sb_id = i,
+	.dst_port = clib_net_to_host_u32 (sb->pri_port),
+	.dscp = clib_net_to_host_u32 (sb->pri_dscp),
+	.protocol_config = clib_net_to_host_u32 (sb->protocol_configuration),
+	.ep_weight = clib_net_to_host_u32 (sb->ep_weight),
+	.traffic_state = clib_net_to_host_u32 (sb->traffic_state),
+      };
 
-	  sw_if_index = ~0;
-	  tunnel_id = ~0;
-	  rv = vnet_ppf_gtpu_add_tunnel (&(sb_tunnel), &sw_if_index, &tunnel_id);
-	
-	  if (rv == 0) {
-	  	sb_tunnel_added[i] = 1;
-	  	sb_tunnel_id[i] = tunnel_id;
-	  	
-	  } else {
-	  	goto out;
-	  }
-	  
-  }
+      /* Check src & dst are different */
+      if (ip46_address_cmp (&(sb_tunnel.dst), &(sb_tunnel.src)) == 0)
+	{
+	  rv = VNET_API_ERROR_SAME_SRC_DST;
+	  goto out;
+	}
 
-  callline->sb_policy = clib_net_to_host_u32(mp->sb_policy);
-  callline->ue_bearer_id = clib_net_to_host_u32(mp->ue_bearer_id);
+      sw_if_index = ~0;
+      tunnel_id = ~0;
+      rv = vnet_ppf_gtpu_add_tunnel (&(sb_tunnel), &sw_if_index, &tunnel_id);
+
+      if (rv == 0)
+	{
+	  sb_tunnel_added[i] = 1;
+	  sb_tunnel_id[i] = tunnel_id;
+
+	}
+      else
+	{
+	  goto out;
+	}
+
+    }
+
+  callline->sb_policy = clib_net_to_host_u32 (mp->sb_policy);
+  callline->ue_bearer_id = clib_net_to_host_u32 (mp->ue_bearer_id);
 
 
 out:
@@ -320,16 +348,16 @@ out:
  	    	vnet_ppf_gtpu_del_tunnel (sb_tunnel_id[i]);
  	      sb_tunnel_added[i] = 0;
  	    }
- 	    
- 	    sb_in_teid[i] = 0;
- 	} 	
 
-      if (call_line_inited == 1) 
- 		ppf_reset_calline (callline->call_index); 	
+ 	    sb_in_teid[i] = 0;
+ 	}
+
+      if (call_line_inited == 1)
+ 		ppf_reset_calline (callline->call_index);
   }
-  
+
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
-  ({  
+  ({
 
      for (i = 0; i< MAX_SB_PER_CALL; i++) {
      	rmp->sb_in_teid[i] = clib_host_to_net_u32(sb_in_teid[i]);
@@ -338,7 +366,7 @@ out:
       rmp->call_id = clib_host_to_net_u32(call_id);
       rmp->ue_bearer_id = (mp->ue_bearer_id);
       rmp->transaction_id = (mp->transaction_id);
-  
+
   }));
 
   /* *INDENT-ON* */
@@ -346,8 +374,8 @@ out:
 
 
 static void
-vl_api_ppfu_plugin_bearer_update_t_handler 
- (vl_api_ppfu_plugin_bearer_update_t * mp)
+  vl_api_ppfu_plugin_bearer_update_t_handler
+  (vl_api_ppfu_plugin_bearer_update_t * mp)
 {
   vl_api_ppfu_plugin_bearer_update_reply_t *rmp;
   int rv = 0;
@@ -356,145 +384,159 @@ vl_api_ppfu_plugin_bearer_update_t_handler
   ip4_main_t *im = &ip4_main;
 
   vl_api_sb_path_context_t *sb;
-    
+
   ppf_callline_t *callline = NULL;
   ppf_gtpu_tunnel_type_t tunnel_type;
   ppf_gtpu_tunnel_id_type_t *sb_key;
   u32 sw_if_index = ~0;
   u32 tunnel_id = ~0;
   u32 sb_in_teid[MAX_SB_PER_CALL];
-  u32 sb_tunnel_added[MAX_SB_PER_CALL]={0};
-  u32 sb_tunnel_id[MAX_SB_PER_CALL] = {0};
+  u32 sb_tunnel_added[MAX_SB_PER_CALL] = { 0 };
+  u32 sb_tunnel_id[MAX_SB_PER_CALL] = { 0 };
   ppf_gtpu_tunnel_t *t = NULL;
-  u32 call_id = clib_net_to_host_u32(mp->call_id);
+  u32 call_id = clib_net_to_host_u32 (mp->call_id);
 
   int i = 0;
 
   if (call_id >= ppfm->max_capacity)
-  {
-	rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
-	goto out;
-  }
-  
+    {
+      rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+      goto out;
+    }
+
   callline = &(ppfm->ppf_calline_table[call_id]);
 
-  if (callline->call_index == ~0) 
-  {
-	rv = VNET_API_ERROR_EMPTY_CALLINE;
-	goto out;
-  }
+  if (callline->call_index == ~0)
+    {
+      rv = VNET_API_ERROR_EMPTY_CALLINE;
+      goto out;
+    }
 
-  //first, remove sbs 
-  for (i = 0; i< MAX_SB_PER_CALL; i++) 
-  {
-	if (callline->call_type == PPF_DRB_CALL)
-	    sb_key = &(callline->rb.drb.sb_tunnel[i]);
-	else 
-	    sb_key = &(callline->rb.srb.sb_tunnel[i]);
+  //first, remove sbs
+  for (i = 0; i < MAX_SB_PER_CALL; i++)
+    {
+      if (callline->call_type == PPF_DRB_CALL)
+	sb_key = &(callline->rb.drb.sb_tunnel[i]);
+      else
+	sb_key = &(callline->rb.srb.sb_tunnel[i]);
 
-	if (sb_key->tunnel_id != INVALID_TUNNEL_ID)  {
+      if (sb_key->tunnel_id != INVALID_TUNNEL_ID)
+	{
 
-		if (clib_net_to_host_u32(mp->removal_sb_id[i]) != 0) {
+	  if (clib_net_to_host_u32 (mp->removal_sb_id[i]) != 0)
+	    {
 
-		  rv = vnet_ppf_gtpu_del_tunnel (sb_key->tunnel_id);
-		  
-		} else {
-		  t = &(gtm->tunnels[sb_key->tunnel_id]);
-		  
-		  sb_in_teid[i] = t->in_teid;
-		}
-	}	  
-  }
+	      rv = vnet_ppf_gtpu_del_tunnel (sb_key->tunnel_id);
+
+	    }
+	  else
+	    {
+	      t = &(gtm->tunnels[sb_key->tunnel_id]);
+
+	      sb_in_teid[i] = t->in_teid;
+	    }
+	}
+    }
 
   //second, update or add sbs
   //To be done: how to rollback if updated failded in progress??
-  for (i = 0; i< MAX_SB_PER_CALL; i++)
-  {
-	  sb = &(mp->sb[i]);
+  for (i = 0; i < MAX_SB_PER_CALL; i++)
+    {
+      sb = &(mp->sb[i]);
 
-	  if (sb->src_ip_address[0] == 0) 
-		continue;
+      if (sb->src_ip_address[0] == 0)
+	continue;
 
-	  uword *p = hash_get (im->fib_index_by_table_id, clib_net_to_host_u32 (sb->encap_vrf_id));
-	  if (!p)
-	  {
-		rv = VNET_API_ERROR_NO_SUCH_FIB;
-		goto out;
-	  }
+      uword *p = hash_get (im->fib_index_by_table_id,
+			   clib_net_to_host_u32 (sb->encap_vrf_id));
+      if (!p)
+	{
+	  rv = VNET_API_ERROR_NO_SUCH_FIB;
+	  goto out;
+	}
 
+      if (callline->call_type == PPF_DRB_CALL)
+	sb_key = &(callline->rb.drb.sb_tunnel[i]);
+      else
+	sb_key = &(callline->rb.srb.sb_tunnel[i]);
+
+      if (sb_key->tunnel_id != INVALID_TUNNEL_ID)
+	{
+
+	  //update sb_tunnel
+	  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
+	    .out_teid = clib_net_to_host_u32 (sb->pri_out_teid),
+	    .dst = to_ip46 (0, sb->pri_ip_address),
+	    .dst_port = clib_net_to_host_u32 (sb->pri_port),
+	    .dscp = clib_net_to_host_u32 (sb->pri_dscp),
+	    .protocol_config =
+	      clib_net_to_host_u32 (sb->protocol_configuration),
+	    .ep_weight = clib_net_to_host_u32 (sb->ep_weight),
+	    .traffic_state = clib_net_to_host_u32 (sb->traffic_state),
+	    .type = ~0,
+	  };
+
+	  rv = vnet_ppf_gtpu_update_tunnel (sb_key->tunnel_id, &(sb_tunnel));
+
+	  if (rv != 0)
+	    goto out;
+
+	}
+      else
+	{
+
+	  //add sb_tunnel
 	  if (callline->call_type == PPF_DRB_CALL)
-	    sb_key = &(callline->rb.drb.sb_tunnel[i]);
-	  else 
-	    sb_key = &(callline->rb.srb.sb_tunnel[i]);
-	    
-	  if (sb_key->tunnel_id != INVALID_TUNNEL_ID) {
-	  
-	  	//update sb_tunnel
-		vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
-		    .out_teid = clib_net_to_host_u32(sb->pri_out_teid),
-		    .dst = to_ip46 (0, sb->pri_ip_address),
-		    .dst_port = clib_net_to_host_u32(sb->pri_port),
-		    .dscp = clib_net_to_host_u32(sb->pri_dscp),
-		    .protocol_config = clib_net_to_host_u32(sb->protocol_configuration),
-		    .ep_weight = clib_net_to_host_u32(sb->ep_weight),
-		    .traffic_state = clib_net_to_host_u32(sb->traffic_state),
-		    .type = ~0,
-		  };
+	    tunnel_type = PPF_GTPU_SB;
+	  else
+	    tunnel_type = PPF_GTPU_SRB;
 
-	    rv = vnet_ppf_gtpu_update_tunnel (sb_key->tunnel_id, &(sb_tunnel));
+	  sb_in_teid[i] =
+	    (((i + 1) << 30) | clib_net_to_host_u32 (mp->ue_bearer_id));
 
-	    if (rv != 0)
-	    	goto out;
+	  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
+	    .is_ip6 = 0,
+	    .mcast_sw_if_index = 0,
+	    .encap_fib_index = clib_net_to_host_u32 (sb->encap_vrf_id),
+	    .decap_next_index = 0,
+	    .in_teid = sb_in_teid[i],
+	    .out_teid = clib_net_to_host_u32 (sb->pri_out_teid),
+	    .dst = to_ip46 (0, sb->pri_ip_address),
+	    .src = to_ip46 (0, sb->src_ip_address),
+	    .call_id = call_id,
+	    .tunnel_type = tunnel_type,
+	    .sb_id = i,
+	    .dst_port = clib_net_to_host_u32 (sb->pri_port),
+	    .dscp = clib_net_to_host_u32 (sb->pri_dscp),
+	    .protocol_config =
+	      clib_net_to_host_u32 (sb->protocol_configuration),
+	    .ep_weight = clib_net_to_host_u32 (sb->ep_weight),
+	    .traffic_state = clib_net_to_host_u32 (sb->traffic_state),
+	  };
 
-	 } else {
+	  /* Check src & dst are different */
+	  if (ip46_address_cmp (&(sb_tunnel.dst), &(sb_tunnel.src)) == 0)
+	    {
+	      rv = VNET_API_ERROR_SAME_SRC_DST;
+	      goto out;
+	    }
 
-		//add sb_tunnel
-		  if (callline->call_type == PPF_DRB_CALL)
-			tunnel_type = PPF_GTPU_SB;
-		  else 
-			tunnel_type = PPF_GTPU_SRB;
-			
-		  sb_in_teid [i] = (((i + 1) << 30) |clib_net_to_host_u32(mp->ue_bearer_id));
+	  sw_if_index = ~0;
+	  tunnel_id = ~0;
+	  rv =
+	    vnet_ppf_gtpu_add_tunnel (&(sb_tunnel), &sw_if_index, &tunnel_id);
 
-		  vnet_ppf_gtpu_add_del_tunnel_args_t sb_tunnel = {
-		    .is_ip6 = 0,
-		    .mcast_sw_if_index = 0,
-		    .encap_fib_index = clib_net_to_host_u32(sb->encap_vrf_id),
-		    .decap_next_index = 0,
-		    .in_teid = sb_in_teid[i],
-		    .out_teid = clib_net_to_host_u32(sb->pri_out_teid),
-		    .dst = to_ip46 (0, sb->pri_ip_address),
-		    .src = to_ip46 (0, sb->src_ip_address),
-		    .call_id =call_id,
-		    .tunnel_type = tunnel_type,
-		    .sb_id = i,
-		    .dst_port = clib_net_to_host_u32(sb->pri_port),
-		    .dscp = clib_net_to_host_u32(sb->pri_dscp),
-		    .protocol_config = clib_net_to_host_u32(sb->protocol_configuration),
-		    .ep_weight = clib_net_to_host_u32(sb->ep_weight),
-		    .traffic_state = clib_net_to_host_u32(sb->traffic_state),
-		  };
+	  if (rv == 0)
+	    {
+	      sb_tunnel_added[i] = 1;
+	      sb_tunnel_id[i] = tunnel_id;
+	    }
+	  else
+	    goto out;
 
-		  /* Check src & dst are different */
-		  if (ip46_address_cmp (&(sb_tunnel.dst), &(sb_tunnel.src)) == 0)
-		    {
-			rv = VNET_API_ERROR_SAME_SRC_DST;
-			goto out;
-		    }
+	}
 
-		  sw_if_index = ~0;
-		  tunnel_id = ~0;
-		  rv = vnet_ppf_gtpu_add_tunnel (&(sb_tunnel), &sw_if_index, &tunnel_id);
-		  
-		  if (rv == 0) {
-			sb_tunnel_added[i] = 1;
-			sb_tunnel_id[i] = tunnel_id;
-		  } else 
-		  	goto out;
-
-	  }
-	  
-  }
+    }
 
 out:
   /* *INDENT-OFF* */
@@ -507,9 +549,9 @@ out:
 	    sb_in_teid[i] = 0;
 	}
   }
-  
+
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_UPDATE_REPLY,
-  ({	
+  ({
 
      for (i = 0; i<MAX_SB_PER_CALL; i++) {
 	rmp->sb_in_teid[i] = clib_host_to_net_u32(sb_in_teid[i]);
@@ -517,7 +559,7 @@ out:
 	rmp->call_id = clib_host_to_net_u32(call_id);
 	rmp->ue_bearer_id = (mp->ue_bearer_id);
 	rmp->transaction_id = (mp->transaction_id);
-  
+
   }));
 
   /* *INDENT-ON* */
@@ -525,8 +567,8 @@ out:
 
 
 static void
-vl_api_ppfu_plugin_bearer_release_t_handler 
-(vl_api_ppfu_plugin_bearer_release_t * mp)
+  vl_api_ppfu_plugin_bearer_release_t_handler
+  (vl_api_ppfu_plugin_bearer_release_t * mp)
 {
   vl_api_ppfu_plugin_bearer_release_reply_t *rmp;
   int rv = 0;
@@ -534,61 +576,63 @@ vl_api_ppfu_plugin_bearer_release_t_handler
   ppf_callline_t *callline = NULL;
   int i = 0;
   ppf_gtpu_tunnel_id_type_t *nb_tunnel, *sb_tunnel[MAX_SB_PER_CALL];
-  u32 call_id = clib_net_to_host_u32(mp->call_id);
+  u32 call_id = clib_net_to_host_u32 (mp->call_id);
 
   if (call_id >= ppfm->max_capacity)
-  {
-	rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
-	goto out;
-  }
-  
+    {
+      rv = VNET_API_ERROR_WRONG_MAX_SESSION_NUM;
+      goto out;
+    }
+
   callline = &(ppfm->ppf_calline_table[call_id]);
 
-  if (callline->call_index == ~0) 
-  {
-	rv = VNET_API_ERROR_EMPTY_CALLINE;
+  if (callline->call_index == ~0)
+    {
+      rv = VNET_API_ERROR_EMPTY_CALLINE;
+      goto out;
+    }
+
+  if ((callline->lbo_mode != PPF_LBO_MODE)
+      && (callline->call_type == PPF_DRB_CALL))
+    {
+      nb_tunnel = &(callline->rb.drb.nb_tunnel);
+
+      rv = vnet_ppf_gtpu_del_tunnel (nb_tunnel->tunnel_id);
+
+      if (rv != 0)
 	goto out;
-  }
 
-  if ((callline->lbo_mode != PPF_LBO_MODE) && (callline->call_type == PPF_DRB_CALL))
-  {
-	  nb_tunnel = &(callline->rb.drb.nb_tunnel);
+    }
 
-	  rv = vnet_ppf_gtpu_del_tunnel (nb_tunnel->tunnel_id);
+  for (i = 0; i < MAX_SB_PER_CALL; i++)
+    {
+
+      if (callline->call_type == PPF_DRB_CALL)
+	sb_tunnel[i] = &(callline->rb.drb.sb_tunnel[i]);
+      else
+	sb_tunnel[i] = &(callline->rb.srb.sb_tunnel[i]);
+
+      if (sb_tunnel[i]->tunnel_id != ~0)
+	{
+	  rv = vnet_ppf_gtpu_del_tunnel (sb_tunnel[i]->tunnel_id);
 
 	  if (rv != 0)
-	  	goto out;
+	    goto out;
+	}
 
-  }
-
-  for (i = 0; i< MAX_SB_PER_CALL; i++)
-  {
-
-	  if (callline->call_type == PPF_DRB_CALL)
-		sb_tunnel[i] = &(callline->rb.drb.sb_tunnel[i]);
-	  else 
-		sb_tunnel[i] = &(callline->rb.srb.sb_tunnel[i]);
-
-        if (sb_tunnel[i]->tunnel_id != ~0) {	  
-	  	rv = vnet_ppf_gtpu_del_tunnel (sb_tunnel[i]->tunnel_id);
-	  	
-	  	if (rv != 0)
-	  		goto out;
-	  }
-	  
-  }
+    }
 
   ppf_reset_calline (callline->call_index);
-  
+
 out:
   /* *INDENT-OFF* */
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_RELEASE_REPLY,
-  ({	
+  ({
 
 	rmp->call_id = clib_host_to_net_u32(call_id);
 	rmp->ue_bearer_id = (mp->ue_bearer_id);
 	rmp->transaction_id = (mp->transaction_id);
-  
+
   }));
 
   /* *INDENT-ON* */
@@ -596,8 +640,8 @@ out:
 
 
 static void
-vl_api_ppfu_plugin_system_reset_t_handler 
-(vl_api_ppfu_plugin_system_reset_t * mp)
+  vl_api_ppfu_plugin_system_reset_t_handler
+  (vl_api_ppfu_plugin_system_reset_t * mp)
 {
   vl_api_registration_t *reg;
 

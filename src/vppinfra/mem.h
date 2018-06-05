@@ -219,10 +219,10 @@ clib_mem_size (void *p)
 always_inline void *
 clib_mem_realloc2 (void *p, uword new_size)
 {
-	uword old_size = clib_mem_size (p);
+  uword old_size = clib_mem_size (p);
 
-	if (new_size <= old_size)
-		return p;
+  if (new_size <= old_size)
+    return p;
 
   /* By default use alloc, copy and free to emulate realloc. */
   void *q = clib_mem_alloc (new_size);

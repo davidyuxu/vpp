@@ -607,14 +607,15 @@ tuntap_config (vlib_main_t * vm, unformat_input_t * input)
     }
 
   /* Allow operators to customize the txqueuelen of TUN device, by Jordy */
-  if (qlen != ~0) {
-    ifr.ifr_qlen = qlen;
-    if (ioctl (tm->dev_tap_fd, SIOCSIFTXQLEN, &ifr) < 0)
-      {
-        error = clib_error_return_unix (0, "ioctl SIOCSIFTXQLEN");
-        goto done;
-      }
-  }
+  if (qlen != ~0)
+    {
+      ifr.ifr_qlen = qlen;
+      if (ioctl (tm->dev_tap_fd, SIOCSIFTXQLEN, &ifr) < 0)
+	{
+	  error = clib_error_return_unix (0, "ioctl SIOCSIFTXQLEN");
+	  goto done;
+	}
+    }
 
 
   /* get flags, modify to bring up interface... */

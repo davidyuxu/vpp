@@ -47,7 +47,7 @@ void BV (clib_bihash_init)
   h->cache_hits = 0;
   h->cache_misses = 0;
 
-  if (h->mheap == NULL) /* Allow customerized mheap, by Jordy*/
+  if (h->mheap == NULL)		/* Allow customerized mheap, by Jordy */
     h->mheap = mheap_alloc (0 /* use VM */ , memory_size);
 
   bucket_size = nbuckets * sizeof (h->buckets[0]);

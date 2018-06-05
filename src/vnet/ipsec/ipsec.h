@@ -133,7 +133,7 @@ typedef struct
 {
   const EVP_MD *md;
   u32 mac_size;
-	u32 trunc_size;
+  u32 trunc_size;
 } ipsec_proto_main_integ_alg_t;
 
 typedef struct
@@ -141,24 +141,25 @@ typedef struct
   ipsec_proto_main_crypto_alg_t *ipsec_proto_main_crypto_algs;
   ipsec_proto_main_integ_alg_t *ipsec_proto_main_integ_algs;
 
-	xoshiro256starstar_t *rand_state;
+  xoshiro256starstar_t *rand_state;
 
-	struct {
-		CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
-		struct random_data data;		
-		i8 buf[32];
-	} * rand_data;
-	
+  struct
+  {
+    CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+    struct random_data data;
+    i8 buf[32];
+  } *rand_data;
+
 } ipsec_proto_main_t;
 
 typedef struct
 {
   EVP_CIPHER_CTX *cipher_ctx;
   HMAC_CTX *hmac_ctx;
-	CMAC_CTX *cmac_ctx;
+  CMAC_CTX *cmac_ctx;
 
-	/* context initialized by worker? */
-	u8 ctx_initialized;
+  /* context initialized by worker? */
+  u8 ctx_initialized;
 } ipsec_sa_per_thread_data_t;
 
 typedef struct
@@ -167,9 +168,9 @@ typedef struct
   u32 spi;
   ipsec_protocol_t protocol;
 
-	ipsec_sa_per_thread_data_t *context;
-	
-	ipsec_crypto_alg_t crypto_alg;
+  ipsec_sa_per_thread_data_t *context;
+
+  ipsec_crypto_alg_t crypto_alg;
   u8 crypto_key_len;
   u8 crypto_key[128];
 
@@ -354,8 +355,8 @@ typedef struct
   /* callbacks */
   ipsec_main_callbacks_t cb;
 
-	/* debug fformat, generate HEXDUMP  */
-	u8 debug_fformat;
+  /* debug fformat, generate HEXDUMP  */
+  u8 debug_fformat;
 } ipsec_main_t;
 
 extern ipsec_main_t ipsec_main;
@@ -405,10 +406,10 @@ int ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
 			    u8 is_outbound);
 
 /* per sa context */
-void ipsec_set_sa_contexts_integ_key (ipsec_sa_t *sa);
-void ipsec_set_sa_contexts_crypto_key (ipsec_sa_t *sa);
-void ipsec_create_sa_contexts (ipsec_sa_t *sa);
-void ipsec_delete_sa_contexts (ipsec_sa_t *sa);
+void ipsec_set_sa_contexts_integ_key (ipsec_sa_t * sa);
+void ipsec_set_sa_contexts_crypto_key (ipsec_sa_t * sa);
+void ipsec_create_sa_contexts (ipsec_sa_t * sa);
+void ipsec_delete_sa_contexts (ipsec_sa_t * sa);
 
 
 static_always_inline u32
@@ -425,50 +426,57 @@ get_next_output_feature_node_index (vlib_buffer_t * b,
 }
 
 #if (OPENSSL_VERSION_NUMBER < 0x10100000L)
-static_always_inline HMAC_CTX *HMAC_CTX_new(void)
+static_always_inline HMAC_CTX *
+HMAC_CTX_new (void)
 {
-	HMAC_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
+  HMAC_CTX *ctx = OPENSSL_malloc (sizeof (*ctx));
 
-	if (ctx != NULL)
-		HMAC_CTX_init(ctx);
-	return ctx;
+  if (ctx != NULL)
+    HMAC_CTX_init (ctx);
+  return ctx;
 }
 
-static_always_inline void HMAC_CTX_free(HMAC_CTX *ctx)
+static_always_inline void
+HMAC_CTX_free (HMAC_CTX * ctx)
 {
-	if (ctx != NULL) {
-		HMAC_CTX_cleanup(ctx);
-		OPENSSL_free(ctx);
-	}
+  if (ctx != NULL)
+    {
+      HMAC_CTX_cleanup (ctx);
+      OPENSSL_free (ctx);
+    }
 }
 #endif
 
 
 
 static_always_inline void
-ipsec_make_sa_contexts (u8 thread_id, ipsec_sa_t *sa, u8 is_outbound)
+ipsec_make_sa_contexts (u8 thread_id, ipsec_sa_t * sa, u8 is_outbound)
 {
-	if (PREDICT_TRUE(sa->context[thread_id].ctx_initialized))
-		return;
-	
-	ipsec_proto_main_t *em = &ipsec_proto_main;
+  if (PREDICT_TRUE (sa->context[thread_id].ctx_initialized))
+    return;
 
-	const EVP_MD *md = em->ipsec_proto_main_integ_algs[sa->integ_alg].md;
-	const EVP_CIPHER *cipher = em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
+  ipsec_proto_main_t *em = &ipsec_proto_main;
 
-	if (!sa->context[thread_id].hmac_ctx)
-		sa->context[thread_id].hmac_ctx = HMAC_CTX_new ();
-	if (!sa->context[thread_id].cipher_ctx)
-		sa->context[thread_id].cipher_ctx = EVP_CIPHER_CTX_new ();
-	if (!sa->context[thread_id].cmac_ctx)
-		sa->context[thread_id].cmac_ctx = CMAC_CTX_new ();
-	
-	HMAC_Init_ex (sa->context[thread_id].hmac_ctx, sa->integ_key, sa->integ_key_len, md, NULL);
-	EVP_CipherInit_ex (sa->context[thread_id].cipher_ctx, cipher, NULL, sa->crypto_key, NULL, is_outbound > 0 ? 1 : 0);
-	EVP_CIPHER_CTX_set_padding(sa->context[thread_id].cipher_ctx, 0);
-	CMAC_Init (sa->context[thread_id].cmac_ctx, sa->integ_key, 16, EVP_aes_128_cbc(), NULL);
+  const EVP_MD *md = em->ipsec_proto_main_integ_algs[sa->integ_alg].md;
+  const EVP_CIPHER *cipher =
+    em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
 
-	sa->context[thread_id].ctx_initialized = 1;
+  if (!sa->context[thread_id].hmac_ctx)
+    sa->context[thread_id].hmac_ctx = HMAC_CTX_new ();
+  if (!sa->context[thread_id].cipher_ctx)
+    sa->context[thread_id].cipher_ctx = EVP_CIPHER_CTX_new ();
+  if (!sa->context[thread_id].cmac_ctx)
+    sa->context[thread_id].cmac_ctx = CMAC_CTX_new ();
+
+  HMAC_Init_ex (sa->context[thread_id].hmac_ctx, sa->integ_key,
+		sa->integ_key_len, md, NULL);
+  EVP_CipherInit_ex (sa->context[thread_id].cipher_ctx, cipher, NULL,
+		     sa->crypto_key, NULL, is_outbound > 0 ? 1 : 0);
+  EVP_CIPHER_CTX_set_padding (sa->context[thread_id].cipher_ctx, 0);
+  CMAC_Init (sa->context[thread_id].cmac_ctx, sa->integ_key, 16,
+	     EVP_aes_128_cbc (), NULL);
+
+  sa->context[thread_id].ctx_initialized = 1;
 }
 
 

@@ -255,36 +255,37 @@ vl_api_cli_inband_t_handler (vl_api_cli_inband_t * mp)
 static void
 vl_api_do_vpp_cmd_output (uword output, u8 * buffer, uword buffer_bytes)
 {
-	char *p = (char *)output;
+  char *p = (char *) output;
 
-	if (strlen (p) + buffer_bytes < VL_API_DO_VPP_CMD_OUTPUT_LEN) {
-		strcat (p, (char *)buffer);
-	}
+  if (strlen (p) + buffer_bytes < VL_API_DO_VPP_CMD_OUTPUT_LEN)
+    {
+      strcat (p, (char *) buffer);
+    }
 }
 
 static void
 vl_api_do_vpp_cmd_t_handler (vl_api_do_vpp_cmd_t * mp)
 {
-	vl_api_do_vpp_cmd_reply_t *rmp;
-	int rv = 0;
-	vlib_main_t *vm = &vlib_global_main;
-	unformat_input_t input;
+  vl_api_do_vpp_cmd_reply_t *rmp;
+  int rv = 0;
+  vlib_main_t *vm = &vlib_global_main;
+  unformat_input_t input;
 
-	u8 output[VL_API_DO_VPP_CMD_OUTPUT_LEN + 1] = {0};
+  u8 output[VL_API_DO_VPP_CMD_OUTPUT_LEN + 1] = { 0 };
 
-	/* Build an unformat structure around our command */
-	unformat_init_string(&input, mp->input, strlen(mp->input));
+  /* Build an unformat structure around our command */
+  unformat_init_string (&input, mp->input, strlen (mp->input));
 
-	/* Remove leading white space from input. */
-	(void) unformat (&input, "");
-	
-	if (unformat_check_input (&input) != UNFORMAT_END_OF_INPUT)
-		vlib_cli_input (vm, &input, vl_api_do_vpp_cmd_output, (uword)output);
+  /* Remove leading white space from input. */
+  (void) unformat (&input, "");
 
-	/* Zero buffer since otherwise unformat_free will call vec_free on it. */
-	//input.buffer = 0;
+  if (unformat_check_input (&input) != UNFORMAT_END_OF_INPUT)
+    vlib_cli_input (vm, &input, vl_api_do_vpp_cmd_output, (uword) output);
 
-	unformat_free (&input);
+  /* Zero buffer since otherwise unformat_free will call vec_free on it. */
+  //input.buffer = 0;
+
+  unformat_free (&input);
 
 	/* *INDENT-OFF* */
 	REPLY_MACRO2(VL_API_DO_VPP_CMD_REPLY,

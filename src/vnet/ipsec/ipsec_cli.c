@@ -147,9 +147,9 @@ ipsec_sa_add_del_command_fn (vlib_main_t * vm,
 	  sa.is_tunnel = 1;
 	  sa.is_tunnel_ip6 = 1;
 	}
-			else if (unformat (line_input, "udp-encap"))
+      else if (unformat (line_input, "udp-encap"))
 	{
-		sa.udp_encap = 1;
+	  sa.udp_encap = 1;
 	}
       else
 	{
@@ -753,7 +753,7 @@ create_ipsec_tunnel_command_fn (vlib_main_t * vm,
 	num_m_args++;
       else if (unformat (line_input, "instance %u", &a.show_instance))
 	a.renumber = 1;
-			else if (unformat (line_input, "udp-encap"))
+      else if (unformat (line_input, "udp-encap"))
 	a.udp_encap = 1;
       else if (unformat (line_input, "del"))
 	a.is_add = 0;
@@ -889,12 +889,12 @@ VLIB_CLI_COMMAND (set_interface_key_command, static) = {
 
 static clib_error_t *
 debug_ipsec_output_command_fn (vlib_main_t * vm,
-				 unformat_input_t * input,
-				 vlib_cli_command_t * cmd)
+			       unformat_input_t * input,
+			       vlib_cli_command_t * cmd)
 {
   ipsec_main_t *im = &ipsec_main;
   unformat_input_t _line_input, *line_input = &_line_input;
-  clib_error_t *error = 0;	
+  clib_error_t *error = 0;
 
   /* Get a line of input. */
   if (!unformat_user (input, unformat_line_input, line_input))

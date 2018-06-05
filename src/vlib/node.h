@@ -742,7 +742,7 @@ typedef struct
 } vlib_node_main_t;
 
 
-#define FRAME_QUEUE_MAX_NELTS 128 //was 32
+#define FRAME_QUEUE_MAX_NELTS 128	//was 32
 typedef struct
 {
   CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);

@@ -191,7 +191,7 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
 
   sa.id = ntohl (mp->sad_id);
   sa.spi = ntohl (mp->spi);
-  sa.protocol = mp->protocol;	
+  sa.protocol = mp->protocol;
   /* check for unsupported crypto-alg */
   if (mp->crypto_algorithm < IPSEC_CRYPTO_ALG_NONE ||
       mp->crypto_algorithm >= IPSEC_CRYPTO_N_ALG)
@@ -219,7 +219,7 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
   sa.use_esn = mp->use_extended_sequence_number;
   sa.is_tunnel = mp->is_tunnel;
   sa.is_tunnel_ip6 = mp->is_tunnel_ipv6;
-	sa.udp_encap = mp->udp_encap;
+  sa.udp_encap = mp->udp_encap;
   if (sa.is_tunnel_ip6)
     {
       clib_memcpy (&sa.tunnel_src_addr, mp->tunnel_src_address, 16);

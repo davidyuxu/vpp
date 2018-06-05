@@ -19,7 +19,7 @@
 #include <vlib/vlib.h>
 #include <ppfu/ppf_gtpu.h>
 
-#define PPFU_HANDOFF_QUEUE_HI_THRESHOLD 126 // was 30
+#define PPFU_HANDOFF_QUEUE_HI_THRESHOLD 126	// was 30
 
 typedef enum
 {
@@ -39,7 +39,7 @@ ppfu_gtpu_get_key (ppf_gtpu_header_t * gtph)
 {
   u32 hash_key;
 
-  u32 teid = clib_host_to_net_u32(gtph->teid);
+  u32 teid = clib_host_to_net_u32 (gtph->teid);
 
   hash_key = 0x3fffffff & teid;
 

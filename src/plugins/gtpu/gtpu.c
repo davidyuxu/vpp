@@ -262,7 +262,7 @@ ip_udp_gtpu_rewrite (gtpu_tunnel_t * t, bool is_ip6)
 
       ip->src_address = t->src.ip6;
       ip->dst_address = t->dst.ip6;
-      
+
       /* UDP header, randomize src port on something, maybe? */
       udp->src_port = clib_host_to_net_u16 (GTPU6_UDP_SRC_DEFAULT_PORT);
       udp->dst_port = clib_host_to_net_u16 (GTPU6_UDP_DST_PORT);
@@ -271,7 +271,7 @@ ip_udp_gtpu_rewrite (gtpu_tunnel_t * t, bool is_ip6)
   /* GTPU header */
   gtpu->ver_flags = GTPU_V1_VER | GTPU_PT_GTP;
   gtpu->type = GTPU_TYPE_GTPU;
-  /* xftony: for the rewrite use the oteid*/
+  /* xftony: for the rewrite use the oteid */
   gtpu->teid = clib_host_to_net_u32 (t->oteid);
 
   t->rewrite = r.rw;
@@ -365,302 +365,320 @@ mcast_shared_remove (ip46_address_t * dst)
 int vnet_gtpu_add_del_tunnel
   (vnet_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp)
 {
-    gtpu_main_t *gtm = &gtpu_main;
-    gtpu_tunnel_t *t = 0;
-    vnet_main_t *vnm = gtm->vnet_main;
-    uword *p, *p_path;
-    u32 hw_if_index = ~0;
-    u32 sw_if_index = ~0;
-    gtpu4_tunnel_key_t key4, key4_path;
-    gtpu6_tunnel_key_t key6, key6_path;
-    u32 is_ip6 = a->is_ip6;
-    gtpu_path_t *path;
+  gtpu_main_t *gtm = &gtpu_main;
+  gtpu_tunnel_t *t = 0;
+  vnet_main_t *vnm = gtm->vnet_main;
+  uword *p, *p_path;
+  u32 hw_if_index = ~0;
+  u32 sw_if_index = ~0;
+  gtpu4_tunnel_key_t key4, key4_path;
+  gtpu6_tunnel_key_t key6, key6_path;
+  u32 is_ip6 = a->is_ip6;
+  gtpu_path_t *path;
 
-    if (!is_ip6)
+  if (!is_ip6)
     {
-        key4.src = a->dst.ip4.as_u32;	/* decap src in key is encap dst in config */
-        key4.teid = clib_host_to_net_u32 (a->teid);
-        p = hash_get (gtm->gtpu4_tunnel_by_key, key4.as_u64);
+      key4.src = a->dst.ip4.as_u32;	/* decap src in key is encap dst in config */
+      key4.teid = clib_host_to_net_u32 (a->teid);
+      p = hash_get (gtm->gtpu4_tunnel_by_key, key4.as_u64);
 
-        /* is or not this path existed --- add by anhua */
-        key4_path.src = a->dst.ip4.as_u32;
-        key4_path.teid = 0;
-        p_path = hash_get (gtm->path_manage.gtpu4_path_by_key, key4_path.as_u64);
+      /* is or not this path existed --- add by anhua */
+      key4_path.src = a->dst.ip4.as_u32;
+      key4_path.teid = 0;
+      p_path =
+	hash_get (gtm->path_manage.gtpu4_path_by_key, key4_path.as_u64);
     }
-    else
+  else
     {
-        key6.src = a->dst.ip6;
-        key6.teid = clib_host_to_net_u32 (a->teid);
-        p = hash_get_mem (gtm->gtpu6_tunnel_by_key, &key6);
+      key6.src = a->dst.ip6;
+      key6.teid = clib_host_to_net_u32 (a->teid);
+      p = hash_get_mem (gtm->gtpu6_tunnel_by_key, &key6);
 
-        /* is or not this path existed --- add by anhua */
-        key6_path.src = a->dst.ip6;
-        key6_path.teid = 0;
-        p_path = hash_get_mem (gtm->path_manage.gtpu6_path_by_key, &key6_path);
+      /* is or not this path existed --- add by anhua */
+      key6_path.src = a->dst.ip6;
+      key6_path.teid = 0;
+      p_path = hash_get_mem (gtm->path_manage.gtpu6_path_by_key, &key6_path);
     }
 
-    if (a->is_add)
+  if (a->is_add)
     {
-        l2input_main_t *l2im = &l2input_main;
+      l2input_main_t *l2im = &l2input_main;
 
-        /* adding a tunnel: tunnel must not already exist */
-        if (p)
-            return VNET_API_ERROR_TUNNEL_EXIST;
+      /* adding a tunnel: tunnel must not already exist */
+      if (p)
+	return VNET_API_ERROR_TUNNEL_EXIST;
 
-        /*if not set explicitly, default to l2 */
-        if (a->decap_next_index == ~0)
-            a->decap_next_index = GTPU_INPUT_NEXT_L2_INPUT;
-        
-        if (!gtpu_decap_next_is_valid (gtm, is_ip6, a->decap_next_index))
-            return VNET_API_ERROR_INVALID_DECAP_NEXT;
+      /*if not set explicitly, default to l2 */
+      if (a->decap_next_index == ~0)
+	a->decap_next_index = GTPU_INPUT_NEXT_L2_INPUT;
 
-        pool_get_aligned (gtm->tunnels, t, CLIB_CACHE_LINE_BYTES);
-        memset (t, 0, sizeof (*t));
+      if (!gtpu_decap_next_is_valid (gtm, is_ip6, a->decap_next_index))
+	return VNET_API_ERROR_INVALID_DECAP_NEXT;
 
-        /* copy from arg structure */
+      pool_get_aligned (gtm->tunnels, t, CLIB_CACHE_LINE_BYTES);
+      memset (t, 0, sizeof (*t));
+
+      /* copy from arg structure */
 #define _(x) t->x = a->x;
-        foreach_copy_field;
+      foreach_copy_field;
 #undef _
 
-        ip_udp_gtpu_rewrite (t, is_ip6);
+      ip_udp_gtpu_rewrite (t, is_ip6);
 
-        /* copy the key */
-        if (is_ip6)
-            hash_set_mem_alloc (&gtm->gtpu6_tunnel_by_key, &key6, t - gtm->tunnels);
-        else
-            hash_set (gtm->gtpu4_tunnel_by_key, key4.as_u64, t - gtm->tunnels);
+      /* copy the key */
+      if (is_ip6)
+	hash_set_mem_alloc (&gtm->gtpu6_tunnel_by_key, &key6,
+			    t - gtm->tunnels);
+      else
+	hash_set (gtm->gtpu4_tunnel_by_key, key4.as_u64, t - gtm->tunnels);
 
-        /* add path to paths pool --- add by anhua */
-        if (p_path)
-        {
-            path = pool_elt_at_index (gtm->path_manage.paths, p_path[0]);
-            path->tunnel_count += 1;
-        }
-        else
-        {
-            pool_get (gtm->path_manage.paths, path);
-            path->src = a->src;
-            path->dst = a->dst;
-            path->tunnel_count = 1;
-            
-            if (is_ip6)
-                hash_set_mem_alloc (&gtm->path_manage.gtpu6_path_by_key, &key6_path, path - gtm->path_manage.paths);
-            else
-                hash_set (gtm->path_manage.gtpu4_path_by_key, key4_path.as_u64, path - gtm->path_manage.paths);
-        }
-        
-        vnet_hw_interface_t *hi;
-        if (vec_len (gtm->free_gtpu_tunnel_hw_if_indices) > 0)
-        {
-            vnet_interface_main_t *im = &vnm->interface_main;
-            
-            hw_if_index = gtm->free_gtpu_tunnel_hw_if_indices[vec_len (gtm->free_gtpu_tunnel_hw_if_indices) - 1];
-            _vec_len (gtm->free_gtpu_tunnel_hw_if_indices) -= 1;
+      /* add path to paths pool --- add by anhua */
+      if (p_path)
+	{
+	  path = pool_elt_at_index (gtm->path_manage.paths, p_path[0]);
+	  path->tunnel_count += 1;
+	}
+      else
+	{
+	  pool_get (gtm->path_manage.paths, path);
+	  path->src = a->src;
+	  path->dst = a->dst;
+	  path->tunnel_count = 1;
 
-            hi = vnet_get_hw_interface (vnm, hw_if_index);
-            hi->dev_instance = t - gtm->tunnels;
-            hi->hw_instance = hi->dev_instance;
+	  if (is_ip6)
+	    hash_set_mem_alloc (&gtm->path_manage.gtpu6_path_by_key,
+				&key6_path, path - gtm->path_manage.paths);
+	  else
+	    hash_set (gtm->path_manage.gtpu4_path_by_key, key4_path.as_u64,
+		      path - gtm->path_manage.paths);
+	}
 
-            /* clear old stats of freed tunnel before reuse */
-            sw_if_index = hi->sw_if_index;
-            vnet_interface_counter_lock (im);
-            vlib_zero_combined_counter(&im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_TX], sw_if_index);
-            vlib_zero_combined_counter (&im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_RX], sw_if_index);
-            vlib_zero_simple_counter (&im->sw_if_counters[VNET_INTERFACE_COUNTER_DROP], sw_if_index);
-            vnet_interface_counter_unlock (im);
-        }
-        else
-        {
-            hw_if_index = vnet_register_interface(vnm, 
-                                                  gtpu_device_class.index, 
-                                                  t - gtm->tunnels,
-                                                  gtpu_hw_class.index, 
-                                                  t - gtm->tunnels);
-            hi = vnet_get_hw_interface (vnm, hw_if_index);
-        }
+      vnet_hw_interface_t *hi;
+      if (vec_len (gtm->free_gtpu_tunnel_hw_if_indices) > 0)
+	{
+	  vnet_interface_main_t *im = &vnm->interface_main;
 
-        /* Set gtpu tunnel output node */
-        u32 encap_index = !is_ip6 ?
-        gtpu4_encap_node.index : gtpu6_encap_node.index;
-        vnet_set_interface_output_node (vnm, hw_if_index, encap_index);
+	  hw_if_index =
+	    gtm->free_gtpu_tunnel_hw_if_indices[vec_len
+						(gtm->free_gtpu_tunnel_hw_if_indices)
+						- 1];
+	  _vec_len (gtm->free_gtpu_tunnel_hw_if_indices) -= 1;
 
-        t->hw_if_index = hw_if_index;
-        t->sw_if_index = sw_if_index = hi->sw_if_index;
+	  hi = vnet_get_hw_interface (vnm, hw_if_index);
+	  hi->dev_instance = t - gtm->tunnels;
+	  hi->hw_instance = hi->dev_instance;
 
-        vec_validate_init_empty (gtm->tunnel_index_by_sw_if_index, sw_if_index, ~0);
-        gtm->tunnel_index_by_sw_if_index[sw_if_index] = t - gtm->tunnels;
+	  /* clear old stats of freed tunnel before reuse */
+	  sw_if_index = hi->sw_if_index;
+	  vnet_interface_counter_lock (im);
+	  vlib_zero_combined_counter (&im->combined_sw_if_counters
+				      [VNET_INTERFACE_COUNTER_TX],
+				      sw_if_index);
+	  vlib_zero_combined_counter (&im->combined_sw_if_counters
+				      [VNET_INTERFACE_COUNTER_RX],
+				      sw_if_index);
+	  vlib_zero_simple_counter (&im->sw_if_counters
+				    [VNET_INTERFACE_COUNTER_DROP],
+				    sw_if_index);
+	  vnet_interface_counter_unlock (im);
+	}
+      else
+	{
+	  hw_if_index = vnet_register_interface (vnm,
+						 gtpu_device_class.index,
+						 t - gtm->tunnels,
+						 gtpu_hw_class.index,
+						 t - gtm->tunnels);
+	  hi = vnet_get_hw_interface (vnm, hw_if_index);
+	}
 
-        /* setup l2 input config with l2 feature and bd 0 to drop packet */
-        vec_validate (l2im->configs, sw_if_index);
-        l2im->configs[sw_if_index].feature_bitmap = L2INPUT_FEAT_DROP;
-        l2im->configs[sw_if_index].bd_index = 0;
+      /* Set gtpu tunnel output node */
+      u32 encap_index = !is_ip6 ?
+	gtpu4_encap_node.index : gtpu6_encap_node.index;
+      vnet_set_interface_output_node (vnm, hw_if_index, encap_index);
+
+      t->hw_if_index = hw_if_index;
+      t->sw_if_index = sw_if_index = hi->sw_if_index;
+
+      vec_validate_init_empty (gtm->tunnel_index_by_sw_if_index, sw_if_index,
+			       ~0);
+      gtm->tunnel_index_by_sw_if_index[sw_if_index] = t - gtm->tunnels;
+
+      /* setup l2 input config with l2 feature and bd 0 to drop packet */
+      vec_validate (l2im->configs, sw_if_index);
+      l2im->configs[sw_if_index].feature_bitmap = L2INPUT_FEAT_DROP;
+      l2im->configs[sw_if_index].bd_index = 0;
 
       vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, sw_if_index);
       /* default to hidden, by Jordy */
-      //si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;      
+      //si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
       si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
-      
+
       vnet_sw_interface_set_flags (vnm, sw_if_index,
 				   VNET_SW_INTERFACE_FLAG_ADMIN_UP);
 
-        fib_node_init (&t->node, gtm->fib_node_type);
-        fib_prefix_t tun_dst_pfx;
-        vnet_flood_class_t flood_class = VNET_FLOOD_CLASS_TUNNEL_NORMAL;
+      fib_node_init (&t->node, gtm->fib_node_type);
+      fib_prefix_t tun_dst_pfx;
+      vnet_flood_class_t flood_class = VNET_FLOOD_CLASS_TUNNEL_NORMAL;
 
-        fib_prefix_from_ip46_addr (&t->dst, &tun_dst_pfx);
-        if (!ip46_address_is_multicast (&t->dst))
-        {
-            /* Unicast tunnel -
-                     * source the FIB entry for the tunnel's destination
-                     * and become a child thereof. The tunnel will then get poked
-                     * when the forwarding for the entry updates, and the tunnel can
-                     * re-stack accordingly
-                     */
-            vtep_addr_ref (&t->src);
-            t->fib_entry_index = fib_table_entry_special_add(t->encap_fib_index, 
-                                                             &tun_dst_pfx, 
-                                                             FIB_SOURCE_RR, 
-                                                             FIB_ENTRY_FLAG_NONE);
+      fib_prefix_from_ip46_addr (&t->dst, &tun_dst_pfx);
+      if (!ip46_address_is_multicast (&t->dst))
+	{
+	  /* Unicast tunnel -
+	   * source the FIB entry for the tunnel's destination
+	   * and become a child thereof. The tunnel will then get poked
+	   * when the forwarding for the entry updates, and the tunnel can
+	   * re-stack accordingly
+	   */
+	  vtep_addr_ref (&t->src);
+	  t->fib_entry_index =
+	    fib_table_entry_special_add (t->encap_fib_index, &tun_dst_pfx,
+					 FIB_SOURCE_RR, FIB_ENTRY_FLAG_NONE);
 #if 0
-            t->sibling_index = fib_entry_child_add
-            (t->fib_entry_index, gtm->fib_node_type, t - gtm->tunnels);
+	  t->sibling_index = fib_entry_child_add
+	    (t->fib_entry_index, gtm->fib_node_type, t - gtm->tunnels);
 #endif
-            gtpu_tunnel_restack_dpo (t);
-        }
-        else
-        {
-            /* Multicast tunnel -
-                     * as the same mcast group can be used for mutiple mcast tunnels
-                     * with different VNIs, create the output fib adjecency only if
-                     * it does not already exist
-                     */
-            fib_protocol_t fp = fib_ip_proto (is_ip6);
+	  gtpu_tunnel_restack_dpo (t);
+	}
+      else
+	{
+	  /* Multicast tunnel -
+	   * as the same mcast group can be used for mutiple mcast tunnels
+	   * with different VNIs, create the output fib adjecency only if
+	   * it does not already exist
+	   */
+	  fib_protocol_t fp = fib_ip_proto (is_ip6);
 
-            if (vtep_addr_ref (&t->dst) == 1)
-            {
-                fib_node_index_t mfei;
-                adj_index_t ai;
-                fib_route_path_t path = {
-                    .frp_proto = fib_proto_to_dpo (fp),
-                    .frp_addr = zero_addr,
-                    .frp_sw_if_index = 0xffffffff,
-                    .frp_fib_index = ~0,
-                    .frp_weight = 0,
-                    .frp_flags = FIB_ROUTE_PATH_LOCAL,
-                };
-                const mfib_prefix_t mpfx = {
-                    .fp_proto = fp,
-                    .fp_len = (is_ip6 ? 128 : 32),
-                    .fp_grp_addr = tun_dst_pfx.fp_addr,
-                };
+	  if (vtep_addr_ref (&t->dst) == 1)
+	    {
+	      fib_node_index_t mfei;
+	      adj_index_t ai;
+	      fib_route_path_t path = {
+		.frp_proto = fib_proto_to_dpo (fp),
+		.frp_addr = zero_addr,
+		.frp_sw_if_index = 0xffffffff,
+		.frp_fib_index = ~0,
+		.frp_weight = 0,
+		.frp_flags = FIB_ROUTE_PATH_LOCAL,
+	      };
+	      const mfib_prefix_t mpfx = {
+		.fp_proto = fp,
+		.fp_len = (is_ip6 ? 128 : 32),
+		.fp_grp_addr = tun_dst_pfx.fp_addr,
+	      };
 
-                /*
-                            * Setup the (*,G) to receive traffic on the mcast group
-                            *  - the forwarding interface is for-us
-                            *  - the accepting interface is that from the API
-                            */
-                mfib_table_entry_path_update (t->encap_fib_index,
-                                              &mpfx,
-                                              MFIB_SOURCE_GTPU,
-                                              &path, 
-                                              MFIB_ITF_FLAG_FORWARD);
+	      /*
+	       * Setup the (*,G) to receive traffic on the mcast group
+	       *  - the forwarding interface is for-us
+	       *  - the accepting interface is that from the API
+	       */
+	      mfib_table_entry_path_update (t->encap_fib_index,
+					    &mpfx,
+					    MFIB_SOURCE_GTPU,
+					    &path, MFIB_ITF_FLAG_FORWARD);
 
-                path.frp_sw_if_index = a->mcast_sw_if_index;
-                path.frp_flags = FIB_ROUTE_PATH_FLAG_NONE;
-                mfei = mfib_table_entry_path_update (t->encap_fib_index,
-                                              	     &mpfx,
-                                              	     MFIB_SOURCE_GTPU,
-                                              	     &path,
-                                                	 MFIB_ITF_FLAG_ACCEPT);
+	      path.frp_sw_if_index = a->mcast_sw_if_index;
+	      path.frp_flags = FIB_ROUTE_PATH_FLAG_NONE;
+	      mfei = mfib_table_entry_path_update (t->encap_fib_index,
+						   &mpfx,
+						   MFIB_SOURCE_GTPU,
+						   &path,
+						   MFIB_ITF_FLAG_ACCEPT);
 
-                /*
-                           * Create the mcast adjacency to send traffic to the group
-                           */
-                ai = adj_mcast_add_or_lock (fp, fib_proto_to_link (fp), a->mcast_sw_if_index);
+	      /*
+	       * Create the mcast adjacency to send traffic to the group
+	       */
+	      ai =
+		adj_mcast_add_or_lock (fp, fib_proto_to_link (fp),
+				       a->mcast_sw_if_index);
 
-                /*
-                            * create a new end-point
-                            */
-                mcast_shared_add (&t->dst, mfei, ai);
-            }
+	      /*
+	       * create a new end-point
+	       */
+	      mcast_shared_add (&t->dst, mfei, ai);
+	    }
 
-            dpo_id_t dpo = DPO_INVALID;
-            mcast_shared_t ep = mcast_shared_get (&t->dst);
+	  dpo_id_t dpo = DPO_INVALID;
+	  mcast_shared_t ep = mcast_shared_get (&t->dst);
 
-            /* Stack shared mcast dst mac addr rewrite on encap */
-            dpo_set (&dpo, DPO_ADJACENCY_MCAST,
-            fib_proto_to_dpo (fp), ep.mcast_adj_index);
+	  /* Stack shared mcast dst mac addr rewrite on encap */
+	  dpo_set (&dpo, DPO_ADJACENCY_MCAST,
+		   fib_proto_to_dpo (fp), ep.mcast_adj_index);
 
-            dpo_stack_from_node (encap_index, &t->next_dpo, &dpo);
+	  dpo_stack_from_node (encap_index, &t->next_dpo, &dpo);
 
-            dpo_reset (&dpo);
-            flood_class = VNET_FLOOD_CLASS_TUNNEL_MASTER;
-        }
+	  dpo_reset (&dpo);
+	  flood_class = VNET_FLOOD_CLASS_TUNNEL_MASTER;
+	}
 
-        vnet_get_sw_interface (vnet_get_main (), sw_if_index)->flood_class = flood_class;
+      vnet_get_sw_interface (vnet_get_main (), sw_if_index)->flood_class =
+	flood_class;
     }
-    else
+  else
     {
-        /* deleting a tunnel: tunnel must exist */
-        if (!p)
-            return VNET_API_ERROR_NO_SUCH_ENTRY;
+      /* deleting a tunnel: tunnel must exist */
+      if (!p)
+	return VNET_API_ERROR_NO_SUCH_ENTRY;
 
-        t = pool_elt_at_index (gtm->tunnels, p[0]);
-        sw_if_index = t->sw_if_index;
+      t = pool_elt_at_index (gtm->tunnels, p[0]);
+      sw_if_index = t->sw_if_index;
 
-        vnet_sw_interface_set_flags (vnm, t->sw_if_index, 0 /* down */ );
-        vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, t->sw_if_index);
-        si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
+      vnet_sw_interface_set_flags (vnm, t->sw_if_index, 0 /* down */ );
+      vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, t->sw_if_index);
+      si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
 
-        /* make sure tunnel is removed from l2 bd or xconnect */
-        set_int_l2_mode (gtm->vlib_main, vnm, MODE_L3, t->sw_if_index, 0, 0, 0, 0);
-        vec_add1 (gtm->free_gtpu_tunnel_hw_if_indices, t->hw_if_index);
+      /* make sure tunnel is removed from l2 bd or xconnect */
+      set_int_l2_mode (gtm->vlib_main, vnm, MODE_L3, t->sw_if_index, 0, 0, 0,
+		       0);
+      vec_add1 (gtm->free_gtpu_tunnel_hw_if_indices, t->hw_if_index);
 
-        gtm->tunnel_index_by_sw_if_index[t->sw_if_index] = ~0;
+      gtm->tunnel_index_by_sw_if_index[t->sw_if_index] = ~0;
 
-        if (!is_ip6)
-            hash_unset (gtm->gtpu4_tunnel_by_key, key4.as_u64);
-        else
-            hash_unset_mem_free (&gtm->gtpu6_tunnel_by_key, &key6);
+      if (!is_ip6)
+	hash_unset (gtm->gtpu4_tunnel_by_key, key4.as_u64);
+      else
+	hash_unset_mem_free (&gtm->gtpu6_tunnel_by_key, &key6);
 
-        if (!ip46_address_is_multicast (&t->dst))
-        {
-            vtep_addr_unref (&t->src);
+      if (!ip46_address_is_multicast (&t->dst))
+	{
+	  vtep_addr_unref (&t->src);
 #if 0
-            fib_entry_child_remove (t->fib_entry_index, t->sibling_index);
+	  fib_entry_child_remove (t->fib_entry_index, t->sibling_index);
 #endif
-            fib_table_entry_delete_index (t->fib_entry_index, FIB_SOURCE_RR);
-        }
-        else if (vtep_addr_unref (&t->dst) == 0)
-        {
-            mcast_shared_remove (&t->dst);
-        }
+	  fib_table_entry_delete_index (t->fib_entry_index, FIB_SOURCE_RR);
+	}
+      else if (vtep_addr_unref (&t->dst) == 0)
+	{
+	  mcast_shared_remove (&t->dst);
+	}
 
-        fib_node_deinit (&t->node);
-        vec_free (t->rewrite);
-        pool_put (gtm->tunnels, t);
+      fib_node_deinit (&t->node);
+      vec_free (t->rewrite);
+      pool_put (gtm->tunnels, t);
 
-        /* remove path --- add by anhua */
-        if (p_path)
-        {
-            path = pool_elt_at_index (gtm->path_manage.paths, p_path[0]);
-            path->tunnel_count -= 1;
-            if (0 == path->tunnel_count)
-            {
-                pool_put (gtm->path_manage.paths, path);
+      /* remove path --- add by anhua */
+      if (p_path)
+	{
+	  path = pool_elt_at_index (gtm->path_manage.paths, p_path[0]);
+	  path->tunnel_count -= 1;
+	  if (0 == path->tunnel_count)
+	    {
+	      pool_put (gtm->path_manage.paths, path);
 
-                if (!is_ip6)
-                    hash_unset (gtm->path_manage.gtpu4_path_by_key, key4_path.as_u64);
-                else
-                    hash_unset_mem_free (&gtm->path_manage.gtpu6_path_by_key, &key6_path);
-            }
-        }
+	      if (!is_ip6)
+		hash_unset (gtm->path_manage.gtpu4_path_by_key,
+			    key4_path.as_u64);
+	      else
+		hash_unset_mem_free (&gtm->path_manage.gtpu6_path_by_key,
+				     &key6_path);
+	    }
+	}
     }
 
-    if (sw_if_indexp)
-        *sw_if_indexp = sw_if_index;
+  if (sw_if_indexp)
+    *sw_if_indexp = sw_if_index;
 
-    return 0;
+  return 0;
 }
 
 static uword
@@ -793,7 +811,7 @@ gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 	;
       else if (unformat (line_input, "teid %d", &teid))
 	;
-	  else if (unformat (line_input, "oteid %d", &oteid))
+      else if (unformat (line_input, "oteid %d", &oteid))
 	;
       else
 	{
@@ -866,8 +884,9 @@ gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
     {
     case 0:
       if (is_add)
-	vlib_cli_output (vm, "%U\n decap-next: %d", format_vnet_sw_if_index_name,
-			 vnet_get_main (), tunnel_sw_if_index, a->decap_next_index);
+	vlib_cli_output (vm, "%U\n decap-next: %d",
+			 format_vnet_sw_if_index_name, vnet_get_main (),
+			 tunnel_sw_if_index, a->decap_next_index);
       break;
 
     case VNET_API_ERROR_TUNNEL_EXIST:
@@ -946,15 +965,16 @@ show_gtpu_tunnel_command_fn (vlib_main_t * vm,
   if (pool_elts (gtm->tunnels) == 0)
     vlib_cli_output (vm, "No gtpu tunnels configured...");
   else
-    vlib_cli_output (vm, "%d gtpu tunnels configured!", pool_elts (gtm->tunnels));
+    vlib_cli_output (vm, "%d gtpu tunnels configured!",
+		     pool_elts (gtm->tunnels));
 
   if (verbose > 0)
-  pool_foreach (t, gtm->tunnels, (
-				   {
-				   vlib_cli_output (vm, "%U",
-						    format_gtpu_tunnel, t);
-				   }
-		));
+    pool_foreach (t, gtm->tunnels, (
+				     {
+				     vlib_cli_output (vm, "%U",
+						      format_gtpu_tunnel, t);
+				     }
+		  ));
 
   return 0;
 }
@@ -1147,7 +1167,7 @@ VLIB_CLI_COMMAND (set_interface_ip6_gtpu_bypass_command, static) = {
 
 
 int
-gtpu_tunnels_init()
+gtpu_tunnels_init ()
 {
   gtpu_main_t *gtm = &gtpu_main;
   ip46_address_t src, dst;
@@ -1172,54 +1192,56 @@ gtpu_tunnels_init()
   a->is_add = 1;
   a->is_ip6 = 0;
 #define _(x) a->x = x;
-    foreach_copy_field;
+  foreach_copy_field;
 #undef _
 
   /* add */
-  for (i = 0; i < gtm->prealloc_tunnels; i++,a->teid++) {
-    rv = vnet_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
-    switch (rv)
-      {
-      case 0:
-	break;
-    
-      case VNET_API_ERROR_TUNNEL_EXIST:
-	clib_warning("tunnel already exists...");
-	break;
-	
-      case VNET_API_ERROR_NO_SUCH_ENTRY:
-	clib_warning ("tunnel does not exist...");
-	break;
-    
-      default:
-	clib_warning("vnet_gtpu_add_del_tunnel returned %d", rv);
-	break;
-      }
-  }
+  for (i = 0; i < gtm->prealloc_tunnels; i++, a->teid++)
+    {
+      rv = vnet_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
+      switch (rv)
+	{
+	case 0:
+	  break;
+
+	case VNET_API_ERROR_TUNNEL_EXIST:
+	  clib_warning ("tunnel already exists...");
+	  break;
+
+	case VNET_API_ERROR_NO_SUCH_ENTRY:
+	  clib_warning ("tunnel does not exist...");
+	  break;
+
+	default:
+	  clib_warning ("vnet_gtpu_add_del_tunnel returned %d", rv);
+	  break;
+	}
+    }
 
   /* del */
   a->is_add = 0;
   a->teid = gtm->start_teid;
-  for (i = 0; i < gtm->prealloc_tunnels; i++,a->teid++) {
-    rv = vnet_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
-    switch (rv)
-      {
-      case 0:
-        break;
-    
-      case VNET_API_ERROR_TUNNEL_EXIST:
-        clib_warning("tunnel already exists...");
-        break;
-        
-      case VNET_API_ERROR_NO_SUCH_ENTRY:
-        clib_warning ("tunnel does not exist...");
-        break;
-    
-      default:
-        clib_warning("vnet_gtpu_add_del_tunnel returned %d", rv);
-        break;
-      }
-  }
+  for (i = 0; i < gtm->prealloc_tunnels; i++, a->teid++)
+    {
+      rv = vnet_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
+      switch (rv)
+	{
+	case 0:
+	  break;
+
+	case VNET_API_ERROR_TUNNEL_EXIST:
+	  clib_warning ("tunnel already exists...");
+	  break;
+
+	case VNET_API_ERROR_NO_SUCH_ENTRY:
+	  clib_warning ("tunnel does not exist...");
+	  break;
+
+	default:
+	  clib_warning ("vnet_gtpu_add_del_tunnel returned %d", rv);
+	  break;
+	}
+    }
 
   return 0;
 }
@@ -1232,36 +1254,36 @@ gtpu_config (vlib_main_t * vm, unformat_input_t * input)
 
   gtm->prealloc_tunnels = 0;
   gtm->start_teid = 1;
-  gtm->src.ip4.as_u32 = clib_host_to_net_u32(0x01010101);
-  gtm->dst.ip4.as_u32 = clib_host_to_net_u32(0x02020202);
+  gtm->src.ip4.as_u32 = clib_host_to_net_u32 (0x01010101);
+  gtm->dst.ip4.as_u32 = clib_host_to_net_u32 (0x02020202);
 
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
-      if (unformat (input, "src %U",
-    		     unformat_ip4_address, &gtm->src.ip4))
-        {
-        }
+      if (unformat (input, "src %U", unformat_ip4_address, &gtm->src.ip4))
+	{
+	}
       else if (unformat (input, "dst %U",
-    		     unformat_ip4_address, &gtm->dst.ip4))
-        {
-        }
+			 unformat_ip4_address, &gtm->dst.ip4))
+	{
+	}
       else if (unformat (input, "teid %d", &gtm->start_teid))
-        ;
-	  else if (unformat (input, "oteid %d", &gtm->start_oteid))
-        ;
+	;
+      else if (unformat (input, "oteid %d", &gtm->start_oteid))
+	;
       else if (unformat (input, "capacity %d", &gtm->prealloc_tunnels))
-        ;
+	;
       else
-        {
-          return clib_error_return (0, "unknown input `%U'",
-    				format_unformat_error, input);
-        }
+	{
+	  return clib_error_return (0, "unknown input `%U'",
+				    format_unformat_error, input);
+	}
     }
 
-  if (gtm->prealloc_tunnels > 0) {
-    gtpu_tunnels_init ();
-  }
-  
+  if (gtm->prealloc_tunnels > 0)
+    {
+      gtpu_tunnels_init ();
+    }
+
   return error;
 }
 
@@ -1286,9 +1308,9 @@ typedef struct
 
 always_inline void
 gtpu_pg_edit_function_inline (pg_main_t * pg,
-                                 pg_stream_t * s,
-                                 pg_edit_group_t * g,
-                                 u32 * packets, u32 n_packets, u32 flags)
+			      pg_stream_t * s,
+			      pg_edit_group_t * g,
+			      u32 * packets, u32 n_packets, u32 flags)
 {
   vlib_main_t *vm = vlib_get_main ();
   u32 gtpu_offset;
@@ -1306,28 +1328,30 @@ gtpu_pg_edit_function_inline (pg_main_t * pg,
       packets += 1;
 
       gtpu0 = (void *) (p0->data + gtpu_offset);
-      gtpu_len0 = vlib_buffer_length_in_chain (vm, p0) - gtpu_offset - GTPU_HEADER_MIN;
+      gtpu_len0 =
+	vlib_buffer_length_in_chain (vm, p0) - gtpu_offset - GTPU_HEADER_MIN;
 
       if (flags & GTPU_PG_EDIT_LENGTH)
-        gtpu0->length = clib_host_to_net_u16 (gtpu_len0);
+	gtpu0->length = clib_host_to_net_u16 (gtpu_len0);
     }
 }
 
 static void
 gtpu_pg_edit_function (pg_main_t * pg,
-                         pg_stream_t * s,
-                         pg_edit_group_t * g, u32 * packets, u32 n_packets)
+		       pg_stream_t * s,
+		       pg_edit_group_t * g, u32 * packets, u32 n_packets)
 {
   switch (g->edit_function_opaque)
-  {
+    {
     case GTPU_PG_EDIT_LENGTH:
-      gtpu_pg_edit_function_inline (pg, s, g, packets, n_packets, GTPU_PG_EDIT_LENGTH);
+      gtpu_pg_edit_function_inline (pg, s, g, packets, n_packets,
+				    GTPU_PG_EDIT_LENGTH);
       break;
 
     default:
       ASSERT (0);
       break;
-  }
+    }
 }
 
 static inline void
@@ -1353,7 +1377,9 @@ unformat_pg_gtpu_header (unformat_input_t * input, va_list * args)
   pg_gtpu_header_t *p;
   u32 group_index;
 
-  p = pg_create_edit_group (s, sizeof (p[0]), sizeof (gtpu_header_t), &group_index);
+  p =
+    pg_create_edit_group (s, sizeof (p[0]), sizeof (gtpu_header_t),
+			  &group_index);
   pg_gtpu_header_init (p);
 
   /* Defaults. */
@@ -1362,8 +1388,8 @@ unformat_pg_gtpu_header (unformat_input_t * input, va_list * args)
   pg_edit_set_fixed (&p->sequence, 0);
   pg_edit_set_fixed (&p->pdu_number, 0);
   pg_edit_set_fixed (&p->next_ext_type, 0);
-  
-  p->teid.type   = PG_EDIT_UNSPECIFIED;
+
+  p->teid.type = PG_EDIT_UNSPECIFIED;
   p->length.type = PG_EDIT_UNSPECIFIED;
 
   if (!unformat (input, "GTPU %U", unformat_input, &sub_input))
@@ -1374,19 +1400,19 @@ unformat_pg_gtpu_header (unformat_input_t * input, va_list * args)
     {
       if (unformat (&sub_input, "teid %U",
 		    unformat_pg_edit, unformat_pg_number, &p->teid))
-	    ;
+	;
 
       else if (unformat (&sub_input, "length %U",
 			 unformat_pg_edit, unformat_pg_number, &p->length))
-	    ;
+	;
 
       else if (unformat (&sub_input, "type %U",
 			 unformat_pg_edit, unformat_pg_number, &p->type))
-	    ;
+	;
 
       /* Can't parse input: try next protocol level. */
       else
-	    break;
+	break;
     }
 
   {
@@ -1395,15 +1421,15 @@ unformat_pg_gtpu_header (unformat_input_t * input, va_list * args)
 
     p = pg_get_edit_group (s, group_index);
     if (p->length.type == PG_EDIT_UNSPECIFIED)
-    {
-      pg_edit_group_t *g = pg_stream_get_group (s, group_index);
-      g->edit_function = gtpu_pg_edit_function;
-      g->edit_function_opaque = 0;
-      if (p->length.type == PG_EDIT_UNSPECIFIED)
-        g->edit_function_opaque |= GTPU_PG_EDIT_LENGTH;
-    }
+      {
+	pg_edit_group_t *g = pg_stream_get_group (s, group_index);
+	g->edit_function = gtpu_pg_edit_function;
+	g->edit_function_opaque = 0;
+	if (p->length.type == PG_EDIT_UNSPECIFIED)
+	  g->edit_function_opaque |= GTPU_PG_EDIT_LENGTH;
+      }
 
-	unformat_free (&sub_input);
+    unformat_free (&sub_input);
     return 1;
   }
 
@@ -1435,8 +1461,9 @@ gtpu_init (vlib_main_t * vm)
 
   /* initialize the ip6 path hash --- add by anhua */
   gtm->path_manage.gtpu6_path_by_key = hash_create_mem (0,
-					      sizeof (gtpu6_tunnel_key_t),
-					      sizeof (uword));
+							sizeof
+							(gtpu6_tunnel_key_t),
+							sizeof (uword));
   gtm->vtep6 = hash_create_mem (0, sizeof (ip6_address_t), sizeof (uword));
   gtm->mcast_shared = hash_create_mem (0,
 				       sizeof (ip46_address_t),
@@ -1451,7 +1478,7 @@ gtpu_init (vlib_main_t * vm)
   /* Added for PG, brant */
   pn = pg_get_node (gtpu4_input_node.index);
   pn->unformat_edit = unformat_pg_gtpu_header;
-  
+
   pn = pg_get_node (gtpu6_input_node.index);
   pn->unformat_edit = unformat_pg_gtpu_header;
 
@@ -1465,9 +1492,11 @@ gtpu_init (vlib_main_t * vm)
 
   gtm->fib_node_type = fib_node_register_new_type (&gtpu_vft);
 
-  if (vm->max_capacity) {
-  	pool_init_aligned (gtm->tunnels, vm->max_capacity, CLIB_CACHE_LINE_BYTES);
-  }
+  if (vm->max_capacity)
+    {
+      pool_init_aligned (gtm->tunnels, vm->max_capacity,
+			 CLIB_CACHE_LINE_BYTES);
+    }
 
   return 0;
 }
@@ -1488,4 +1517,3 @@ VLIB_PLUGIN_REGISTER () = {
  * eval: (c-set-style "gnu")
  * End:
  */
-

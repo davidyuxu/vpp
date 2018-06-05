@@ -494,7 +494,7 @@ found:
       ASSERT (lo_free_usize >= (word) MHEAP_MIN_USER_DATA_BYTES);
       //mheap_elt_set_size (v, f0, lo_free_usize, /* is_free */ 1);
       new_free_elt (v, f0, lo_free_usize);
-	  h->stats.free_list.n_low_split += 1;
+      h->stats.free_list.n_low_split += 1;
     }
 
   mheap_elt_set_size (v, o0, search_n_user_data_bytes, /* is_free */ 0);
@@ -504,7 +504,7 @@ found:
       uword uo = o1 + MHEAP_ELT_OVERHEAD_BYTES;
       //mheap_elt_set_size (v, uo, hi_free_usize, /* is_free */ 1);
       new_free_elt (v, uo, hi_free_usize);
-	  h->stats.free_list.n_high_split += 1;
+      h->stats.free_list.n_high_split += 1;
     }
 
   /* Return actual size of block. */
@@ -542,7 +542,10 @@ mheap_get_search_free_list (void *v,
     }
 
   /* kingwel, lookup a free bin which is big enough to hold everything align+align_offset+lo_free_size+overhead */
-  word modifier = (align > MHEAP_USER_DATA_WORD_BYTES ? align + align_offset + sizeof(mheap_elt_t) : 0);
+  word modifier =
+    (align >
+     MHEAP_USER_DATA_WORD_BYTES ? align + align_offset +
+     sizeof (mheap_elt_t) : 0);
   bin = user_data_size_to_bin_index (n_user_bytes + modifier);
   for (i = bin / BITS (uword); i < ARRAY_LEN (h->non_empty_free_elt_heads);
        i++)
@@ -670,7 +673,7 @@ mheap_get_aligned (void *v,
 
   /* Round requested size. */
   n_user_data_bytes = clib_max (n_user_data_bytes, MHEAP_MIN_USER_DATA_BYTES);
-  
+
   n_user_data_bytes =
     round_pow2 (n_user_data_bytes,
 		STRUCT_SIZE_OF (mheap_elt_t, user_data[0]));
@@ -1152,8 +1155,10 @@ format_mheap_stats (u8 * s, va_list * va)
 	     0 ? (f64) st->free_list.n_objects_searched /
 	     (f64) st->free_list.n_search_attempts : 0.));
 
-  s = format (s, "\n%Ualloc. low splits: %Ld, high splits: %Ld, combined: %Ld",
-	      format_white_space, indent, st->free_list.n_low_split, st->free_list.n_high_split, st->free_list.n_objects_combined);
+  s =
+    format (s, "\n%Ualloc. low splits: %Ld, high splits: %Ld, combined: %Ld",
+	    format_white_space, indent, st->free_list.n_low_split,
+	    st->free_list.n_high_split, st->free_list.n_objects_combined);
 
   s = format (s, "\n%Ualloc. from vector-expand: %Ld",
 	      format_white_space, indent, st->n_vector_expands);
@@ -1201,16 +1206,16 @@ format_mheap (u8 * s, va_list * va)
   if (usage.bytes_max != ~0)
     s = format (s, ", %U capacity", format_mheap_byte_count, usage.bytes_max);
 
-  /* kingwel, clear usage */  
+  /* kingwel, clear usage */
   if (verbose == -1)
-  	{
-	  s = format (s, "\n%U%U",
+    {
+      s = format (s, "\n%U%U",
 		  format_white_space, indent + 2, format_mheap_stats, h);
 
-  	  memset (&h->stats, 0, sizeof(h->stats));
-  	  mheap_maybe_unlock (v);
-  	  return s;
-  	}
+      memset (&h->stats, 0, sizeof (h->stats));
+      mheap_maybe_unlock (v);
+      return s;
+    }
 
   /* Show histogram of sizes. */
   if ((verbose == 5) || (verbose >= 100))
@@ -1255,18 +1260,19 @@ format_mheap (u8 * s, va_list * va)
     s = format (s, "\n%U%U",
 		format_white_space, indent + 2, format_mheap_stats, h);
 
-  if (verbose >= 8 && (h->flags & MHEAP_FLAG_TRACE) && vec_len (h->trace_main.traces) > 0)
+  if (verbose >= 8 && (h->flags & MHEAP_FLAG_TRACE)
+      && vec_len (h->trace_main.traces) > 0)
     {
       /* Make a copy of traces since we'll be sorting them. */
       mheap_trace_t *t, *traces_copy;
       u32 indent, total_objects_traced;
 
       traces_copy = vec_dup (h->trace_main.traces);
-	  if(verbose == 8)
-        qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
+      if (verbose == 8)
+	qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
 	       mheap_trace_sort);
-	  else
-        qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
+      else
+	qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
 	       mheap_trace_sort2);
 
       total_objects_traced = 0;
@@ -1284,10 +1290,12 @@ format_mheap (u8 * s, va_list * va)
 	  continue;
 
 	if (t == traces_copy)
-	  s = format (s, "%=9s%=9s%=9s %=10s Traceback\n", "Bytes", "Allocs", "Count",
-		      "Sample");
-	s = format (s, "%9d%9d%9d %p", t->n_bytes, t->n_gets, t->n_allocations,
-		    t->offset + v);
+	  s =
+	    format (s, "%=9s%=9s%=9s %=10s Traceback\n", "Bytes", "Allocs",
+		    "Count", "Sample");
+	s =
+	  format (s, "%9d%9d%9d %p", t->n_bytes, t->n_gets, t->n_allocations,
+		  t->offset + v);
 	indent = format_get_indent (s);
 	for (i = 0; i < ARRAY_LEN (t->callers) && t->callers[i]; i++)
 	  {
@@ -1325,7 +1333,7 @@ format_mheap (u8 * s, va_list * va)
 
       s = format (s, "\n");
 
-      e = v; //mheap_elt_at_uoffset (v, 0);
+      e = v;			//mheap_elt_at_uoffset (v, 0);
       i = 0;
       while (1)
 	{
@@ -1342,54 +1350,63 @@ format_mheap (u8 * s, va_list * va)
 	  if ((i % 4) == 3 || (i + 1) >= h->n_elts)
 	    s = format (s, "\n");
 
-	  if (e->n_user_data != MHEAP_N_USER_DATA_INVALID) {
-            e = mheap_next_elt (e);
-	    i++;
-	  } else
+	  if (e->n_user_data != MHEAP_N_USER_DATA_INVALID)
+	    {
+	      e = mheap_next_elt (e);
+	      i++;
+	    }
+	  else
 	    break;
 	}
     }
 
-  if ((verbose == 2) || (verbose == 3) || (verbose >= 100)) {
-  	uword bin, count, total_count;
+  if ((verbose == 2) || (verbose == 3) || (verbose >= 100))
+    {
+      uword bin, count, total_count;
 #if CLIB_VEC64 > 0
-	u64 offset;
+      u64 offset;
 #else
-	u32 offset;
+      u32 offset;
 #endif
-	mheap_elt_t *e;
+      mheap_elt_t *e;
 
-    total_count = 0;
+      total_count = 0;
 
-	s = format(s, "\nFree list:\n");
-	for (bin = 0; bin < MHEAP_N_BINS; bin++) {
+      s = format (s, "\nFree list:\n");
+      for (bin = 0; bin < MHEAP_N_BINS; bin++)
+	{
 
 	  offset = h->first_free_elt_uoffset_by_bin[bin];
 	  if (offset != MHEAP_GROUNDED)
-	    s = format(s, "bin %d:\n", bin);
+	    s = format (s, "bin %d:\n", bin);
 
 	  count = 0;
-	  while (offset != MHEAP_GROUNDED) {
-	    e = mheap_elt_at_uoffset (v, offset);
-	    
-	    if (((verbose == 3) && (count < 4)) || (verbose >= 100))
-	      s = format(s, "%U(%08x %02d) ", format_mheap_byte_count, mheap_elt_data_bytes (e), offset, offset % CLIB_CACHE_LINE_BYTES);
-	    
-	    count++;
-	    offset = e->free_elt.next_uoffset;
+	  while (offset != MHEAP_GROUNDED)
+	    {
+	      e = mheap_elt_at_uoffset (v, offset);
 
-	    if (((verbose >= 100) && (count % 4 == 0)) || (offset == MHEAP_GROUNDED))
-	      s = format(s, "\n");
-	  }
-	  
+	      if (((verbose == 3) && (count < 4)) || (verbose >= 100))
+		s =
+		  format (s, "%U(%08x %02d) ", format_mheap_byte_count,
+			  mheap_elt_data_bytes (e), offset,
+			  offset % CLIB_CACHE_LINE_BYTES);
+
+	      count++;
+	      offset = e->free_elt.next_uoffset;
+
+	      if (((verbose >= 100) && (count % 4 == 0))
+		  || (offset == MHEAP_GROUNDED))
+		s = format (s, "\n");
+	    }
+
 	  if (count)
-	    s = format(s, "total %d\n", count);
+	    s = format (s, "total %d\n", count);
 
 	  total_count += count;
 	}
-	if (total_count)
-	  s = format(s, "Total count in free bin: %d\n", total_count);
-  }
+      if (total_count)
+	s = format (s, "Total count in free bin: %d\n", total_count);
+    }
 
   mheap_maybe_unlock (v);
 
@@ -1692,7 +1709,7 @@ mheap_trace_sort2 (const void *_t1, const void *_t2)
 
   cmp = (word) t2->n_allocations - (word) t1->n_allocations;
   if (!cmp)
-	  cmp = (word) t2->n_bytes - (word) t1->n_bytes;
+    cmp = (word) t2->n_bytes - (word) t1->n_bytes;
   return cmp;
 }
 

@@ -273,7 +273,7 @@ vl_api_save_msg_table (void)
 u64 api_sleep_us = 200;
 static clib_error_t *
 api_sleep (vlib_main_t * vm,
-             unformat_input_t * input, vlib_cli_command_t * cmd)
+	   unformat_input_t * input, vlib_cli_command_t * cmd)
 {
   u32 tmp;
 
@@ -386,10 +386,11 @@ vl_api_clnt_process (vlib_main_t * vm, vlib_node_runtime_t * node,
 	      break;
 	    }
 
-	  if (api_sleep_us != ~0) {
-	    sleep_time = (f64)(api_sleep_us) * 1e-6;
-	    break;
-	  }
+	  if (api_sleep_us != ~0)
+	    {
+	      sleep_time = (f64) (api_sleep_us) * 1e-6;
+	      break;
+	    }
 	  /* Allow no more than 10us without a pause */
 	  if (vlib_time_now (vm) > start_time + 10e-6)
 	    {
@@ -411,7 +412,7 @@ vl_api_clnt_process (vlib_main_t * vm, vlib_node_runtime_t * node,
 		  index = SLEEP_10_US;
 		  sleep_time = 10e-6;
 		}
-	      
+
 	      vector_rate_histogram[index] += 1;
 	      break;
 	    }

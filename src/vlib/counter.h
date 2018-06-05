@@ -114,7 +114,8 @@ vlib_get_simple_counter (vlib_simple_counter_main_t * cm, u32 index)
 }
 
 always_inline counter_t
-vlib_get_simple_counter_per_thread (vlib_simple_counter_main_t * cm, u32 index, u32 thread_index)
+vlib_get_simple_counter_per_thread (vlib_simple_counter_main_t * cm,
+				    u32 index, u32 thread_index)
 {
   counter_t *my_counters;
   counter_t v;
@@ -284,7 +285,8 @@ vlib_get_combined_counter (const vlib_combined_counter_main_t * cm,
 
 static inline void
 vlib_get_combined_counter_per_thread (const vlib_combined_counter_main_t * cm,
-			   u32 index, u32 thread_index, vlib_counter_t * result)
+				      u32 index, u32 thread_index,
+				      vlib_counter_t * result)
 {
   vlib_counter_t *my_counters, *counter;
 
@@ -361,9 +363,9 @@ typedef struct
 
 typedef struct
 {
-    vlib_if_counter_t *counters;//per thread
-    u32 sw_if_index;
-}vlib_if_stats_main_t;
+  vlib_if_counter_t *counters;	//per thread
+  u32 sw_if_index;
+} vlib_if_stats_main_t;
 
 
 /*added by brant for measure throughput per thread*/
@@ -373,27 +375,27 @@ typedef struct
 
 typedef struct
 {
-    vlib_if_stats_main_t *if_stats;/*last counters per object per thread */
+  vlib_if_stats_main_t *if_stats;	/*last counters per object per thread */
 
-	vlib_if_stats_main_t *if_stats_by_bin[SYSTEM_THROUGHPUT_MAX_BINS];
+  vlib_if_stats_main_t *if_stats_by_bin[SYSTEM_THROUGHPUT_MAX_BINS];
 
-	u32 throughput_threshold_interval;
-	u32 system_current_throughput_mbps;
-	u32 system_current_throughput_pps;
-	u32 system_interval_throughput_mbps;
-	u32 system_interval_throughput_pps;
+  u32 throughput_threshold_interval;
+  u32 system_current_throughput_mbps;
+  u32 system_current_throughput_pps;
+  u32 system_interval_throughput_mbps;
+  u32 system_interval_throughput_pps;
 
-    int throughput_debug;
+  int throughput_debug;
 
-    
-    volatile u32 *if_counter_lock;
+
+  volatile u32 *if_counter_lock;
 } throughput_stats_main_t;
 
-void throughput_stats_validate(u32 sw_if_index);
+void throughput_stats_validate (u32 sw_if_index);
 
 extern void *counter_heap;
 
-void vlib_counter_heap_init(uword size);
+void vlib_counter_heap_init (uword size);
 
 
 #endif /* included_vlib_counter_h */

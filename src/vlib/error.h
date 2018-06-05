@@ -79,7 +79,7 @@ typedef struct
 
   /* kingwel Error rate counters. */
   u64 *rate_counters;
-  f64 last_show_time;  
+  f64 last_show_time;
 
   /* Counter values as of last counter clear. */
   u64 *counters_last_clear;

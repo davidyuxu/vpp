@@ -357,25 +357,25 @@ format_mbps_pps_1000 (u8 * s, va_list * va)
   uword usize = (uword) size;
 
   if (usize < 1000)
-  	{
-    	log_u = 0;
-			u = 1;
-  	}
+    {
+      log_u = 0;
+      u = 1;
+    }
   else if (usize < 1000000)
-  	{
-    	log_u = 10;
-			u = 1000;
-  	}
+    {
+      log_u = 10;
+      u = 1000;
+    }
   else if (usize < 1000000000)
-  	{
-    	log_u = 20;
-			u = 1000000;
-  	}
+    {
+      log_u = 20;
+      u = 1000000;
+    }
   else
-  	{
-    	log_u = 30;
-			u = 1000000000;
-  	}
+    {
+      log_u = 30;
+      u = 1000000000;
+    }
 
   s = format (s, "%+10.3f", (f64) size / (f64) u);
 

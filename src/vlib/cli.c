@@ -713,9 +713,9 @@ show_memory_usage (vlib_main_t * vm,
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (input, "verbose %d", &verbose))
-      	;
+	;
       else if (unformat (input, "verbose"))
-      	verbose = 1;
+	verbose = 1;
       else
 	{
 	  error = clib_error_return (0, "unknown input `%U'",
@@ -750,23 +750,23 @@ extern void *counter_heap;
 
 static clib_error_t *
 show_counter_memory_usage (vlib_main_t * vm,
-		   unformat_input_t * input, vlib_cli_command_t * cmd)
+			   unformat_input_t * input, vlib_cli_command_t * cmd)
 {
   int verbose = 0;
   clib_error_t *error;
 
-	if (counter_heap == 0)
-	{
-		vlib_cli_output (vm, "No Counter Heap allocated, use default heap\n");
-		return 0;
-	}
+  if (counter_heap == 0)
+    {
+      vlib_cli_output (vm, "No Counter Heap allocated, use default heap\n");
+      return 0;
+    }
 
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (input, "verbose %d", &verbose))
-      	;
+	;
       else if (unformat (input, "verbose"))
-      	verbose = 1;
+	verbose = 1;
       else
 	{
 	  error = clib_error_return (0, "unknown input `%U'",

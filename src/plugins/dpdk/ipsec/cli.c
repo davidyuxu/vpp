@@ -21,13 +21,16 @@ static u8 *
 format_crypto_resource (u8 * s, va_list * args)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
-	
-	u32 indent = va_arg (*args, u32);
-	u32 res_idx = va_arg (*args, u32);
 
-  crypto_resource_t *res = vec_elt_at_index (dcm->resource ,res_idx);
-	
-  s = format (s, "%U numa %2u thr_id %3d qp %2u/%-2u inflight %2u/%-2u\n", format_white_space, indent, res->numa, (i16)res->thread_idx, res->qp_id, res->qp_id + 1, res->inflights[0], res->inflights[1]);  
+  u32 indent = va_arg (*args, u32);
+  u32 res_idx = va_arg (*args, u32);
+
+  crypto_resource_t *res = vec_elt_at_index (dcm->resource, res_idx);
+
+  s =
+    format (s, "%U numa %2u thr_id %3d qp %2u/%-2u inflight %2u/%-2u\n",
+	    format_white_space, indent, res->numa, (i16) res->thread_idx,
+	    res->qp_id, res->qp_id + 1, res->inflights[0], res->inflights[1]);
 
   return s;
 }
@@ -44,7 +47,11 @@ format_crypto (u8 * s, va_list * args)
 
   s = format (s, "%-25s%-20s%-10s\n", dev->name, drv->name,
 	      rte_cryptodevs[dev->id].data->dev_started ? "up" : "down");
-  s = format (s, "  id %u drv_id %u numa_node %u, max_queues %u, max_nb_sessions %u, max_nb_sessions_per_qp %u \n", dev->id, dev->drv_id, dev->numa, dev->max_qp, dev->max_nb_sessions, dev->max_nb_sessions_per_qp);
+  s =
+    format (s,
+	    "  id %u drv_id %u numa_node %u, max_queues %u, max_nb_sessions %u, max_nb_sessions_per_qp %u \n",
+	    dev->id, dev->drv_id, dev->numa, dev->max_qp,
+	    dev->max_nb_sessions, dev->max_nb_sessions_per_qp);
 
   if (dev->features)
     {
@@ -82,11 +89,14 @@ format_crypto (u8 * s, va_list * args)
       }
   s = format (s, "\n");
 
-	struct rte_cryptodev_stats stats;
-	rte_cryptodev_stats_get (dev->id, &stats);
+  struct rte_cryptodev_stats stats;
+  rte_cryptodev_stats_get (dev->id, &stats);
 
-  s = format (s, "  enqueue %-10lu dequeue %-10lu enqueue_err %-10lu dequeue_err %-10lu \n", 
-							stats.enqueued_count, stats.dequeued_count, stats.enqueue_err_count, stats.dequeue_err_count);
+  s =
+    format (s,
+	    "  enqueue %-10lu dequeue %-10lu enqueue_err %-10lu dequeue_err %-10lu \n",
+	    stats.enqueued_count, stats.dequeued_count,
+	    stats.enqueue_err_count, stats.dequeue_err_count);
 
   /* *INDENT-OFF* */
 	u16 *res_idx;
@@ -116,7 +126,7 @@ format_crypto (u8 * s, va_list * args)
 
 static clib_error_t *
 clear_crypto_stats_fn (vlib_main_t * vm, unformat_input_t * input,
-		     vlib_cli_command_t * cmd)
+		       vlib_cli_command_t * cmd)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_dev_t *dev;
@@ -160,7 +170,7 @@ show_dpdk_crypto_fn (vlib_main_t * vm, unformat_input_t * input,
     vlib_cli_output (vm, "%U", format_crypto, dev);
   /* *INDENT-ON* */
 
-  return NULL;
+return NULL;
 }
 
 /*?

@@ -3696,7 +3696,6 @@ _(SESSION_RULE_ADD_DEL, session_rule_add_del)                           \
 _(OUTPUT_ACL_SET_INTERFACE, output_acl_set_interface)                   \
 _(QOS_RECORD_ENABLE_DISABLE, qos_record_enable_disable)                 \
 _(DO_VPP_CMD, do_vpp_cmd)
-
   void
 vl_msg_api_custom_dump_configure (api_main_t * am)
 {

@@ -455,8 +455,8 @@ vl_mem_api_init (const char *region_name)
   /* Make a note so we can always find the primary region easily */
   am->vlib_primary_rp = am->vlib_rp;
 
-  am->vm = (u8 *)vm;
-  
+  am->vm = (u8 *) vm;
+
   return 0;
 }
 

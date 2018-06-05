@@ -1097,8 +1097,9 @@ elog_id_for_msg_name (vlib_main_t * vm, u32 node_index)
   p = hash_get (h, node_index);
   if (p)
     return p[0];
-	
-  r = elog_string (&vm->elog_main, "%U", format_vlib_node_name, vm, node_index);
+
+  r =
+    elog_string (&vm->elog_main, "%U", format_vlib_node_name, vm, node_index);
 
   hash_set (h, node_index, r);
 
@@ -1156,7 +1157,7 @@ dispatch_pending_node (vlib_main_t * vm, uword pending_frame_index,
      Trace flag indicates that at least one vector in the dispatched
      frame is traced. */
 
-	CLIB_UNUSED (u16 old) = n->flags;
+  CLIB_UNUSED (u16 old) = n->flags;
   n->flags &= ~VLIB_NODE_FLAG_TRACE;
   n->flags |= (nf->flags & VLIB_FRAME_TRACE) ? VLIB_NODE_FLAG_TRACE : 0;
   nf->flags &= ~VLIB_FRAME_TRACE;
@@ -1171,15 +1172,15 @@ dispatch_pending_node (vlib_main_t * vm, uword pending_frame_index,
 		};
 		/* *INDENT-ON* */
 
-		struct
-		{
-			u32 node_name, old, new;
-		} *ed = 0;
-	
-		ed = ELOG_DATA (&vlib_global_main.elog_main, e);
-		ed->node_name = elog_id_for_msg_name (vm, n->node_index);
-		ed->old = (int) old;
-		ed->new = (int) n->flags;
+  struct
+  {
+    u32 node_name, old, new;
+  } *ed = 0;
+
+  ed = ELOG_DATA (&vlib_global_main.elog_main, e);
+  ed->node_name = elog_id_for_msg_name (vm, n->node_index);
+  ed->old = (int) old;
+  ed->new = (int) n->flags;
 #endif
 
 
@@ -1543,13 +1544,13 @@ vlib_main_or_worker_loop (vlib_main_t * vm, int is_main)
 	}
 
       /* Process pre-input nodes. */
-      if (is_main) /* PRE-INPUT can only run in main thread, by Jordy */
-      vec_foreach (n, nm->nodes_by_type[VLIB_NODE_TYPE_PRE_INPUT])
-	cpu_time_now = dispatch_node (vm, n,
-				      VLIB_NODE_TYPE_PRE_INPUT,
-				      VLIB_NODE_STATE_POLLING,
-				      /* frame */ 0,
-				      cpu_time_now);
+      if (is_main)		/* PRE-INPUT can only run in main thread, by Jordy */
+	vec_foreach (n, nm->nodes_by_type[VLIB_NODE_TYPE_PRE_INPUT])
+	  cpu_time_now = dispatch_node (vm, n,
+					VLIB_NODE_TYPE_PRE_INPUT,
+					VLIB_NODE_STATE_POLLING,
+					/* frame */ 0,
+					cpu_time_now);
 
       /* Next process input nodes. */
       vec_foreach (n, nm->nodes_by_type[VLIB_NODE_TYPE_INPUT])

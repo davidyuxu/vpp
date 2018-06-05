@@ -213,83 +213,83 @@ ipsec_proto_init ()
   ipsec_proto_main_t *em = &ipsec_proto_main;
   memset (em, 0, sizeof (em[0]));
 
-	vlib_thread_main_t *tm = vlib_get_thread_main ();
+  vlib_thread_main_t *tm = vlib_get_thread_main ();
 
   vec_validate (em->rand_state, tm->n_vlib_mains - 1);
   vec_validate (em->rand_data, tm->n_vlib_mains - 1);
 
-	for (int i = 0; i < vec_len (em->rand_state); i++)
-	{
-		xoshiro256starstar_seed (&em->rand_state[i]);
-		initstate_r (0, em->rand_data[i].buf, 32, &em->rand_data[i].data);
-	}
+  for (int i = 0; i < vec_len (em->rand_state); i++)
+    {
+      xoshiro256starstar_seed (&em->rand_state[i]);
+      initstate_r (0, em->rand_data[i].buf, 32, &em->rand_data[i].data);
+    }
 
   vec_validate (em->ipsec_proto_main_crypto_algs, IPSEC_CRYPTO_N_ALG - 1);
 
-	ipsec_proto_main_crypto_alg_t *c;
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_NONE];
+  ipsec_proto_main_crypto_alg_t *c;
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_NONE];
   c->type = NULL;
   c->iv_size = 0;
   c->block_size = 4;
 
-	/* CBC */
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128];
+  /* CBC */
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128];
   c->type = EVP_aes_128_cbc ();
   c->iv_size = 16;
   c->block_size = 16;
 
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192];
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192];
   c->type = EVP_aes_192_cbc ();
   c->iv_size = 16;
   c->block_size = 16;
-    
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256];
-	c->type = EVP_aes_256_cbc ();
-	c->iv_size = 16;
-	c->block_size = 16;
 
-	/* CTR */
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_128];
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256];
+  c->type = EVP_aes_256_cbc ();
+  c->iv_size = 16;
+  c->block_size = 16;
+
+  /* CTR */
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_128];
   c->type = EVP_aes_128_ctr ();
   c->iv_size = 8;
   c->block_size = 4;
 
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_192];
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_192];
   c->type = EVP_aes_192_ctr ();
   c->iv_size = 8;
   c->block_size = 4;
-    
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_256];
-	c->type = EVP_aes_256_ctr ();
-	c->iv_size = 8;
-	c->block_size = 4;
 
-	/* GCM */
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_128];
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_256];
+  c->type = EVP_aes_256_ctr ();
+  c->iv_size = 8;
+  c->block_size = 4;
+
+  /* GCM */
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_128];
   c->type = EVP_aes_128_gcm ();
   c->iv_size = 8;
   c->block_size = 4;
 
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_192];
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_192];
   c->type = EVP_aes_192_gcm ();
   c->iv_size = 8;
   c->block_size = 4;
-    
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_256];
-	c->type = EVP_aes_256_gcm ();
-	c->iv_size = 8;
-	c->block_size = 4;
 
-	/* DES 3DES */
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC];
-	c->type = EVP_des_cbc ();
-	c->iv_size = 8;
-	c->block_size = 8;
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_256];
+  c->type = EVP_aes_256_gcm ();
+  c->iv_size = 8;
+  c->block_size = 4;
 
-	c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC];
-	c->type = EVP_des_ede3_cbc ();
-	c->iv_size = 8;
-	c->block_size = 8;
+  /* DES 3DES */
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC];
+  c->type = EVP_des_cbc ();
+  c->iv_size = 8;
+  c->block_size = 8;
+
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC];
+  c->type = EVP_des_ede3_cbc ();
+  c->iv_size = 8;
+  c->block_size = 8;
 
   vec_validate (em->ipsec_proto_main_integ_algs, IPSEC_INTEG_N_ALG - 1);
   ipsec_proto_main_integ_alg_t *i;
@@ -345,31 +345,36 @@ ipsec_proto_init ()
   i->trunc_size = 4;
 }
 
-typedef void (* MAC_FUNC) (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature);
+typedef void (*MAC_FUNC) (ipsec_sa_t * sa, int thread_index, u8 * data,
+			  int data_len, u8 * signature);
 
 always_inline void
-hmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature)
+hmac_calc (ipsec_sa_t * sa, int thread_index, u8 * data, int data_len,
+	   u8 * signature)
 {
   HMAC_CTX *ctx = sa->context[thread_index].hmac_ctx;
 
   unsigned int len;
 
-  ASSERT (sa->integ_alg < IPSEC_INTEG_N_ALG && sa->integ_alg > IPSEC_INTEG_ALG_NONE && sa->integ_alg != IPSEC_INTEG_ALG_AES_CMAC );
+  ASSERT (sa->integ_alg < IPSEC_INTEG_N_ALG
+	  && sa->integ_alg > IPSEC_INTEG_ALG_NONE
+	  && sa->integ_alg != IPSEC_INTEG_ALG_AES_CMAC);
 
-	HMAC_Init_ex (ctx, NULL, 0, NULL, NULL);
+  HMAC_Init_ex (ctx, NULL, 0, NULL, NULL);
 
   HMAC_Update (ctx, data, data_len);
 
   if (PREDICT_TRUE (sa->use_esn))
     HMAC_Update (ctx, (u8 *) & sa->seq_hi, sizeof (sa->seq_hi));
-	
+
   HMAC_Final (ctx, signature, &len);
 
-	//fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
+  //fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
 }
 
 always_inline void
-cmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signature)
+cmac_calc (ipsec_sa_t * sa, int thread_index, u8 * data, int data_len,
+	   u8 * signature)
 {
   CMAC_CTX *ctx = sa->context[thread_index].cmac_ctx;
 
@@ -377,39 +382,39 @@ cmac_calc (ipsec_sa_t *sa, int thread_index, u8 * data, int data_len, u8 * signa
 
   ASSERT (sa->integ_alg == IPSEC_INTEG_ALG_AES_CMAC);
 
-	CMAC_Init (ctx, NULL, 0, NULL, NULL);
-	//CMAC_Init(ctx, "1234567890", 16, EVP_aes_128_cbc(), NULL);
+  CMAC_Init (ctx, NULL, 0, NULL, NULL);
+  //CMAC_Init(ctx, "1234567890", 16, EVP_aes_128_cbc(), NULL);
 
   CMAC_Update (ctx, data, data_len);
 
   if (PREDICT_TRUE (sa->use_esn))
     CMAC_Update (ctx, (u8 *) & sa->seq_hi, sizeof (sa->seq_hi));
-	
+
   CMAC_Final (ctx, signature, &len);
 
-	//fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
+  //fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
 }
 
-always_inline void 
-rand_bytes (void *buf, int num, xoshiro256starstar_t *s)
+always_inline void
+rand_bytes (void *buf, int num, xoshiro256starstar_t * s)
 {
-	u64 *_iv = (u64 *) buf;
+  u64 *_iv = (u64 *) buf;
 
-	for (int i = 0; i < num / sizeof (u64); i++)
-	{
-		_iv[i] = xoshiro256starstar (s);
-	}
+  for (int i = 0; i < num / sizeof (u64); i++)
+    {
+      _iv[i] = xoshiro256starstar (s);
+    }
 }
 
-always_inline void 
-c_rand_bytes (void *buf, int num, struct random_data * s)
+always_inline void
+c_rand_bytes (void *buf, int num, struct random_data *s)
 {
-	i32 *_iv = (i32 *) buf;
+  i32 *_iv = (i32 *) buf;
 
-	for (int i = 0; i < num / sizeof (i32); i++)
-	{
-		random_r (s, &_iv[i]);
-	}
+  for (int i = 0; i < num / sizeof (i32); i++)
+    {
+      random_r (s, &_iv[i]);
+    }
 }
 
 #endif /* __ESP_H__ */

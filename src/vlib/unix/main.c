@@ -79,41 +79,50 @@ VLIB_INIT_FUNCTION (unix_main_init);
 static struct backtrace_state *bt_state;
 
 static void
-error_callback(void *data, const char *msg, int errnum)
+error_callback (void *data, const char *msg, int errnum)
 {
-  fprintf(stderr, "ERROR: %s (%d)", msg, errnum);
+  fprintf (stderr, "ERROR: %s (%d)", msg, errnum);
 }
 
 static void
-syminfo_callback (void *data, uintptr_t pc, const char *symname, uintptr_t symval, uintptr_t symsize)
+syminfo_callback (void *data, uintptr_t pc, const char *symname,
+		  uintptr_t symval, uintptr_t symsize)
 {
-  if (symname) {
-    printf("%lx %s ??:0\n", (unsigned long)pc, symname);
-  } else {
-    printf("%lx ?? ??:0\n", (unsigned long)pc);
-  }
+  if (symname)
+    {
+      printf ("%lx %s ??:0\n", (unsigned long) pc, symname);
+    }
+  else
+    {
+      printf ("%lx ?? ??:0\n", (unsigned long) pc);
+    }
 }
 
 static int
-full_callback(void *data, uintptr_t pc, const char *filename, int lineno, const char *function)
+full_callback (void *data, uintptr_t pc, const char *filename, int lineno,
+	       const char *function)
 {
-  struct backtrace_state *state = *(struct backtrace_state **)data;
+  struct backtrace_state *state = *(struct backtrace_state **) data;
 
-  if (function) {
-    printf("%lx %s %s:%d\n", (unsigned long)pc, function, filename?filename:"??", lineno);
-  } else {
-    backtrace_syminfo (state, pc, syminfo_callback, error_callback, data);
-  }
+  if (function)
+    {
+      printf ("%lx %s %s:%d\n", (unsigned long) pc, function,
+	      filename ? filename : "??", lineno);
+    }
+  else
+    {
+      backtrace_syminfo (state, pc, syminfo_callback, error_callback, data);
+    }
   return 0;
 }
 
 static int
-get_time_string(char *str, size_t len)
+get_time_string (char *str, size_t len)
 {
-  time_t t = time(NULL);
-  struct tm *tm = localtime(&t);
+  time_t t = time (NULL);
+  struct tm *tm = localtime (&t);
 
-  return strftime(str, len, "%Y-%m-%d-%H-%M-%S", tm);
+  return strftime (str, len, "%Y-%m-%d-%H-%M-%S", tm);
 }
 
 static int
@@ -175,24 +184,28 @@ unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
     {
       syslog (LOG_ERR | LOG_DAEMON, "%s", msg);
       {
-         char filename[256] = {0};
-         char timestamp[64] = {0};
+	char filename[256] = { 0 };
+	char timestamp[64] = { 0 };
 
-         if (get_time_string(timestamp, sizeof(timestamp)-1)) {
-           snprintf (filename, sizeof(filename), "%s/crashdump-%s.log", "..", timestamp);
-           printf("write crashdump to %s\n", filename);
+	if (get_time_string (timestamp, sizeof (timestamp) - 1))
+	  {
+	    snprintf (filename, sizeof (filename), "%s/crashdump-%s.log",
+		      "..", timestamp);
+	    printf ("write crashdump to %s\n", filename);
 
-           crash_file = fopen(filename, "w");
-           if (crash_file) {
-             backtrace_print(bt_state, 0, crash_file);
-             fclose(crash_file);
-           }
-         }
+	    crash_file = fopen (filename, "w");
+	    if (crash_file)
+	      {
+		backtrace_print (bt_state, 0, crash_file);
+		fclose (crash_file);
+	      }
+	  }
 
-	 backtrace_full(bt_state, 0, full_callback, error_callback, &bt_state);
+	backtrace_full (bt_state, 0, full_callback, error_callback,
+			&bt_state);
       }
       if (signum == SIGABRT)
-      	unsetup_signal_handlers(signum);
+	unsetup_signal_handlers (signum);
 
       os_exit (1);
     }
@@ -401,36 +414,44 @@ application_global_config (vlib_main_t * vm, unformat_input_t * input)
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (input, "capacity %d", &max_capacity))
-        ;
+	;
       else if (unformat (input, "max-interfaces %d", &max_interfaces))
-        ;
-      else if (unformat (input, "counter-heap-size %U", unformat_memory_size, &heap_size))
-        ;
+	;
       else
-        {
-          return clib_error_return (0, "unknown input `%U'",
-    				format_unformat_error, input);
-        }
+	if (unformat
+	    (input, "counter-heap-size %U", unformat_memory_size, &heap_size))
+	;
+      else
+	{
+	  return clib_error_return (0, "unknown input `%U'",
+				    format_unformat_error, input);
+	}
     }
 
-  if (max_capacity != 0) {
-    vm->max_capacity = max_capacity;
-  } else {
-    vm->max_capacity = 1000;
-  }
+  if (max_capacity != 0)
+    {
+      vm->max_capacity = max_capacity;
+    }
+  else
+    {
+      vm->max_capacity = 1000;
+    }
 
-  if (max_interfaces != 0) {
-    vm->max_interfaces = max_interfaces;
-  } else {
-    vm->max_interfaces = 2000;
-  }
-  
+  if (max_interfaces != 0)
+    {
+      vm->max_interfaces = max_interfaces;
+    }
+  else
+    {
+      vm->max_interfaces = 2000;
+    }
+
   if (heap_size != 0)
     vm->counter_heap_size = heap_size;
   else
-  	vm->counter_heap_size = 0;
+    vm->counter_heap_size = 0;
 
-	vlib_counter_heap_init(vm->counter_heap_size);
+  vlib_counter_heap_init (vm->counter_heap_size);
 
   return error;
 }
@@ -722,7 +743,9 @@ vlib_unix_main (int argc, char *argv[])
   clib_error_t *e;
   int i;
 
-  bt_state = backtrace_create_state (argv[0], BACKTRACE_SUPPORTS_THREADS, error_callback, &bt_state);
+  bt_state =
+    backtrace_create_state (argv[0], BACKTRACE_SUPPORTS_THREADS,
+			    error_callback, &bt_state);
   vm->argv = (u8 **) argv;
   vm->name = argv[0];
   vm->heap_base = clib_mem_get_heap ();
@@ -753,7 +776,7 @@ vlib_unix_main (int argc, char *argv[])
 
 #ifdef CLIB_UNIX
   /* load symbols for memory trace in debug version, by Jordy */
-  clib_elf_main_init(vm->name);
+  clib_elf_main_init (vm->name);
 #endif
 
   vlib_thread_stack_init (0);

@@ -1308,18 +1308,21 @@ static void vl_api_show_version_reply_t_handler_json
   vam->result_ready = 1;
 }
 
-static void vl_api_do_vpp_cmd_reply_t_handler
-  (vl_api_do_vpp_cmd_reply_t * mp)
+static void
+vl_api_do_vpp_cmd_reply_t_handler (vl_api_do_vpp_cmd_reply_t * mp)
 {
   vat_main_t *vam = &vat_main;
   i32 retval = ntohl (mp->retval);
 
-  if (retval >= 0) {
-	  errmsg ("         output: %s", mp->output);
-  } else {
-	  errmsg ("         execute failed: %d", mp->retval);
-  }
-	
+  if (retval >= 0)
+    {
+      errmsg ("         output: %s", mp->output);
+    }
+  else
+    {
+      errmsg ("         execute failed: %d", mp->retval);
+    }
+
   vam->retval = retval;
   vam->result_ready = 1;
 }

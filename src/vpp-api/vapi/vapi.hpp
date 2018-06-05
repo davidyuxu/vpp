@@ -167,15 +167,14 @@ public:
           }
       }
 
-	 events.reserve (vapi_get_message_count () + 1);
+    events.reserve (vapi_get_message_count () + 1);
 
-	
-	 tx_msg = 0;
-	 rx_msg = 0;
-	 rx_err = 0;
-	 discard = 0;
-	 keepalive_rcv = 0;
-	 event_rcv = 0;
+    tx_msg = 0;
+    rx_msg = 0;
+    rx_err = 0;
+    discard = 0;
+    keepalive_rcv = 0;
+    event_rcv = 0;
   }
 
   Connection (const Connection &) = delete;
@@ -249,87 +248,112 @@ public:
     return vapi_get_fd (vapi_ctx, fd);
   }
 
-	/**
-	* @brief wait for responses from vpp and assign them to appropriate objects
-	*
-	* @return VAPI_OK on success, other error code on error
-	*/
-	Common_req * recv (const Common_req *limit = nullptr)
-	{
-		std::lock_guard<std::mutex> lock (dispatch_mutex);
-		vapi_error_e rv = VAPI_OK;
+  /**
+  * @brief wait for responses from vpp and assign them to appropriate objects
+  *
+  * @return VAPI_OK on success, other error code on error
+  */
+  Common_req *recv (const Common_req *limit = nullptr)
+  {
+    std::lock_guard<std::mutex> lock (dispatch_mutex);
+    vapi_error_e rv = VAPI_OK;
 
-		while (true) {
-			void *shm_data;
-			size_t shm_data_size;
-			rv = vapi_recv (vapi_ctx, &shm_data, &shm_data_size, SVM_Q_TIMEDWAIT, 5);
-			if (VAPI_EINVAL == rv) {
-				rx_err++;
-				return nullptr;
-			} else if (VAPI_OK != rv || shm_data == nullptr) {
-				return nullptr;
-			}
+    while (true)
+      {
+        void *shm_data;
+        size_t shm_data_size;
+        rv = vapi_recv (vapi_ctx, &shm_data, &shm_data_size, SVM_Q_TIMEDWAIT,
+                        5);
+        if (VAPI_EINVAL == rv)
+          {
+            rx_err++;
+            return nullptr;
+          }
+        else if (VAPI_OK != rv || shm_data == nullptr)
+          {
+            return nullptr;
+          }
 
-			rx_msg++;
-			
+        rx_msg++;
+
 #if VAPI_CPP_DEBUG_LEAKS
-			on_shm_data_alloc (shm_data);
+        on_shm_data_alloc (shm_data);
 #endif
 
-			std::lock_guard<std::recursive_mutex> requests_lock (requests_mutex);
-			std::lock_guard<std::recursive_mutex> events_lock (events_mutex);
-			
-			vapi_msg_id_t id = vapi_lookup_vapi_msg_id_t (vapi_ctx, be16toh (*static_cast<u16 *> (shm_data)));
-			bool has_context = vapi_msg_is_with_context (id);
-			bool break_dispatch = false;
-			Common_req *matching_req = nullptr;
+        std::lock_guard<std::recursive_mutex> requests_lock (requests_mutex);
+        std::lock_guard<std::recursive_mutex> events_lock (events_mutex);
 
-			if (has_context) {
-				u32 context = *reinterpret_cast<u32 *> ((static_cast<u8 *> (shm_data) + vapi_get_context_offset (id)));
-				const auto x = requests.front ();
-				if (x != nullptr && context == x->context) {
-					matching_req = x;
-					
-					VAPI_DBG("Chk: %p, ctx_id: %u, queue_size: %ld", x, x->context, requests.size());
-					
-					std::tie (rv, break_dispatch) = x->assign_response (id, shm_data);
-					
-					if (break_dispatch) {
-						requests.pop_front ();
-						VAPI_DBG("POP: %p, queue_size: %ld", x, requests.size());
-						rx_reply++;
-						return matching_req;
-					} else {
-						VAPI_DBG ("not break, continue to recv");
-					}
-				} else {
-					if (id == vapi_msg_id_memclnt_keepalive) {
-						keepalive_rcv++;
-					} else {
-						discard++;
-					}
-					
-					VAPI_DBG ("Unexpect msg@%p, msg_id:%d(%s), expected: %p, recv: %p", shm_data, id, vapi_get_msg_name(id), limit, matching_req);
-					vapi_msg_free(vapi_ctx, shm_data);
-				}
-			} else {
-				if (events[id]) {
-					event_rcv++;
-					std::tie (rv, break_dispatch) = events[id]->assign_response (id, shm_data);
-					matching_req = events[id];
-				} else {
-					discard++;
-					msg_free (shm_data);
-				}
-			}
+        vapi_msg_id_t id = vapi_lookup_vapi_msg_id_t (
+            vapi_ctx, be16toh (*static_cast<u16 *> (shm_data)));
+        bool has_context = vapi_msg_is_with_context (id);
+        bool break_dispatch = false;
+        Common_req *matching_req = nullptr;
 
-			return nullptr;
-		}
-		
-		return nullptr;
-	}
+        if (has_context)
+          {
+            u32 context = *reinterpret_cast<u32 *> (
+                (static_cast<u8 *> (shm_data) + vapi_get_context_offset (id)));
+            const auto x = requests.front ();
+            if (x != nullptr && context == x->context)
+              {
+                matching_req = x;
 
+                VAPI_DBG ("Chk: %p, ctx_id: %u, queue_size: %ld", x,
+                          x->context, requests.size ());
 
+                std::tie (rv, break_dispatch) =
+                    x->assign_response (id, shm_data);
+
+                if (break_dispatch)
+                  {
+                    requests.pop_front ();
+                    VAPI_DBG ("POP: %p, queue_size: %ld", x, requests.size ());
+                    rx_reply++;
+                    return matching_req;
+                  }
+                else
+                  {
+                    VAPI_DBG ("not break, continue to recv");
+                  }
+              }
+            else
+              {
+                if (id == vapi_msg_id_memclnt_keepalive)
+                  {
+                    keepalive_rcv++;
+                  }
+                else
+                  {
+                    discard++;
+                  }
+
+                VAPI_DBG (
+                    "Unexpect msg@%p, msg_id:%d(%s), expected: %p, recv: %p",
+                    shm_data, id, vapi_get_msg_name (id), limit, matching_req);
+                vapi_msg_free (vapi_ctx, shm_data);
+              }
+          }
+        else
+          {
+            if (events[id])
+              {
+                event_rcv++;
+                std::tie (rv, break_dispatch) =
+                    events[id]->assign_response (id, shm_data);
+                matching_req = events[id];
+              }
+            else
+              {
+                discard++;
+                msg_free (shm_data);
+              }
+          }
+
+        return nullptr;
+      }
+
+    return nullptr;
+  }
 
   /**
    * @brief wait for responses from vpp and assign them to appropriate objects
@@ -376,11 +400,11 @@ public:
               }
             else
               {
-		vapi_msg_free(vapi_ctx, shm_data);
-		#if 0
+                vapi_msg_free (vapi_ctx, shm_data);
+#if 0
                 std::tie (rv, break_dispatch) =
                     x->assign_response (id, nullptr);
-		#endif
+#endif
               }
             if (break_dispatch)
               {
@@ -434,14 +458,14 @@ public:
     return dispatch (req);
   }
 
-	uint64_t tx_req;
-	uint64_t rx_reply;
-	uint64_t tx_msg;
-	uint64_t rx_msg;
-	uint64_t rx_err;
-	uint64_t discard;
-	uint64_t keepalive_rcv;
-	uint64_t event_rcv;
+  uint64_t tx_req;
+  uint64_t rx_reply;
+  uint64_t tx_msg;
+  uint64_t rx_msg;
+  uint64_t rx_err;
+  uint64_t discard;
+  uint64_t keepalive_rcv;
+  uint64_t event_rcv;
 
 private:
   void msg_free (void *shm_data)
@@ -469,7 +493,7 @@ private:
     vapi_error_e rv = vapi_send (vapi_ctx, req->request.shm_data);
     if (VAPI_OK == rv)
       {
-      	tx_req++;
+        tx_req++;
         VAPI_DBG ("Push %p", req);
         requests.emplace_back (req);
         req->set_context (req_context);
@@ -549,8 +573,6 @@ private:
   std::deque<Common_req *> requests;
   std::vector<Common_req *> events;
   int event_count;
-
-  
 
   template <typename Req, typename Resp, typename... Args>
   friend class Request;

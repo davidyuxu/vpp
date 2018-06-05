@@ -77,12 +77,13 @@ format_api_error (u8 * s, va_list * args)
   return s;
 }
 
-typedef struct {
+typedef struct
+{
   char event[8];
-  u64  time;
-}myevent;
+  u64 time;
+} myevent;
 
-myevent * events;
+myevent *events;
 
 void
 do_one_file (vat_main_t * vam)
@@ -94,7 +95,9 @@ do_one_file (vat_main_t * vam)
   u8 *cmdp, *argsp;
   uword *p;
   u8 *this_cmd = 0;
-  myevent startev = {"start", 0}, endev = {"end", 0};
+  myevent startev = { "start", 0 }, endev =
+  {
+  "end", 0};
 
   vam->input = &_input;
 
@@ -190,58 +193,70 @@ do_one_file (vat_main_t * vam)
 	  fp = exec;
 	}
 
-      if (vam->logfp) {
-        startev.time = clib_cpu_time_now();
-        vec_add1(events, startev);
-      }
-      
+      if (vam->logfp)
+	{
+	  startev.time = clib_cpu_time_now ();
+	  vec_add1 (events, startev);
+	}
+
       rv = (*fp) (vam);
 
-      if (vam->logfp) {
-        endev.time = clib_cpu_time_now();
-        vec_add1(events, endev);
-      }
+      if (vam->logfp)
+	{
+	  endev.time = clib_cpu_time_now ();
+	  vec_add1 (events, endev);
+	}
 
       if (rv < 0)
 	errmsg ("%s error: %U\n", cmdp, format_api_error, vam, rv);
 #if 0
-      else {
-	u32 is_gtp_cmd = (NULL == strstr((char *)vam->inbuf, "gtpu_add_del_tunnel")) ? 0 : 1;
-	u32 is_del = (NULL == strstr((char *)vam->inbuf, " del")) ? 0 : 1;
-	if (is_gtp_cmd && !is_del) {
-	  char * end = strchr((char *)vam->inbuf, '\n');
-	  u8 *outbuf;
+      else
+	{
+	  u32 is_gtp_cmd =
+	    (NULL ==
+	     strstr ((char *) vam->inbuf, "gtpu_add_del_tunnel")) ? 0 : 1;
+	  u32 is_del = (NULL == strstr ((char *) vam->inbuf, " del")) ? 0 : 1;
+	  if (is_gtp_cmd && !is_del)
+	    {
+	      char *end = strchr ((char *) vam->inbuf, '\n');
+	      u8 *outbuf;
 
-	  if (end)
-	    *end = '\0';
+	      if (end)
+		*end = '\0';
 
-	  outbuf = format(0, "%s del\n", (char *)vam->inbuf);
-	  
-	  if (0 == fgets ((char *) vam->inbuf, vec_len (vam->inbuf), vam->ifp)) {
-	    break;
-	  }
-	  
-	  if (strstr((char *)vam->inbuf, "ip_add_del_route")) {
-	    char * sw_if_str = strstr((char *)vam->inbuf, "sw_if_index");
-	    if (sw_if_str) {
-	      u8 *append_str= format(0, "sw_if_index %d", vam->sw_if_index);
-	      
-	      *sw_if_str = '\0';
-	      
-	      strcat((char *)vam->inbuf, (char *)append_str);
-	      fprintf (vam->ofp, "%s del\n", (char *)vam->inbuf);
-	      strcat((char *)vam->inbuf, "\n");
+	      outbuf = format (0, "%s del\n", (char *) vam->inbuf);
 
-	      vec_free (append_str);
-	      fputs((char *)outbuf, vam->ofp);
+	      if (0 ==
+		  fgets ((char *) vam->inbuf, vec_len (vam->inbuf), vam->ifp))
+		{
+		  break;
+		}
+
+	      if (strstr ((char *) vam->inbuf, "ip_add_del_route"))
+		{
+		  char *sw_if_str =
+		    strstr ((char *) vam->inbuf, "sw_if_index");
+		  if (sw_if_str)
+		    {
+		      u8 *append_str =
+			format (0, "sw_if_index %d", vam->sw_if_index);
+
+		      *sw_if_str = '\0';
+
+		      strcat ((char *) vam->inbuf, (char *) append_str);
+		      fprintf (vam->ofp, "%s del\n", (char *) vam->inbuf);
+		      strcat ((char *) vam->inbuf, "\n");
+
+		      vec_free (append_str);
+		      fputs ((char *) outbuf, vam->ofp);
+		    }
+		}
+
+	      vec_free (outbuf);
+
+	      goto process_cmd;
 	    }
-	  }
-
-	  vec_free (outbuf);
-
-	  goto process_cmd;
 	}
-      }
 #endif
 
       unformat_free (vam->input);
@@ -371,11 +386,13 @@ main (int argc, char **argv)
   mheap_t *h;
   int i;
   f64 timeout;
-  
+
 #if CLIB_DEBUG > 0
-  clib_elf_main_init("/home/vppshare/jordy/vpp/build-root/install-vpp_debug-native/vpp/bin/vpp_api_test");
+  clib_elf_main_init
+    ("/home/vppshare/jordy/vpp/build-root/install-vpp_debug-native/vpp/bin/vpp_api_test");
 #else
-  clib_elf_main_init("/home/vppshare/jordy/vpp/build-root/install-vpp-native/vpp/bin/vpp_api_test");
+  clib_elf_main_init
+    ("/home/vppshare/jordy/vpp/build-root/install-vpp-native/vpp/bin/vpp_api_test");
 #endif
 
   clib_mem_init (0, 1 << 30);
@@ -476,14 +493,15 @@ main (int argc, char **argv)
   vam->json_output = json_output;
 
   if (!json_output)
-    ;//api_sw_interface_dump (vam);
+    ;				//api_sw_interface_dump (vam);
 
   vec_validate (vam->inbuf, 4096);
 
-  if (vam->logfp) {
-    vec_validate (events, 200000);
-    _vec_len (events) = 0;
-  }
+  if (vam->logfp)
+    {
+      vec_validate (events, 200000);
+      _vec_len (events) = 0;
+    }
 
   vam->current_file = (u8 *) "plugin-init";
   vat_plugin_init (vam);
@@ -503,15 +521,18 @@ main (int argc, char **argv)
     }
 
   /* dump all events here */
-  if (vam->logfp) {
-    myevent *e;
-    vec_foreach (e, events)
+  if (vam->logfp)
     {
-      f64 dt = (e->time - vam->clib_time.init_cpu_time) * vam->clib_time.seconds_per_clock;
-      fprintf(vam->ofp, "%8s %18.9f\n", e->event, dt);
+      myevent *e;
+      vec_foreach (e, events)
+      {
+	f64 dt =
+	  (e->time -
+	   vam->clib_time.init_cpu_time) * vam->clib_time.seconds_per_clock;
+	fprintf (vam->ofp, "%8s %18.9f\n", e->event, dt);
+      }
+      fclose (vam->logfp);
     }
-    fclose (vam->logfp);
-  }
 
   if (output_file)
     fclose (vam->ofp);

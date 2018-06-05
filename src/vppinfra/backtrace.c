@@ -269,17 +269,17 @@ clib_backtrace (uword * callers, uword max_callers, uword n_frames_to_skip)
   /* Also skip current frame. */
   n_frames_to_skip += 1;
 
-  size = clib_min(ARRAY_LEN(array), max_callers + n_frames_to_skip);
+  size = clib_min (ARRAY_LEN (array), max_callers + n_frames_to_skip);
 
   size = backtrace (array, size);
 
-#if 0  // only for overlook debugging 
+#if 0				// only for overlook debugging
   char **symbols;
 
   symbols = backtrace_symbols (array, size);
 
-  if(symbols)
-  	free (symbols);
+  if (symbols)
+    free (symbols);
 #endif
 
   uword i;

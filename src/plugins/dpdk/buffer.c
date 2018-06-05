@@ -464,8 +464,8 @@ dpdk_pool_create (vlib_main_t * vm, u8 * pool_name, u32 elt_size,
   u32 size, obj_size;
   i32 ret;
 
-	/* to make dpdk happy */
-	cache_size = clib_min (num_elts *2/3, cache_size);
+  /* to make dpdk happy */
+  cache_size = clib_min (num_elts * 2 / 3, cache_size);
 
   obj_size = rte_mempool_calc_obj_size (elt_size, 0, 0);
   size = rte_mempool_xmem_size (num_elts, obj_size, 21, 0);

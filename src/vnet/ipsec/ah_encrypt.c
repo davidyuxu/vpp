@@ -88,7 +88,7 @@ ah_encrypt_node_fn (vlib_main_t * vm,
   n_left_from = from_frame->n_vectors;
   ipsec_main_t *im = &ipsec_main;
   ipsec_proto_main_t *em = &ipsec_proto_main;
-	int thread_id = vlib_get_thread_index ();
+  int thread_id = vlib_get_thread_index ();
 
   next_index = node->cached_next_index;
 
@@ -144,134 +144,151 @@ ah_encrypt_node_fn (vlib_main_t * vm,
 	  ih0 = vlib_buffer_get_current (i_b0);
 
 	  is_ipv6 = (ih0->ip4.ip_version_and_header_length & 0xF0) == 0x60;
-		
+
 	  /* is ipv6 */
 	  if (PREDICT_TRUE (sa0->is_tunnel))
-    {
-      if (PREDICT_TRUE (!is_ipv6))
-				adv = -sizeof (ip4_and_ah_header_t);
-	    else
-				adv = -sizeof (ip6_and_ah_header_t);
-    }
+	    {
+	      if (PREDICT_TRUE (!is_ipv6))
+		adv = -sizeof (ip4_and_ah_header_t);
+	      else
+		adv = -sizeof (ip6_and_ah_header_t);
+	    }
 	  else
-    {
-      adv = -sizeof (ah_header_t);
-    }
+	    {
+	      adv = -sizeof (ah_header_t);
+	    }
 
-	  icv_size = em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
-		
+	  icv_size =
+	    em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
+
 	  /*transport mode save the eth header before it is overwritten */
 	  if (PREDICT_FALSE (!sa0->is_tunnel))
-	  {
-	    ethernet_header_t *ieh0 = (ethernet_header_t *) ((u8 *) vlib_buffer_get_current (i_b0) - sizeof (ethernet_header_t));
-      ethernet_header_t *oeh0 = (ethernet_header_t *) ((u8 *) ieh0 + (adv - icv_size));
-      clib_memcpy (oeh0, ieh0, sizeof (ethernet_header_t));
-    }
+	    {
+	      ethernet_header_t *ieh0 =
+		(ethernet_header_t *) ((u8 *) vlib_buffer_get_current (i_b0) -
+				       sizeof (ethernet_header_t));
+	      ethernet_header_t *oeh0 =
+		(ethernet_header_t *) ((u8 *) ieh0 + (adv - icv_size));
+	      clib_memcpy (oeh0, ieh0, sizeof (ethernet_header_t));
+	    }
 
 	  vlib_buffer_advance (i_b0, adv - icv_size);
 
 	  /* is ipv6 */
 	  if (PREDICT_FALSE (is_ipv6))
-    {
-      ih6_0 = (ip6_and_ah_header_t *) ih0;
-      ip_hdr_size = sizeof (ip6_header_t);
-      oh6_0 = vlib_buffer_get_current (i_b0);
+	    {
+	      ih6_0 = (ip6_and_ah_header_t *) ih0;
+	      ip_hdr_size = sizeof (ip6_header_t);
+	      oh6_0 = vlib_buffer_get_current (i_b0);
 
-      if (PREDICT_TRUE (sa0->is_tunnel))
-			{
-			  next_hdr_type = IP_PROTOCOL_IPV6;
-			  oh6_0->ip6.ip_version_traffic_class_and_flow_label = ih6_0->ip6.ip_version_traffic_class_and_flow_label;
-			}
-      else
-			{
-			  next_hdr_type = ih6_0->ip6.protocol;
-			  memmove (oh6_0, ih6_0, sizeof (ip6_header_t));
-			}
-
-      oh6_0->ip6.protocol = IP_PROTOCOL_IPSEC_AH;
-      oh6_0->ip6.hop_limit = 254;
-      oh6_0->ah.spi = clib_net_to_host_u32 (sa0->spi);
-      oh6_0->ah.seq_no = clib_net_to_host_u32 (sa0->seq);
-      oh6_0->ip6.payload_length = clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0) - sizeof (ip6_header_t));
-    }
-	  else
-    {
-      ip_hdr_size = sizeof (ip4_header_t);
-      oh0 = vlib_buffer_get_current (i_b0);
-
-      if (PREDICT_TRUE (sa0->is_tunnel))
-			{
-			  next_hdr_type = IP_PROTOCOL_IP_IN_IP;
-			}
-      else
-			{
-			  next_hdr_type = ih0->ip4.protocol;
-			  memmove (oh0, ih0, sizeof (ip4_header_t));
-			}
-
-			ttl = ih0->ip4.ttl;
-			tos = ih0->ip4.tos;
-
-	    oh0->ip4.length = clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0));
-      oh0->ip4.ip_version_and_header_length = 0x45;
-      oh0->ip4.fragment_id = 0;
-      oh0->ip4.flags_and_fragment_offset = 0;
-      oh0->ip4.ttl = 0;
-      oh0->ip4.tos = 0;
-      oh0->ip4.protocol = IP_PROTOCOL_IPSEC_AH;
-      oh0->ah.spi = clib_net_to_host_u32 (sa0->spi);
-      oh0->ah.seq_no = clib_net_to_host_u32 (sa0->seq);
-      oh0->ip4.checksum = 0;
-      oh0->ah.nexthdr = next_hdr_type;
-      oh0->ah.hdrlen = 4;
-    }
-
-	  if (PREDICT_TRUE (!is_ipv6 && sa0->is_tunnel && !sa0->is_tunnel_ip6))
-    {
-      oh0->ip4.src_address.as_u32 = sa0->tunnel_src_addr.ip4.as_u32;
-      oh0->ip4.dst_address.as_u32 = sa0->tunnel_dst_addr.ip4.as_u32;
-
-      next0 = AH_ENCRYPT_NEXT_IP4_LOOKUP;
-      vnet_buffer (i_b0)->sw_if_index[VLIB_TX] = (u32) ~ 0;
-    }
-	  else if (is_ipv6 && sa0->is_tunnel && sa0->is_tunnel_ip6)
-    {
-      oh6_0->ip6.src_address.as_u64[0] = sa0->tunnel_src_addr.ip6.as_u64[0];
-      oh6_0->ip6.src_address.as_u64[1] = sa0->tunnel_src_addr.ip6.as_u64[1];
-      oh6_0->ip6.dst_address.as_u64[0] = sa0->tunnel_dst_addr.ip6.as_u64[0];
-      oh6_0->ip6.dst_address.as_u64[1] = sa0->tunnel_dst_addr.ip6.as_u64[1];
-
-      next0 = AH_ENCRYPT_NEXT_IP6_LOOKUP;
-      vnet_buffer (i_b0)->sw_if_index[VLIB_TX] = (u32) ~ 0;
-    }
-	  else
-    {
-      transport_mode = 1;
-      next0 = AH_ENCRYPT_NEXT_INTERFACE_OUTPUT;
-    }
-
-	  u8 sig[64];
-		
-	  u8 *digest = vlib_buffer_get_current (i_b0) + ip_hdr_size + sizeof (ah_header_t);
-    memset (digest, 0, icv_size);
-
-		if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
-    {
-
-		  hmac_calc (sa0, thread_id, (u8 *) vlib_buffer_get_current (i_b0), i_b0->current_length, sig);
-
-  		clib_memcpy (digest, (char *) &sig[0], icv_size);
+	      if (PREDICT_TRUE (sa0->is_tunnel))
+		{
+		  next_hdr_type = IP_PROTOCOL_IPV6;
+		  oh6_0->ip6.ip_version_traffic_class_and_flow_label =
+		    ih6_0->ip6.ip_version_traffic_class_and_flow_label;
+		}
+	      else
+		{
+		  next_hdr_type = ih6_0->ip6.protocol;
+		  memmove (oh6_0, ih6_0, sizeof (ip6_header_t));
 		}
 
-	  if (PREDICT_FALSE (is_ipv6))
-    {
-    }
+	      oh6_0->ip6.protocol = IP_PROTOCOL_IPSEC_AH;
+	      oh6_0->ip6.hop_limit = 254;
+	      oh6_0->ah.spi = clib_net_to_host_u32 (sa0->spi);
+	      oh6_0->ah.seq_no = clib_net_to_host_u32 (sa0->seq);
+	      oh6_0->ip6.payload_length =
+		clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0) -
+				      sizeof (ip6_header_t));
+	    }
 	  else
-    {
-			oh0->ip4.ttl = ttl;
-			oh0->ip4.tos = tos;
-      oh0->ip4.checksum = ip4_header_checksum (&oh0->ip4);
-    }
+	    {
+	      ip_hdr_size = sizeof (ip4_header_t);
+	      oh0 = vlib_buffer_get_current (i_b0);
+
+	      if (PREDICT_TRUE (sa0->is_tunnel))
+		{
+		  next_hdr_type = IP_PROTOCOL_IP_IN_IP;
+		}
+	      else
+		{
+		  next_hdr_type = ih0->ip4.protocol;
+		  memmove (oh0, ih0, sizeof (ip4_header_t));
+		}
+
+	      ttl = ih0->ip4.ttl;
+	      tos = ih0->ip4.tos;
+
+	      oh0->ip4.length =
+		clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0));
+	      oh0->ip4.ip_version_and_header_length = 0x45;
+	      oh0->ip4.fragment_id = 0;
+	      oh0->ip4.flags_and_fragment_offset = 0;
+	      oh0->ip4.ttl = 0;
+	      oh0->ip4.tos = 0;
+	      oh0->ip4.protocol = IP_PROTOCOL_IPSEC_AH;
+	      oh0->ah.spi = clib_net_to_host_u32 (sa0->spi);
+	      oh0->ah.seq_no = clib_net_to_host_u32 (sa0->seq);
+	      oh0->ip4.checksum = 0;
+	      oh0->ah.nexthdr = next_hdr_type;
+	      oh0->ah.hdrlen = 4;
+	    }
+
+	  if (PREDICT_TRUE
+	      (!is_ipv6 && sa0->is_tunnel && !sa0->is_tunnel_ip6))
+	    {
+	      oh0->ip4.src_address.as_u32 = sa0->tunnel_src_addr.ip4.as_u32;
+	      oh0->ip4.dst_address.as_u32 = sa0->tunnel_dst_addr.ip4.as_u32;
+
+	      next0 = AH_ENCRYPT_NEXT_IP4_LOOKUP;
+	      vnet_buffer (i_b0)->sw_if_index[VLIB_TX] = (u32) ~ 0;
+	    }
+	  else if (is_ipv6 && sa0->is_tunnel && sa0->is_tunnel_ip6)
+	    {
+	      oh6_0->ip6.src_address.as_u64[0] =
+		sa0->tunnel_src_addr.ip6.as_u64[0];
+	      oh6_0->ip6.src_address.as_u64[1] =
+		sa0->tunnel_src_addr.ip6.as_u64[1];
+	      oh6_0->ip6.dst_address.as_u64[0] =
+		sa0->tunnel_dst_addr.ip6.as_u64[0];
+	      oh6_0->ip6.dst_address.as_u64[1] =
+		sa0->tunnel_dst_addr.ip6.as_u64[1];
+
+	      next0 = AH_ENCRYPT_NEXT_IP6_LOOKUP;
+	      vnet_buffer (i_b0)->sw_if_index[VLIB_TX] = (u32) ~ 0;
+	    }
+	  else
+	    {
+	      transport_mode = 1;
+	      next0 = AH_ENCRYPT_NEXT_INTERFACE_OUTPUT;
+	    }
+
+	  u8 sig[64];
+
+	  u8 *digest =
+	    vlib_buffer_get_current (i_b0) + ip_hdr_size +
+	    sizeof (ah_header_t);
+	  memset (digest, 0, icv_size);
+
+	  if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
+	    {
+
+	      hmac_calc (sa0, thread_id,
+			 (u8 *) vlib_buffer_get_current (i_b0),
+			 i_b0->current_length, sig);
+
+	      clib_memcpy (digest, (char *) &sig[0], icv_size);
+	    }
+
+	  if (PREDICT_FALSE (is_ipv6))
+	    {
+	    }
+	  else
+	    {
+	      oh0->ip4.ttl = ttl;
+	      oh0->ip4.tos = tos;
+	      oh0->ip4.checksum = ip4_header_checksum (&oh0->ip4);
+	    }
 
 	  if (transport_mode)
 	    vlib_buffer_advance (i_b0, -sizeof (ethernet_header_t));;

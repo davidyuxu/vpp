@@ -171,7 +171,8 @@ vlib_register_errors (vlib_main_t * vm,
 
   /* Allocate a counter/elog type for each error. */
   vec_validate_aligned (em->counters, l - 1, CLIB_CACHE_LINE_BYTES);
-  vec_validate_aligned (vm->error_elog_event_types, l - 1, CLIB_CACHE_LINE_BYTES);
+  vec_validate_aligned (vm->error_elog_event_types, l - 1,
+			CLIB_CACHE_LINE_BYTES);
 
   /* Zero counters for re-registrations of errors. */
   if (n->error_heap_index + n_errors <= vec_len (em->counters_last_clear))
@@ -219,14 +220,16 @@ show_errors (vlib_main_t * vm,
   u64 *tmp_sum = 0;
 
   if (verbose)
-    vlib_cli_output (vm, "%=10s%=15s%=40s%-28s%=10s", "Count", "Rate", "Node", "Reason", "Index");
+    vlib_cli_output (vm, "%=10s%=15s%=40s%-28s%=10s", "Count", "Rate", "Node",
+		     "Reason", "Index");
   else
-    vlib_cli_output (vm, "%=10s%=15s%=40s%-28s", "Count", "Rate", "Node", "Reason");
+    vlib_cli_output (vm, "%=10s%=15s%=40s%-28s", "Count", "Rate", "Node",
+		     "Reason");
 
 
-	duration = vlib_time_now(vm) - em->last_show_time;	
-	em->last_show_time = vlib_time_now (vm);
-	
+  duration = vlib_time_now (vm) - em->last_show_time;
+  em->last_show_time = vlib_time_now (vm);
+
   /* *INDENT-OFF* */
   foreach_vlib_main(({
 
@@ -238,7 +241,7 @@ show_errors (vlib_main_t * vm,
 		vec_validate (tmp, len - 1);
 		vec_validate (tmp_sum, len - 1);
 		vec_validate (em->rate_counters, len - 1);
-		
+
     if (verbose)
       vlib_cli_output(vm, "Thread %u (%v):", index, vlib_worker_threads[index].name);
 
@@ -283,8 +286,9 @@ show_errors (vlib_main_t * vm,
 	  if (sums[i])
 	    {
 	      if (verbose)
-		vlib_cli_output (vm, "%10Ld %U   %=40v%-28s%=10d", sums[i], format_mbps_pps, tmp_sum[i]/duration, n->name,
-				 em->error_strings_heap[i], i);
+		vlib_cli_output (vm, "%10Ld %U   %=40v%-28s%=10d", sums[i],
+				 format_mbps_pps, tmp_sum[i] / duration,
+				 n->name, em->error_strings_heap[i], i);
 	    }
 	}
     }
@@ -293,7 +297,7 @@ show_errors (vlib_main_t * vm,
 
   vec_free (tmp);
   vec_free (tmp_sum);
-  
+
   return 0;
 }
 

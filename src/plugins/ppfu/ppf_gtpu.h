@@ -180,13 +180,13 @@ typedef struct
   u32 protocol_config;
   u32 type;
   u32 ep_weight;
-  u32 traffic_state;  
+  u32 traffic_state;
 
 } ppf_gtpu_tunnel_t;
 
 
 
- #define foreach_ppf_gtpu_input_next        \
+#define foreach_ppf_gtpu_input_next        \
 _(DROP, "error-drop")                  \
 _(L2_INPUT, "l2-input")                \
 _(IP4_INPUT,  "ip4-input")             \
@@ -218,11 +218,12 @@ _(DROP, "error-drop")                  \
 _(IP4_LOOKUP, "ip4-lookup")             \
 _(IP6_LOOKUP, "ip6-lookup")
 
-typedef enum {
-    PPF_GTPU_ENCAP_NEXT_DROP,
-    PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP,
-    PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP,
-    PPF_GTPU_ENCAP_N_NEXT,
+typedef enum
+{
+  PPF_GTPU_ENCAP_NEXT_DROP,
+  PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP,
+  PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP,
+  PPF_GTPU_ENCAP_N_NEXT,
 } ppf_gtpu_encap_next_t;
 
 typedef struct
@@ -234,7 +235,7 @@ typedef struct
   uword *ppf_gtpu4_tunnel_by_key;	/* keyed on teid */
   uword *ppf_gtpu6_tunnel_by_key;	/* keyed on ipv6.dst + teid */
 
-  uword *ppf_gtpu4_tunnel_by_callid_dir;        /*key on callid + dir */		
+  uword *ppf_gtpu4_tunnel_by_callid_dir;	/*key on callid + dir */
 
   /* local VTEP IPs ref count used by ppf_gtpu-bypass node to check if
      received ppf_gtpu packet DIP matches any local VTEP address */
@@ -306,18 +307,19 @@ int vnet_ppf_gtpu_add_del_tunnel
 #endif
 
 int vnet_ppf_gtpu_add_tunnel
-  (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp, u32 *tunnel_id_ret);
-  
+  (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp,
+   u32 * tunnel_id_ret);
+
 int vnet_ppf_gtpu_update_tunnel
   (u32 tunnel_id, vnet_ppf_gtpu_add_del_tunnel_args_t * a);
 
-int vnet_ppf_gtpu_del_tunnel
-  (u32 tunnel_id);
+int vnet_ppf_gtpu_del_tunnel (u32 tunnel_id);
 
 int vnet_ppf_gtpu_add_tunnel_in_call
-  (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp, u32 *tunnel_id_ret);
+  (vnet_ppf_gtpu_add_del_tunnel_args_t * a, u32 * sw_if_indexp,
+   u32 * tunnel_id_ret);
 
- int vnet_ppf_gtpu_del_tunnel_in_call
+int vnet_ppf_gtpu_del_tunnel_in_call
   (vnet_ppf_gtpu_add_del_tunnel_args_t * a);
 
 void vnet_int_ppf_gtpu_bypass_mode (u32 sw_if_index, u8 is_ip6, u8 is_enable);

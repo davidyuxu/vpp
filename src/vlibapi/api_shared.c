@@ -388,6 +388,7 @@ void
 vl_msg_api_barrier_release (void)
 {
 }
+
 /* set to 1 if you want before/after message handler event logging */
 #define ELOG_API_MESSAGE_HANDLERS 1
 #if ELOG_API_MESSAGE_HANDLERS > 0
@@ -421,9 +422,10 @@ msg_handler_internal (api_main_t * am,
   u16 id = ntohs (*((u16 *) the_msg));
   u8 *(*print_fp) (void *, void *);
 #if ELOG_API_MESSAGE_HANDLERS > 0
-    vlib_main_t *vm = (vlib_main_t *)am->vm;
-    if (vm) {
-        {
+  vlib_main_t *vm = (vlib_main_t *) am->vm;
+  if (vm)
+    {
+      {
           /* *INDENT-OFF* */
           ELOG_TYPE_DECLARE (e) =
             {
@@ -431,16 +433,16 @@ msg_handler_internal (api_main_t * am,
               .format_args = "T4",
             };
           /* *INDENT-ON* */
-          struct
-          {
-            u32 c;
-          } *ed;
-          ed = ELOG_DATA (&vm->elog_main, e);
-          if (id < vec_len (am->msg_names))
-            ed->c = elog_id_for_msg_name (vm, (char *)(am->msg_names[id]));
-          else
-            ed->c = elog_id_for_msg_name (vm, "BOGUS");
-        }
+	struct
+	{
+	  u32 c;
+	} *ed;
+	ed = ELOG_DATA (&vm->elog_main, e);
+	if (id < vec_len (am->msg_names))
+	  ed->c = elog_id_for_msg_name (vm, (char *) (am->msg_names[id]));
+	else
+	  ed->c = elog_id_for_msg_name (vm, "BOGUS");
+      }
     }
 #endif
 
@@ -483,27 +485,28 @@ msg_handler_internal (api_main_t * am,
   if (free_it)
     vl_msg_api_free (the_msg);
 
-  
+
 #if ELOG_API_MESSAGE_HANDLERS > 0
-    if (vm) {
-        {
+  if (vm)
+    {
+      {
         /* *INDENT-OFF* */
         ELOG_TYPE_DECLARE (e) = {
           .format = "[i]api-msg-done: %s",
           .format_args = "T4",
         };
         /* *INDENT-ON* */
-      
-          struct
-          {
-            u32 c;
-          } *ed;
-          ed = ELOG_DATA (&vm->elog_main, e);
-          if (id < vec_len (am->msg_names))
-            ed->c = elog_id_for_msg_name (vm, (char *)(am->msg_names[id]));
-          else
-            ed->c = elog_id_for_msg_name (vm, "BOGUS");
-        }
+
+	struct
+	{
+	  u32 c;
+	} *ed;
+	ed = ELOG_DATA (&vm->elog_main, e);
+	if (id < vec_len (am->msg_names))
+	  ed->c = elog_id_for_msg_name (vm, (char *) (am->msg_names[id]));
+	else
+	  ed->c = elog_id_for_msg_name (vm, "BOGUS");
+      }
     }
 #endif
 }
@@ -534,7 +537,7 @@ vl_msg_api_handler_with_vm_node (api_main_t * am,
     } *ed;
     ed = ELOG_DATA (&vm->elog_main, e);
     if (id < vec_len (am->msg_names))
-      ed->c = elog_id_for_msg_name (vm, (char *)(am->msg_names[id]));
+      ed->c = elog_id_for_msg_name (vm, (char *) (am->msg_names[id]));
     else
       ed->c = elog_id_for_msg_name (vm, "BOGUS");
   }
@@ -583,7 +586,7 @@ vl_msg_api_handler_with_vm_node (api_main_t * am,
     } *ed;
     ed = ELOG_DATA (&vm->elog_main, e);
     if (id < vec_len (am->msg_names))
-      ed->c = elog_id_for_msg_name (vm, (char *)(am->msg_names[id]));
+      ed->c = elog_id_for_msg_name (vm, (char *) (am->msg_names[id]));
     else
       ed->c = elog_id_for_msg_name (vm, "BOGUS");
   }

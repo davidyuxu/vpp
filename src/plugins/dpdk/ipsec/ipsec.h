@@ -98,10 +98,10 @@ typedef struct
   u16 id;
   const char *name;
   u32 max_qp;
-	u32 max_nb_sessions;
-	/* Maximum number of sessions supported by device. */
-	u32 max_nb_sessions_per_qp;
-	/* Maximum number of sessions per queue pair. Default 0 for infinite sessions */
+  u32 max_nb_sessions;
+  /* Maximum number of sessions supported by device. */
+  u32 max_nb_sessions_per_qp;
+  /* Maximum number of sessions per queue pair. Default 0 for infinite sessions */
   u64 features;
 } crypto_dev_t;
 
@@ -151,18 +151,18 @@ typedef struct
 
 typedef struct
 {
-	crypto_alg_t *cipher_alg;
-	crypto_alg_t *auth_alg;	
-	struct rte_cryptodev_sym_session **sessions;
-	u32 sa_index;
-	u8 is_aead;
+  crypto_alg_t *cipher_alg;
+  crypto_alg_t *auth_alg;
+  struct rte_cryptodev_sym_session **sessions;
+  u32 sa_index;
+  u8 is_aead;
 } crypto_session_t;
 
 typedef struct
 {
   crypto_worker_main_t *workers_main;
   crypto_session_t *sa_session;
-	u32 *sa_session_index;
+  u32 *sa_session_index;
   crypto_dev_t *dev;
   crypto_resource_t *resource;
   crypto_alg_t *cipher_algs;
@@ -183,14 +183,17 @@ static const u8 pad_data[] =
 
 void crypto_auto_placement (void);
 
-i32 crypto_make_session (u8 thread_idx, crypto_session_t *cs, ipsec_sa_t *sa, crypto_resource_t * res, crypto_worker_main_t * cwm, u8 is_outbound);
+i32 crypto_make_session (u8 thread_idx, crypto_session_t * cs,
+			 ipsec_sa_t * sa, crypto_resource_t * res,
+			 crypto_worker_main_t * cwm, u8 is_outbound);
 
 
 static_always_inline u32
 crypto_op_len (void)
 {
   const u32 align = 16;
-  u32 op_size = sizeof (struct rte_crypto_op) + sizeof (struct rte_crypto_sym_op);
+  u32 op_size =
+    sizeof (struct rte_crypto_op) + sizeof (struct rte_crypto_sym_op);
 
   return ((op_size + align - 1) & ~(align - 1)) + sizeof (dpdk_op_priv_t);
 }
@@ -214,7 +217,8 @@ crypto_op_get_priv (struct rte_crypto_op * op)
 }
 
 static_always_inline u16
-crypto_get_resource (crypto_worker_main_t * cwm, ipsec_sa_t * sa, crypto_session_t * cs)
+crypto_get_resource (crypto_worker_main_t * cwm, ipsec_sa_t * sa,
+		     crypto_session_t * cs)
 {
   u16 cipher_res = cwm->cipher_resource_idx[sa->crypto_alg];
   u16 auth_res = cwm->auth_resource_idx[sa->integ_alg];
@@ -289,7 +293,7 @@ crypto_set_icb (dpdk_gcm_cnt_blk * icb, u32 salt, u32 seq, u32 seq_hi)
   icb->salt = salt;
   icb->iv[0] = seq;
   icb->iv[1] = seq_hi;
-	icb->cnt = clib_host_to_net_u32 (1);
+  icb->cnt = clib_host_to_net_u32 (1);
 }
 
 static_always_inline void
@@ -332,14 +336,14 @@ crypto_op_setup (u8 is_aead, struct rte_mbuf *mb0,
 }
 
 static_always_inline crypto_session_t *
-crypto_session_from_sa_index (dpdk_crypto_main_t *dcm, u32 sa_index)
+crypto_session_from_sa_index (dpdk_crypto_main_t * dcm, u32 sa_index)
 {
-	u32 index = vec_elt (dcm->sa_session_index, sa_index);
+  u32 index = vec_elt (dcm->sa_session_index, sa_index);
 
-	if (PREDICT_FALSE(index == (u32)~0))
-		return NULL;
-	
-	return pool_elt_at_index (dcm->sa_session, index);
+  if (PREDICT_FALSE (index == (u32) ~ 0))
+    return NULL;
+
+  return pool_elt_at_index (dcm->sa_session, index);
 }
 
 

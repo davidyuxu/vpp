@@ -32,12 +32,12 @@
 #include <vpp/app/version.h>
 #include <ppfu/ppfu.h>
 
-ppf_sb_main_t ppf_sb_main; 
+ppf_sb_main_t ppf_sb_main;
 
 static clib_error_t *
 ppf_srb_config (vlib_main_t * vm, unformat_input_t * input)
 {
- // ppf_srb_main_t *psm = &ppf_srb_main;
+  // ppf_srb_main_t *psm = &ppf_srb_main;
   clib_error_t *error = 0;
 
   return error;
@@ -69,10 +69,10 @@ ppf_srb_ip_udp_rewrite ()
   ip->ip_version_and_header_length = 0x45;
   ip->ttl = 254;
   ip->protocol = IP_PROTOCOL_UDP;
-  
+
   ip->src_address.as_u32 = ppf_sb_main.src;
   ip->dst_address.as_u32 = ppf_sb_main.dst;
-  
+
   /* we fix up the ip4 header length and checksum after-the-fact */
   ip->checksum = ip4_header_checksum (ip);
 
@@ -81,42 +81,45 @@ ppf_srb_ip_udp_rewrite ()
   udp->dst_port = clib_host_to_net_u16 (SRB_NB_PORT);
 
   /* SRB indata header */
-  srb->call_id = clib_host_to_net_u32(0);
-  srb->transaction_id = clib_host_to_net_u32(0);
-  srb->msg.in.request_id = clib_host_to_net_u32(0);
-  srb->msg.in.integrity_status = clib_host_to_net_u32(1);
-  srb->msg.in.data_l = clib_host_to_net_u32(0);
-  
+  srb->call_id = clib_host_to_net_u32 (0);
+  srb->transaction_id = clib_host_to_net_u32 (0);
+  srb->msg.in.request_id = clib_host_to_net_u32 (0);
+  srb->msg.in.integrity_status = clib_host_to_net_u32 (1);
+  srb->msg.in.data_l = clib_host_to_net_u32 (0);
+
   ppf_sb_main.rewrite = r.rw;
-  
+
   return;
 }
 
 static clib_error_t *
 ppf_srb_set_command_fn (vlib_main_t * vm,
-					unformat_input_t * input,
-					vlib_cli_command_t * cmd)
+			unformat_input_t * input, vlib_cli_command_t * cmd)
 {
   clib_error_t *error = NULL;
   u32 want_feedback = 0;
-  
+
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
-      if (unformat (input, "feedback")) {
-	    if (unformat (input, "enable"))
-          want_feedback = 1;
-        else if (unformat (input, "disable"))
-	      want_feedback = 0;
-      }
+      if (unformat (input, "feedback"))
+	{
+	  if (unformat (input, "enable"))
+	    want_feedback = 1;
+	  else if (unformat (input, "disable"))
+	    want_feedback = 0;
+	}
       else
-      {
-        error = clib_error_return (0, "parse error: '%U'", format_unformat_error, input);
-        return error;
-      }
+	{
+	  error =
+	    clib_error_return (0, "parse error: '%U'", format_unformat_error,
+			       input);
+	  return error;
+	}
     }
 
   ppf_sb_main.want_feedback = want_feedback;
-  vlib_cli_output (vm, "PPF SRB want_feedback is set to %s\n", (ppf_sb_main.want_feedback ? "enable" : "disable"));
+  vlib_cli_output (vm, "PPF SRB want_feedback is set to %s\n",
+		   (ppf_sb_main.want_feedback ? "enable" : "disable"));
 
   return error;
 }
@@ -141,8 +144,8 @@ typedef struct
   u32 call_id;
   u32 transaction_id;
   u32 request_id;
-  u8  sb_id[3];
-  u8  sb_num;
+  u8 sb_id[3];
+  u8 sb_num;
   u32 data_l;
 } ppf_srb_in_header_t;
 
@@ -158,9 +161,9 @@ typedef struct
 
 always_inline void
 ppf_srb_pg_edit_function_inline (pg_main_t * pg,
-                                       pg_stream_t * s,
-                                       pg_edit_group_t * g,
-                                       u32 * packets, u32 n_packets, u32 flags)
+				 pg_stream_t * s,
+				 pg_edit_group_t * g,
+				 u32 * packets, u32 n_packets, u32 flags)
 {
   vlib_main_t *vm = vlib_get_main ();
   u32 srb_offset;
@@ -178,29 +181,30 @@ ppf_srb_pg_edit_function_inline (pg_main_t * pg,
       packets += 1;
 
       srb0 = (void *) (p0->data + srb_offset);
-      srb_len0 = vlib_buffer_length_in_chain (vm, p0) -	srb_offset - sizeof (srb0[0]);
+      srb_len0 =
+	vlib_buffer_length_in_chain (vm, p0) - srb_offset - sizeof (srb0[0]);
 
       if (flags & PPF_SRB_PG_EDIT_LENGTH)
-        srb0->data_l = clib_host_to_net_u32 (srb_len0);
+	srb0->data_l = clib_host_to_net_u32 (srb_len0);
     }
 }
 
 static void
 ppf_srb_pg_edit_function (pg_main_t * pg,
-                               pg_stream_t * s,
-                               pg_edit_group_t * g, u32 * packets, u32 n_packets)
+			  pg_stream_t * s,
+			  pg_edit_group_t * g, u32 * packets, u32 n_packets)
 {
   switch (g->edit_function_opaque)
-  {
+    {
     case PPF_SRB_PG_EDIT_LENGTH:
       ppf_srb_pg_edit_function_inline (pg, s, g, packets, n_packets,
-                                       PPF_SRB_PG_EDIT_LENGTH);
+				       PPF_SRB_PG_EDIT_LENGTH);
       break;
 
     default:
       ASSERT (0);
       break;
-  }
+    }
 }
 
 static inline void
@@ -232,14 +236,14 @@ unformat_pg_ppf_srb_header (unformat_input_t * input, va_list * args)
   pg_ppf_srb_header_init (p);
 
   /* Defaults. */
-  p->call_id.type        = PG_EDIT_UNSPECIFIED;
+  p->call_id.type = PG_EDIT_UNSPECIFIED;
   p->transaction_id.type = PG_EDIT_UNSPECIFIED;
-  p->request_id.type     = PG_EDIT_UNSPECIFIED;
-  p->sb_id[0].type       = PG_EDIT_UNSPECIFIED;
-  p->sb_id[1].type       = PG_EDIT_UNSPECIFIED;
-  p->sb_id[2].type       = PG_EDIT_UNSPECIFIED;
-  p->sb_num.type         = PG_EDIT_UNSPECIFIED;
-  p->data_l.type         = PG_EDIT_UNSPECIFIED;
+  p->request_id.type = PG_EDIT_UNSPECIFIED;
+  p->sb_id[0].type = PG_EDIT_UNSPECIFIED;
+  p->sb_id[1].type = PG_EDIT_UNSPECIFIED;
+  p->sb_id[2].type = PG_EDIT_UNSPECIFIED;
+  p->sb_num.type = PG_EDIT_UNSPECIFIED;
+  p->data_l.type = PG_EDIT_UNSPECIFIED;
 
   if (!unformat (input, "SRB %U", unformat_input, &sub_input))
     goto error;
@@ -249,39 +253,41 @@ unformat_pg_ppf_srb_header (unformat_input_t * input, va_list * args)
     {
       if (unformat (&sub_input, "call-id %U",
 		    unformat_pg_edit, unformat_pg_number, &p->call_id))
-	    ;
+	;
 
       else if (unformat (&sub_input, "transaction-id %U",
-			 unformat_pg_edit, unformat_pg_number, &p->transaction_id))
-	    ;
+			 unformat_pg_edit, unformat_pg_number,
+			 &p->transaction_id))
+	;
 
       else if (unformat (&sub_input, "request-id %U",
-			 unformat_pg_edit, unformat_pg_number, &p->request_id))
-	    ;
+			 unformat_pg_edit, unformat_pg_number,
+			 &p->request_id))
+	;
 
       else if (unformat (&sub_input, "sb-num %U",
 			 unformat_pg_edit, unformat_pg_number, &p->sb_num))
-	    ;
+	;
 
       else if (unformat (&sub_input, "sb-id0 %U",
 			 unformat_pg_edit, unformat_pg_number, &p->sb_id[0]))
-	    ;
+	;
 
       else if (unformat (&sub_input, "sb-id1 %U",
 			 unformat_pg_edit, unformat_pg_number, &p->sb_id[1]))
-	    ;
+	;
 
       else if (unformat (&sub_input, "sb-id2 %U",
 			 unformat_pg_edit, unformat_pg_number, &p->sb_id[2]))
-	    ;
+	;
 
       else if (unformat (&sub_input, "length %U",
 			 unformat_pg_edit, unformat_pg_number, &p->data_l))
-	    ;
+	;
 
       /* Can't parse input: try next protocol level. */
       else
-	    break;
+	break;
     }
 
   {
@@ -290,15 +296,15 @@ unformat_pg_ppf_srb_header (unformat_input_t * input, va_list * args)
 
     p = pg_get_edit_group (s, group_index);
     if (p->data_l.type == PG_EDIT_UNSPECIFIED)
-    {
-      pg_edit_group_t *g = pg_stream_get_group (s, group_index);
-      g->edit_function = ppf_srb_pg_edit_function;
-      g->edit_function_opaque = 0;
-      if (p->data_l.type == PG_EDIT_UNSPECIFIED)
-        g->edit_function_opaque |= PPF_SRB_PG_EDIT_LENGTH;
-    }
+      {
+	pg_edit_group_t *g = pg_stream_get_group (s, group_index);
+	g->edit_function = ppf_srb_pg_edit_function;
+	g->edit_function_opaque = 0;
+	if (p->data_l.type == PG_EDIT_UNSPECIFIED)
+	  g->edit_function_opaque |= PPF_SRB_PG_EDIT_LENGTH;
+      }
 
-	unformat_free (&sub_input);
+    unformat_free (&sub_input);
     return 1;
   }
 
@@ -323,7 +329,7 @@ ppf_srb_init (vlib_main_t * vm)
 
   psm->vnet_main = vnet_get_main ();
   psm->vlib_main = vm;
-	
+
   psm->srb_rx_next_index = PPF_SRB_NB_RX_NEXT_PPF_SB_PATH_LB;
   psm->sb_lb_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
 
@@ -337,7 +343,7 @@ ppf_srb_init (vlib_main_t * vm)
   pi = udp_get_dst_port_info (&udp_main, SRB_NB_PORT, 1);
   if (pi)
     pi->unformat_pg_edit = unformat_pg_ppf_srb_header;
-  
+
   return 0;
 }
 

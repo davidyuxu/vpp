@@ -250,9 +250,10 @@ static inline uword BV (clib_bihash_get_offset) (BVT (clib_bihash) * h,
 }
 
 /* Expose an API to allow designers to assign their own mheap, by Jordy */
-static inline void BV (clib_bihash_set_mheap) (BVT (clib_bihash) * h, void *new_heap)
+static inline void BV (clib_bihash_set_mheap) (BVT (clib_bihash) * h,
+					       void *new_heap)
 {
-  ASSERT(new_heap);
+  ASSERT (new_heap);
   h->mheap = new_heap;
 }
 

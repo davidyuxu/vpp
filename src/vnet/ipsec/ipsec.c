@@ -432,33 +432,33 @@ ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add,
     return VNET_API_ERROR_SYSCALL_ERROR_1;
 
   if (!is_add)			/* delete */
-  {
-    sa_index = p[0];
-    sa = pool_elt_at_index (im->sad, sa_index);
-    if (ipsec_is_sa_used (sa_index))
-		{
-		  clib_warning ("sa_id %u used in policy", sa->id);
-		  return VNET_API_ERROR_SYSCALL_ERROR_1;	/* sa used in policy */
-		}
-    hash_unset (im->sa_index_by_sa_id, sa->id);
+    {
+      sa_index = p[0];
+      sa = pool_elt_at_index (im->sad, sa_index);
+      if (ipsec_is_sa_used (sa_index))
+	{
+	  clib_warning ("sa_id %u used in policy", sa->id);
+	  return VNET_API_ERROR_SYSCALL_ERROR_1;	/* sa used in policy */
+	}
+      hash_unset (im->sa_index_by_sa_id, sa->id);
 
-    if (im->cb.add_del_sa_sess_cb)
-		  im->cb.add_del_sa_sess_cb (sa_index, 0);
+      if (im->cb.add_del_sa_sess_cb)
+	im->cb.add_del_sa_sess_cb (sa_index, 0);
 
-		ipsec_delete_sa_contexts (sa);
-    pool_put (im->sad, sa);
-  }
-	else				/* create new SA */
-  {
-    pool_get (im->sad, sa);
-    sa_index = sa - im->sad;
-    clib_memcpy (sa, new_sa, sizeof (*sa));
-		ipsec_create_sa_contexts (sa);
-    if (im->cb.add_del_sa_sess_cb)
-			im->cb.add_del_sa_sess_cb (sa_index, 1);
-		
-    hash_set (im->sa_index_by_sa_id, sa->id, sa_index);
-  }
+      ipsec_delete_sa_contexts (sa);
+      pool_put (im->sad, sa);
+    }
+  else				/* create new SA */
+    {
+      pool_get (im->sad, sa);
+      sa_index = sa - im->sad;
+      clib_memcpy (sa, new_sa, sizeof (*sa));
+      ipsec_create_sa_contexts (sa);
+      if (im->cb.add_del_sa_sess_cb)
+	im->cb.add_del_sa_sess_cb (sa_index, 1);
+
+      hash_set (im->sa_index_by_sa_id, sa->id, sa_index);
+    }
   return 0;
 }
 
@@ -488,24 +488,25 @@ ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update)
   /* new integ key */
   if (0 < sa_update->integ_key_len)
     {
-      clib_memcpy (sa->integ_key, sa_update->integ_key, sa_update->integ_key_len);
+      clib_memcpy (sa->integ_key, sa_update->integ_key,
+		   sa_update->integ_key_len);
       sa->integ_key_len = sa_update->integ_key_len;
     }
 
-	ipsec_set_sa_contexts_integ_key (sa);
-	ipsec_set_sa_contexts_crypto_key (sa);
+  ipsec_set_sa_contexts_integ_key (sa);
+  ipsec_set_sa_contexts_crypto_key (sa);
 
   if (im->cb.update_sa_sess_cb)
-	{
-		clib_error_t *e;
+    {
+      clib_error_t *e;
 
-		e = im->cb.update_sa_sess_cb (sa_index);
-		if (e)
-		{
-		  clib_error_free (e);
-			return VNET_API_ERROR_SYSCALL_ERROR_1;
-		}
+      e = im->cb.update_sa_sess_cb (sa_index);
+      if (e)
+	{
+	  clib_error_free (e);
+	  return VNET_API_ERROR_SYSCALL_ERROR_1;
 	}
+    }
 
   return 0;
 }
@@ -513,32 +514,33 @@ ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update)
 static void
 ipsec_rand_engine (void)
 {
-	ENGINE *engine;
-	ENGINE_load_rdrand();
+  ENGINE *engine;
+  ENGINE_load_rdrand ();
 
-	engine= ENGINE_by_id("rdrand");
-	if (engine == NULL)
-	{
-			clib_warning ("OPENSSL rdrand ENGINE_load_rdrand returned %lu", ERR_get_error());
-			return;
-	}
-	if ( !ENGINE_init(engine))
-	{
-			clib_warning ("ENGINE_init returned %lu", ERR_get_error());
-			return;
-	}
-	if ( !ENGINE_set_default(engine, ENGINE_METHOD_RAND) )
-	{
-			clib_warning ("ENGINE_set_default returned %lu", ERR_get_error());
-			return;
-	}
+  engine = ENGINE_by_id ("rdrand");
+  if (engine == NULL)
+    {
+      clib_warning ("OPENSSL rdrand ENGINE_load_rdrand returned %lu",
+		    ERR_get_error ());
+      return;
+    }
+  if (!ENGINE_init (engine))
+    {
+      clib_warning ("ENGINE_init returned %lu", ERR_get_error ());
+      return;
+    }
+  if (!ENGINE_set_default (engine, ENGINE_METHOD_RAND))
+    {
+      clib_warning ("ENGINE_set_default returned %lu", ERR_get_error ());
+      return;
+    }
 
-	/* maybe clean up this engine somewhere ? */
-	/*
-	ENGINE_finish(engine);
-	ENGINE_free(engine);
-	ENGINE_cleanup();
-	*/
+  /* maybe clean up this engine somewhere ? */
+  /*
+     ENGINE_finish(engine);
+     ENGINE_free(engine);
+     ENGINE_cleanup();
+   */
 }
 
 static void
@@ -565,9 +567,9 @@ ipsec_init (vlib_main_t * vm)
   ipsec_main_t *im = &ipsec_main;
   vlib_node_t *node;
 
-	//CRYPTO_set_mem_functions (clib_mem_alloc, clib_mem_realloc2, clib_mem_free);
+  //CRYPTO_set_mem_functions (clib_mem_alloc, clib_mem_realloc2, clib_mem_free);
 
-	ipsec_rand_engine ();
+  ipsec_rand_engine ();
 
   ipsec_rand_seed ();
 
@@ -613,17 +615,20 @@ ipsec_init (vlib_main_t * vm)
 
   ipsec_proto_init ();
 
-	im->debug_fformat = 1;
+  im->debug_fformat = 1;
 
   if ((error = ikev2_init (vm)))
     return error;
 
   im->ipsec_if_pool_index_by_key = hash_create (0, sizeof (uword));
-  
-  if (vm->max_capacity) {
-  	pool_init_aligned (im->sad, vm->max_capacity * 2, CLIB_CACHE_LINE_BYTES);
-    pool_init_aligned (im->tunnel_interfaces, vm->max_capacity, CLIB_CACHE_LINE_BYTES);
-  }
+
+  if (vm->max_capacity)
+    {
+      pool_init_aligned (im->sad, vm->max_capacity * 2,
+			 CLIB_CACHE_LINE_BYTES);
+      pool_init_aligned (im->tunnel_interfaces, vm->max_capacity,
+			 CLIB_CACHE_LINE_BYTES);
+    }
 
 
   return 0;
