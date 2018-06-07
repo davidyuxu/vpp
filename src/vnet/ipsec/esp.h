@@ -221,7 +221,8 @@ ipsec_proto_init ()
   for (int i = 0; i < vec_len (em->rand_state); i++)
     {
       xoshiro256starstar_seed (&em->rand_state[i]);
-      initstate_r (0, (char *)em->rand_data[i].buf, 32, &em->rand_data[i].data);
+      initstate_r (0, (char *) em->rand_data[i].buf, 32,
+		   &em->rand_data[i].data);
     }
 
   vec_validate (em->ipsec_proto_main_crypto_algs, IPSEC_CRYPTO_N_ALG - 1);

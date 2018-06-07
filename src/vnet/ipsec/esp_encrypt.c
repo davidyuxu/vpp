@@ -536,15 +536,15 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 	trace:
 	  if (PREDICT_FALSE (i_b0->flags & VLIB_BUFFER_IS_TRACED))
-    {
-		  esp_encrypt_trace_t *tr =
-		    vlib_add_trace (vm, node, i_b0, sizeof (*tr));
-		  tr->spi = sa0->spi;
-		  tr->seq = sa0->seq - 1;
-		  tr->udp_encap = sa0->udp_encap;
-		  tr->crypto_alg = sa0->crypto_alg;
-		  tr->integ_alg = sa0->integ_alg;
-    }
+	    {
+	      esp_encrypt_trace_t *tr =
+		vlib_add_trace (vm, node, i_b0, sizeof (*tr));
+	      tr->spi = sa0->spi;
+	      tr->seq = sa0->seq - 1;
+	      tr->udp_encap = sa0->udp_encap;
+	      tr->crypto_alg = sa0->crypto_alg;
+	      tr->integ_alg = sa0->integ_alg;
+	    }
 
 	  vlib_validate_buffer_enqueue_x1 (vm, node, next_index, to_next,
 					   n_left_to_next, i_bi0, next0);

@@ -72,7 +72,7 @@ _(CREATE_LOOPBACK_INSTANCE, create_loopback_instance)		\
 _(DELETE_LOOPBACK, delete_loopback)                             \
 _(INTERFACE_NAME_RENUMBER, interface_name_renumber)             \
 _(COLLECT_DETAILED_INTERFACE_STATS, collect_detailed_interface_stats) \
-_(GET_SW_INTERFACE_STATS, get_sw_interface_stats)                         
+_(GET_SW_INTERFACE_STATS, get_sw_interface_stats)
 
 
 static void

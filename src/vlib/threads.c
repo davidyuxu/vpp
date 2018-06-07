@@ -918,11 +918,13 @@ start_workers (vlib_main_t * vm)
 
 	      vm_clone->error_main.counters = vec_dup_aligned
 		(vlib_mains[0]->error_main.counters, CLIB_CACHE_LINE_BYTES);
-				vm_clone->error_main.rate_counters =
-		vec_dup_aligned (vlib_mains[0]->error_main.rate_counters, CLIB_CACHE_LINE_BYTES);
-	      vm_clone->error_main.counters_last_clear = vec_dup_aligned
-		(vlib_mains[0]->error_main.counters_last_clear,
-		 CLIB_CACHE_LINE_BYTES);
+	      vm_clone->error_main.rate_counters =
+		vec_dup_aligned (vlib_mains[0]->error_main.rate_counters,
+				 CLIB_CACHE_LINE_BYTES);
+	      vm_clone->error_main.counters_last_clear =
+		vec_dup_aligned (vlib_mains[0]->
+				 error_main.counters_last_clear,
+				 CLIB_CACHE_LINE_BYTES);
 
 	      /* Fork the vlib_buffer_main_t free lists, etc. */
 	      orig_freelist_pool = vm_clone->buffer_free_list_pool;

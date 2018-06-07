@@ -722,9 +722,9 @@ typedef enum
 } vnet_interface_counter_type_t;
 
 /* A copy of Interfcae counters for any visible interface */
- typedef struct
+typedef struct
 {
-  f64 last_show_time;   /**< Last show cpu time. */
+  f64 last_show_time;	/**< Last show cpu time. */
   vlib_counter_t *combined_per_thread[VNET_N_COMBINED_INTERFACE_COUNTER];	  /**< Last show counter . */
   vlib_counter_t combined_total[VNET_N_COMBINED_INTERFACE_COUNTER];
   counter_t *simple_per_thread[VNET_N_SIMPLE_INTERFACE_COUNTER]; /**< Last show counter . */
