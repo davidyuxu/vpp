@@ -563,7 +563,6 @@ u8 *BV (format_bihash) (u8 * s, va_list * args)
   u64 active_elements = 0;
   u64 active_buckets = 0;
   u64 linear_buckets = 0;
-  u64 used_bytes;
 
   s = format (s, "Hash table %s\n", h->name ? h->name : (u8 *) "(unnamed)");
 

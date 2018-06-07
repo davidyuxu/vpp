@@ -1096,7 +1096,7 @@ vlib_worker_thread_node_refork (void)
   j = vec_len (vm->error_main.counters) - 1;
 
   vec_validate_aligned (old_counters, j, CLIB_CACHE_LINE_BYTES);
-  vec_validate (old_counters_all_clear, j);
+  vec_validate_aligned (old_counters_all_clear, j, CLIB_CACHE_LINE_BYTES);
   vec_validate (old_rate_counters, j);
   vm_clone->error_main.counters = old_counters;
   vm_clone->error_main.rate_counters = old_rate_counters;

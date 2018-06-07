@@ -90,6 +90,7 @@ typedef struct
   u64 cache_misses;
 
     BVT (clib_bihash_value) ** freelists;
+  void *mheap;
 
   /*
    * Backing store allocation. Since bihash manages its own

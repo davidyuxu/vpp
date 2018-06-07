@@ -415,8 +415,7 @@ ipsec_is_sa_used (u32 sa_index)
 }
 
 int
-ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add,
-		  u8 udp_encap)
+ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add)
 {
   ipsec_main_t *im = &ipsec_main;
   ipsec_sa_t *sa = 0;
@@ -624,10 +623,8 @@ ipsec_init (vlib_main_t * vm)
 
   if (vm->max_capacity)
     {
-      pool_init_aligned (im->sad, vm->max_capacity * 2,
-			 CLIB_CACHE_LINE_BYTES);
-      pool_init_aligned (im->tunnel_interfaces, vm->max_capacity,
-			 CLIB_CACHE_LINE_BYTES);
+      pool_init (im->sad, vm->max_capacity * 2);
+      pool_init (im->tunnel_interfaces, vm->max_capacity);
     }
 
 

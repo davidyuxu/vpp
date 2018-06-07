@@ -817,7 +817,7 @@ ip4_sw_interface_add_del (vnet_main_t * vnm, u32 sw_if_index, u32 is_add)
     }
 
   vnet_feature_enable_disable ("ip4-unicast", "ip4-not-enabled", sw_if_index,
-			       0, 0, 0);
+			       is_add, 0, 0);
 
   vnet_feature_enable_disable ("ip4-multicast", "ip4-not-enabled",
 			       sw_if_index, is_add, 0, 0);
@@ -2317,8 +2317,7 @@ ip4_rewrite_inline (vlib_main_t * vm,
 	  ip_adjacency_t *adj0;
 	  vlib_buffer_t *p0;
 	  ip4_header_t *ip0;
-	  u32 pi0, rw_len0, adj_index0, next0, error0;
-	  u32 checksum0;
+	  u32 pi0, rw_len0, adj_index0, next0, error0, checksum0;
 	  u32 tx_sw_if_index0;
 
 	  pi0 = to_next[0] = from[0];
@@ -2335,7 +2334,6 @@ ip4_rewrite_inline (vlib_main_t * vm,
 	  next0 = IP4_REWRITE_NEXT_DROP;	/* drop on error */
 
 	  /* Decrement TTL & update checksum. */
-
 	  if (PREDICT_TRUE (!(p0->flags & VNET_BUFFER_F_LOCALLY_ORIGINATED)))
 	    {
 	      i32 ttl0 = ip0->ttl;

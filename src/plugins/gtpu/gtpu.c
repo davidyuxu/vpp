@@ -1469,7 +1469,6 @@ gtpu_init (vlib_main_t * vm)
 				       sizeof (ip46_address_t),
 				       sizeof (mcast_shared_t));
 
-#if 1
   udp_register_dst_port (vm, GTPU_UDP_DST_PORT,
 			 gtpu4_input_node.index, /* is_ip4 */ 1);
   udp_register_dst_port (vm, GTPU6_UDP_DST_PORT,

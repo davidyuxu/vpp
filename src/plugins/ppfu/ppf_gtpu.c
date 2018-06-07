@@ -765,7 +765,7 @@ int vnet_ppf_gtpu_add_tunnel
       if (!ppf_gtpu_decap_next_is_valid (gtm, is_ip6, a->decap_next_index))
 	return VNET_API_ERROR_INVALID_DECAP_NEXT;
 
-      pool_get_aligned (gtm->tunnels, t, CLIB_CACHE_LINE_BYTES);
+      pool_get (gtm->tunnels, t);
       memset (t, 0, sizeof (*t));
 
       /* copy from arg structure */

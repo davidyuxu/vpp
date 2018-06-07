@@ -480,7 +480,7 @@ dpdk_pool_create (vlib_main_t * vm, u8 * pool_name, u32 elt_size,
   pr = vlib_physmem_get_region (vm, pri[0]);
 
   mp =
-    rte_mempool_create_empty ((i8 *) pool_name, num_elts, elt_size,
+    rte_mempool_create_empty ((const char *) pool_name, num_elts, elt_size,
 			      cache_size, pool_priv_size, numa, 0);
   if (!mp)
     return clib_error_return (0, "failed to create %s", pool_name);

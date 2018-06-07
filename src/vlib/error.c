@@ -170,9 +170,8 @@ vlib_register_errors (vlib_main_t * vm,
 	       error_strings, n_errors * sizeof (error_strings[0]));
 
   /* Allocate a counter/elog type for each error. */
-  vec_validate_aligned (em->counters, l - 1, CLIB_CACHE_LINE_BYTES);
-  vec_validate_aligned (vm->error_elog_event_types, l - 1,
-			CLIB_CACHE_LINE_BYTES);
+  vec_validate (em->counters, l - 1);
+  vec_validate (vm->error_elog_event_types, l - 1);
 
   /* Zero counters for re-registrations of errors. */
   if (n->error_heap_index + n_errors <= vec_len (em->counters_last_clear))

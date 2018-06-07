@@ -33,7 +33,8 @@ vpp_LDFLAGS += -L$($(PLATFORM)_dpdk_lib_dir)
 else
 vpp_configure_depend += dpdk-install
 vpp_CPPFLAGS += $(call installed_includes_fn, dpdk)/dpdk
-vpp_LDFLAGS += $(call installed_libs_fn, dpdk) -L$(BR)/../3rd-party/libbacktrace/.libs
+vpp_LDFLAGS += $(call installed_libs_fn, dpdk)
+vpp_LDFLAGS += -L$(BR)/../3rd-party/libbacktrace/.libs -Wl,-rpath -Wl,$(BR)/../3rd-party/libbacktrace/.libs
 vpp_CPPFLAGS += -I/usr/include/dpdk -I$(BR)/../3rd-party/libbacktrace
 endif
 ifeq ($($(PLATFORM)_uses_dpdk_mlx5_pmd),yes)

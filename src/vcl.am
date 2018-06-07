@@ -55,10 +55,10 @@ noinst_PROGRAMS +=				\
 
 
 test_vcl_listener_server_SOURCES = vcl/test_vcl_listener_server.c
-test_vcl_listener_server_LDADD = libvppcom.la
+test_vcl_listener_server_LDADD = libvppcom.la -lbacktrace
 
 test_vcl_listener_client_SOURCES = vcl/test_vcl_listener_client.c
-test_vcl_listener_client_LDADD = libvppcom.la
+test_vcl_listener_client_LDADD = libvppcom.la -lbacktrace
 
 vcl_test_server_SOURCES = vcl/vcl_test_server.c
 vcl_test_server_LDADD = libvppcom.la -lbacktrace

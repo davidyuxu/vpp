@@ -16,30 +16,30 @@ vppplugins_LTLIBRARIES += ppfu_plugin.la
 
 ppfu_plugin_la_SOURCES =		\
 	ppfu/ppf_gtpu_encap.c		    \
-    ppfu/ppf_gtpu_decap.c		    \
+	ppfu/ppf_gtpu_decap.c		    \
 	ppfu/ppf_gtpu.c				    \
 	ppfu/ppf_pdcp_decrypt.c		\
 	ppfu/ppf_pdcp_encrypt.c		\
 	ppfu/ppf_pdcp_input.c		\
 	ppfu/ppf_sb_path_lb.c		\
 	ppfu/ppf_srb_nb_rx.c			\
-	ppfu/ppf_srb_nb_tx.c		\	
+	ppfu/ppf_srb_nb_tx.c		\
 	ppfu/ppf_srb.c		\
 	ppfu/ppf_pdcp.c     \
 	ppfu/ppfu.c		\
-	ppfu/ppfu_api.c		\	
+	ppfu/ppfu_api.c		\
         ppfu/ppfu_handoff.c    \
         ppfu/snow3g.c
 
 
 BUILT_SOURCES +=			\
-	ppfu/ppf_gtpu.api.h		    \
-	ppfu/ppf_gtpu.api.json
+	ppfu/ppf_gtpu.api.h		\
+	ppfu/ppf_gtpu.api.json		\
 	ppfu/ppfu.api.h			\
-	ppfu/ppfu_api.json
+	ppfu/ppfu.api.json
 
 API_FILES += ppfu/ppf_gtpu.api	\
-	     ppfu/ppfu.api
+	ppfu/ppfu.api
 
 
 nobase_apiinclude_HEADERS +=			\
