@@ -170,7 +170,7 @@ vlib_register_errors (vlib_main_t * vm,
 	       error_strings, n_errors * sizeof (error_strings[0]));
 
   /* Allocate a counter/elog type for each error. */
-  vec_validate (em->counters, l - 1);
+  vec_validate_aligned (em->counters, l - 1, CLIB_CACHE_LINE_BYTES);
   vec_validate (vm->error_elog_event_types, l - 1);
 
   /* Zero counters for re-registrations of errors. */
@@ -239,7 +239,7 @@ show_errors (vlib_main_t * vm,
 		vec_validate (sums, len - 1);
 		vec_validate (tmp, len - 1);
 		vec_validate (tmp_sum, len - 1);
-		vec_validate (em->rate_counters, len - 1);
+		vec_validate_aligned (em->rate_counters, len - 1, CLIB_CACHE_LINE_BYTES);
 
     if (verbose)
       vlib_cli_output(vm, "Thread %u (%v):", index, vlib_worker_threads[index].name);
@@ -326,7 +326,7 @@ clear_error_counters (vlib_main_t * vm,
   /* *INDENT-OFF* */
   foreach_vlib_main(({
     em = &this_vlib_main->error_main;
-    vec_validate (em->counters_last_clear, vec_len (em->counters) - 1);
+    vec_validate_aligned (em->counters_last_clear, vec_len (em->counters) - 1, CLIB_CACHE_LINE_BYTES);
     for (i = 0; i < vec_len (em->counters); i++)
       em->counters_last_clear[i] = em->counters[i];
   }));
