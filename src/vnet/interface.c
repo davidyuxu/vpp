@@ -631,7 +631,7 @@ vnet_create_sw_interface_couter_rate (vnet_main_t * vnm, u32 sw_if_index,
       vnet_interface_counter_t *c;
       u32 index;
 
-      pool_get (im->instant_if_counters, c);
+      pool_get_aligned (im->instant_if_counters, c, CLIB_CACHE_LINE_BYTES);
 
       index = c - im->instant_if_counters;
 

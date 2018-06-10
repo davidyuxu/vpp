@@ -724,6 +724,11 @@ typedef enum
 /* A copy of Interfcae counters for any visible interface */
 typedef struct
 {
+	/**
+	 * required for pool_get_aligned.
+	 *	memebers used in the switch path come first!
+	 */
+	CLIB_CACHE_LINE_ALIGN_MARK(cacheline0);
   f64 last_show_time;	/**< Last show cpu time. */
   vlib_counter_t *combined_per_thread[VNET_N_COMBINED_INTERFACE_COUNTER];	  /**< Last show counter . */
   vlib_counter_t combined_total[VNET_N_COMBINED_INTERFACE_COUNTER];

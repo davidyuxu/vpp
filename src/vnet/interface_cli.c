@@ -277,7 +277,7 @@ show_sw_interfaces (vlib_main_t * vm,
   u8 show_addresses = 0;
   u8 show_features = 0;
   u8 show_tag = 0;
-  int verbose = 0;
+  u8 verbose = 0;
 
   /*
    * Get a line of input. Won't work if the user typed
@@ -352,14 +352,16 @@ show_sw_interfaces (vlib_main_t * vm,
   if (vec_len (sorted_sis) == 0)	/* Get all interfaces */
     {
       /* Gather interfaces. */
-      sorted_sis =
-	vec_new (vnet_sw_interface_t, pool_elts (im->sw_interfaces));
-      _vec_len (sorted_sis) = 0;
+      // kingwel, don't do this, most of interfaces are actually hidden 
+      //sorted_sis =
+      //vec_new (vnet_sw_interface_t, pool_elts (im->sw_interfaces));
+      //_vec_len (sorted_sis) = 0;
+      
       /* *INDENT-OFF* */
       pool_foreach (si, im->sw_interfaces,
       ({
         int visible = vnet_swif_is_api_visible (si);
-        if (visible)
+        if (visible && si->counter_index != ~0)
           vec_add1 (sorted_sis, si[0]);}
         ));
       /* *INDENT-OFF* */
@@ -456,7 +458,7 @@ else
 {
   vec_foreach (si, sorted_sis)
   {
-    vlib_cli_output (vm, "%U\n", format_vnet_sw_interface, vnm, si);
+    vlib_cli_output (vm, "%U\n", format_vnet_sw_interface, vnm, si, verbose);
   }
 }
 
