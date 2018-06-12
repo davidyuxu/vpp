@@ -1083,7 +1083,7 @@ dispatch_node (vlib_main_t * vm,
   return t;
 }
 
-#if CLIB_DEBUG > 0
+#if 0//CLIB_DEBUG > 0
 static __thread uword *h;
 
 static u32
@@ -1162,7 +1162,7 @@ dispatch_pending_node (vlib_main_t * vm, uword pending_frame_index,
   n->flags |= (nf->flags & VLIB_FRAME_TRACE) ? VLIB_NODE_FLAG_TRACE : 0;
   nf->flags &= ~VLIB_FRAME_TRACE;
 
-#if CLIB_DEBUG > 0
+#if 0//CLIB_DEBUG > 0
 
 		/* *INDENT-OFF* */
 		ELOG_TYPE_DECLARE (e) =
