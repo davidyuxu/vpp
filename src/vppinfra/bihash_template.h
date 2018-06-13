@@ -90,6 +90,7 @@ typedef struct
   u64 cache_misses;
 
     BVT (clib_bihash_value) ** freelists;
+  void *mheap;
 
   /*
    * Backing store allocation. Since bihash manages its own
@@ -232,7 +233,7 @@ static inline void BV (clib_bihash_unlock_bucket)
 static inline void *BV (clib_bihash_get_value) (BVT (clib_bihash) * h,
 						uword offset)
 {
-  u8 *hp = (u8 *) h->alloc_arena;
+  u8 *hp = h->mheap;
   u8 *vp = hp + offset;
 
   return (void *) vp;
@@ -243,10 +244,19 @@ static inline uword BV (clib_bihash_get_offset) (BVT (clib_bihash) * h,
 {
   u8 *hp, *vp;
 
-  hp = (u8 *) h->alloc_arena;
+  hp = (u8 *) h->mheap;
   vp = (u8 *) v;
 
+  ASSERT ((vp - hp) < 0x100000000ULL);
   return vp - hp;
+}
+
+/* Expose an API to allow designers to assign their own mheap, by Jordy */
+static inline void BV (clib_bihash_set_mheap) (BVT (clib_bihash) * h,
+					       void *new_heap)
+{
+  ASSERT (new_heap);
+  h->mheap = new_heap;
 }
 
 void BV (clib_bihash_init)

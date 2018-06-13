@@ -681,10 +681,13 @@ vlib_cli_output (vlib_main_t * vm, char *fmt, ...)
 {
   vlib_process_t *cp = vlib_get_current_process (vm);
   va_list va;
-  u8 *s;
+  u8 *s = 0;
+
+  /* kingwel, make a big enough buffer for cli tx, to avoid vec_resize */
+  vec_alloc (s, 160000);
 
   va_start (va, fmt);
-  s = va_format (0, fmt, &va);
+  s = va_format (s, fmt, &va);
   va_end (va);
 
   /* Terminate with \n if not present. */
@@ -712,8 +715,10 @@ show_memory_usage (vlib_main_t * vm,
 
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
-      if (unformat (input, "verbose"))
-	verbose = 1;
+      if (unformat (input, "verbose %d", &verbose))
+	;
+      else if (unformat (input, "verbose"))
+      	verbose = 1;
       else if (unformat (input, "api-segment"))
 	api_segment = 1;
       else
@@ -747,6 +752,8 @@ show_memory_usage (vlib_main_t * vm,
       vlib_cli_output (vm, "Thread %d %v\n", index, vlib_worker_threads[index].name);
       vlib_cli_output (vm, "%U\n", format_mheap, clib_per_cpu_mheaps[index], verbose);
       index++;
+	  // kingwel, don't show worker's heap
+	  break;
   }));
   /* *INDENT-ON* */
   return 0;
@@ -759,6 +766,50 @@ VLIB_CLI_COMMAND (show_memory_usage_command, static) = {
   .function = show_memory_usage,
 };
 /* *INDENT-ON* */
+
+extern void *counter_heap;
+
+static clib_error_t *
+show_counter_memory_usage (vlib_main_t * vm,
+			   unformat_input_t * input, vlib_cli_command_t * cmd)
+{
+  int verbose = 0;
+  clib_error_t *error;
+
+  if (counter_heap == 0)
+    {
+      vlib_cli_output (vm, "No Counter Heap allocated, use default heap\n");
+      return 0;
+    }
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "verbose %d", &verbose))
+	;
+      else if (unformat (input, "verbose"))
+	verbose = 1;
+      else
+	{
+	  error = clib_error_return (0, "unknown input `%U'",
+				     format_unformat_error, input);
+	  return error;
+	}
+    }
+
+  vlib_cli_output (vm, "Counter Heap : \n");
+  vlib_cli_output (vm, "%U\n", format_mheap, counter_heap, verbose);
+
+  return 0;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (show_counter_memory_usage_command, static) = {
+  .path = "show counter memory",
+  .short_help = "Show counter memory usage",
+  .function = show_counter_memory_usage,
+};
+/* *INDENT-ON* */
+
 
 static clib_error_t *
 show_cpu (vlib_main_t * vm, unformat_input_t * input,

@@ -176,7 +176,8 @@ vl_api_ip_neighbor_dump_t_handler (vl_api_ip_neighbor_dump_t * mp)
       /* *INDENT-OFF* */
       vec_foreach (n, ns)
       {
-        send_ip_neighbor_details (sw_if_index, mp->is_ipv6,
+        /* Fix the sw_if_index display error, Brant*/
+        send_ip_neighbor_details (n->sw_if_index, mp->is_ipv6,
           ((n->flags & ETHERNET_ARP_IP4_ENTRY_FLAG_STATIC) ? 1 : 0),
           (u8*) n->ethernet_address,
           (u8*) & (n->ip4_address.as_u8),
@@ -3293,6 +3294,11 @@ ip_api_hookup (vlib_main_t * vm)
                            sizeof(vl_api_##n##_t), 1);
   foreach_ip_api_msg;
 #undef _
+
+  /*
+   * Thread-safe API messages
+   */
+  am->is_mp_safe[VL_API_IP_ADD_DEL_ROUTE] = 1;
 
   /*
    * Set up the (msg_name, crc, message-id) table

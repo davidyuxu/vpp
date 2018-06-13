@@ -50,6 +50,14 @@ typedef enum
 
 #define vlib_foreach_rx_tx(v) for (v = 0; v < VLIB_N_RX_TX; v++)
 
+typedef enum
+{
+  VLIB_RX_TUNNEL,
+  VLIB_TX_TUNNEL,
+  VLIB_N_RX_TX_TUNNEL = 2,     /* Used to size arrays. */
+} vlib_rx_or_tx_tunnel_t;
+
+
 /* Read/write. */
 typedef enum
 {

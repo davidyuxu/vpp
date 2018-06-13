@@ -73,11 +73,32 @@ unix_main_init (vlib_main_t * vm)
 
 VLIB_INIT_FUNCTION (unix_main_init);
 
+static int
+get_time_string (char *str, size_t len)
+{
+  time_t t = time (NULL);
+  struct tm *tm = localtime (&t);
+
+  return strftime (str, len, "%Y-%m-%d-%H-%M-%S", tm);
+}
+
+static int
+unsetup_signal_handlers (int sig)
+{
+  struct sigaction sa;
+
+  sa.sa_handler = SIG_DFL;
+  sa.sa_flags = 0;
+  sigemptyset (&sa.sa_mask);
+  return sigaction (sig, &sa, 0);
+}
+
 static void
 unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
 {
   uword fatal = 0;
   u8 *msg = 0;
+  FILE *crash_file;
 
   msg = format (msg, "received signal %U, PC %U",
 		format_signal, signum, format_ucontext_pc, uc);
@@ -103,6 +124,7 @@ unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
     case SIGSEGV:
     case SIGHUP:
     case SIGFPE:
+    case SIGABRT:
       fatal = 1;
       break;
 
@@ -118,6 +140,29 @@ unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
   if (fatal)
     {
       syslog (LOG_ERR | LOG_DAEMON, "%s", msg);
+      {
+	char filename[256] = { 0 };
+	char timestamp[64] = { 0 };
+
+	if (get_time_string (timestamp, sizeof (timestamp) - 1))
+	  {
+	    snprintf (filename, sizeof (filename), "%s/crashdump-%s.log",
+		      "..", timestamp);
+	    printf ("write crashdump to %s\n", filename);
+
+	    crash_file = fopen (filename, "w");
+	    if (crash_file)
+	      {
+		//backtrace_print (bt_state, 0, crash_file);
+		fclose (crash_file);
+	      }
+	  }
+
+	//backtrace_full (bt_state, 0, full_callback, error_callback, &bt_state);
+      }
+      if (signum == SIGABRT)
+	unsetup_signal_handlers (signum);
+
       os_exit (1);
     }
   else
@@ -141,7 +186,6 @@ setup_signal_handlers (unix_main_t * um)
       switch (i)
 	{
 	  /* these signals take the default action */
-	case SIGABRT:
 	case SIGKILL:
 	case SIGSTOP:
 	case SIGUSR1:
@@ -311,6 +355,65 @@ VLIB_REGISTER_NODE (startup_config_node,static) = {
     .name = "startup-config-process",
 };
 /* *INDENT-ON* */
+
+
+/* Application global configuration in config-file, by Jordy */
+
+static clib_error_t *
+application_global_config (vlib_main_t * vm, unformat_input_t * input)
+{
+  clib_error_t *error = 0;
+  u32 max_capacity = 0;
+  u32 max_interfaces = 0;
+  uword heap_size = 0;
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "capacity %d", &max_capacity))
+	;
+      else if (unformat (input, "max-interfaces %d", &max_interfaces))
+	;
+      else
+	if (unformat
+	    (input, "counter-heap-size %U", unformat_memory_size, &heap_size))
+	;
+      else
+	{
+	  return clib_error_return (0, "unknown input `%U'",
+				    format_unformat_error, input);
+	}
+    }
+
+  if (max_capacity != 0)
+    {
+      vm->max_capacity = max_capacity;
+    }
+  else
+    {
+      vm->max_capacity = 1000;
+    }
+
+  if (max_interfaces != 0)
+    {
+      vm->max_interfaces = max_interfaces;
+    }
+  else
+    {
+      vm->max_interfaces = 2000;
+    }
+
+  if (heap_size != 0)
+    vm->counter_heap_size = heap_size;
+  else
+    vm->counter_heap_size = 0;
+
+  vlib_counter_heap_init (vm->counter_heap_size);
+
+  return error;
+}
+
+VLIB_EARLY_CONFIG_FUNCTION (application_global_config, "app-global");
+
 
 static clib_error_t *
 unix_config (vlib_main_t * vm, unformat_input_t * input)
@@ -623,6 +726,11 @@ vlib_unix_main (int argc, char *argv[])
       return 1;
     }
   unformat_free (&input);
+
+#ifdef CLIB_UNIX
+  /* load symbols for memory trace in debug version, by Jordy */
+  clib_elf_main_init (vm->name);
+#endif
 
   vlib_thread_stack_init (0);
 

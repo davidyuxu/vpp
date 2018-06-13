@@ -75,11 +75,11 @@ format_gtpu_tunnel (u8 * s, va_list * args)
   gtpu_tunnel_t *t = va_arg (*args, gtpu_tunnel_t *);
   gtpu_main_t *ngm = &gtpu_main;
 
-  s = format (s, "[%d] src %U dst %U teid %d fib-idx %d sw-if-idx %d ",
+  s = format (s, "[%d] src %U dst %U teid %d  oteid %d fib-idx %d sw-if-idx %d ",
 	      t - ngm->tunnels,
 	      format_ip46_address, &t->src, IP46_TYPE_ANY,
 	      format_ip46_address, &t->dst, IP46_TYPE_ANY,
-	      t->teid,  t->encap_fib_index, t->sw_if_index);
+	      t->teid, t->oteid, t->encap_fib_index, t->sw_if_index);
 
   s = format (s, "encap-dpo-idx %d ", t->next_dpo.dpoi_index);
   s = format (s, "decap-next-%U ", format_decap_next, t->decap_next_index);
@@ -94,7 +94,7 @@ static u8 *
 format_gtpu_name (u8 * s, va_list * args)
 {
   u32 dev_instance = va_arg (*args, u32);
-  return format (s, "gtpu_tunnel%d", dev_instance);
+  return format (s, "gu%d", dev_instance);
 }
 
 static clib_error_t *
@@ -130,7 +130,7 @@ VNET_HW_INTERFACE_CLASS (gtpu_hw_class) =
   .name = "GTPU",
   .format_header = format_gtpu_header_with_length,
   .build_rewrite = default_build_rewrite,
-  .flags = VNET_HW_INTERFACE_CLASS_FLAG_P2P,
+  .flags = VNET_HW_INTERFACE_CLASS_FLAG_P2P | VNET_HW_INTERFACE_CLASS_FLAG_NO_RATE,
 };
 /* *INDENT-ON* */
 
@@ -203,9 +203,10 @@ const static fib_node_vft_t gtpu_vft = {
   .fnv_back_walk = gtpu_tunnel_back_walk,
 };
 
-
+/* xftony add the oteid*/
 #define foreach_copy_field                      \
 _(teid)                                          \
+_(oteid) 										 \
 _(mcast_sw_if_index)                            \
 _(encap_fib_index)                              \
 _(decap_next_index)                             \
@@ -244,6 +245,10 @@ ip_udp_gtpu_rewrite (gtpu_tunnel_t * t, bool is_ip6)
 
       /* we fix up the ip4 header length and checksum after-the-fact */
       ip->checksum = ip4_header_checksum (ip);
+
+      /* UDP header, randomize src port on something, maybe? */
+      udp->src_port = clib_host_to_net_u16 (GTPU_UDP_SRC_DEFAULT_PORT);
+      udp->dst_port = clib_host_to_net_u16 (GTPU_UDP_DST_PORT);
     }
   else
     {
@@ -257,16 +262,17 @@ ip_udp_gtpu_rewrite (gtpu_tunnel_t * t, bool is_ip6)
 
       ip->src_address = t->src.ip6;
       ip->dst_address = t->dst.ip6;
-    }
 
-  /* UDP header, randomize src port on something, maybe? */
-  udp->src_port = clib_host_to_net_u16 (2152);
-  udp->dst_port = clib_host_to_net_u16 (UDP_DST_PORT_GTPU);
+      /* UDP header, randomize src port on something, maybe? */
+      udp->src_port = clib_host_to_net_u16 (GTPU6_UDP_SRC_DEFAULT_PORT);
+      udp->dst_port = clib_host_to_net_u16 (GTPU6_UDP_DST_PORT);
+    }
 
   /* GTPU header */
   gtpu->ver_flags = GTPU_V1_VER | GTPU_PT_GTP;
   gtpu->type = GTPU_TYPE_GTPU;
-  gtpu->teid = clib_host_to_net_u32 (t->teid);
+  /* xftony: for the rewrite use the oteid */
+  gtpu->teid = clib_host_to_net_u32 (t->oteid);
 
   t->rewrite = r.rw;
   /* Now only support 8-byte gtpu header. TBD */
@@ -362,24 +368,36 @@ int vnet_gtpu_add_del_tunnel
   gtpu_main_t *gtm = &gtpu_main;
   gtpu_tunnel_t *t = 0;
   vnet_main_t *vnm = gtm->vnet_main;
-  uword *p;
+  uword *p, *p_path;
   u32 hw_if_index = ~0;
   u32 sw_if_index = ~0;
-  gtpu4_tunnel_key_t key4;
-  gtpu6_tunnel_key_t key6;
+  gtpu4_tunnel_key_t key4, key4_path;
+  gtpu6_tunnel_key_t key6, key6_path;
   u32 is_ip6 = a->is_ip6;
+  gtpu_path_t *path;
 
   if (!is_ip6)
     {
       key4.src = a->dst.ip4.as_u32;	/* decap src in key is encap dst in config */
       key4.teid = clib_host_to_net_u32 (a->teid);
       p = hash_get (gtm->gtpu4_tunnel_by_key, key4.as_u64);
+
+      /* is or not this path existed --- add by anhua */
+      key4_path.src = a->dst.ip4.as_u32;
+      key4_path.teid = 0;
+      p_path =
+	hash_get (gtm->path_manage.gtpu4_path_by_key, key4_path.as_u64);
     }
   else
     {
       key6.src = a->dst.ip6;
       key6.teid = clib_host_to_net_u32 (a->teid);
       p = hash_get_mem (gtm->gtpu6_tunnel_by_key, &key6);
+
+      /* is or not this path existed --- add by anhua */
+      key6_path.src = a->dst.ip6;
+      key6_path.teid = 0;
+      p_path = hash_get_mem (gtm->path_manage.gtpu6_path_by_key, &key6_path);
     }
 
   if (a->is_add)
@@ -393,6 +411,7 @@ int vnet_gtpu_add_del_tunnel
       /*if not set explicitly, default to l2 */
       if (a->decap_next_index == ~0)
 	a->decap_next_index = GTPU_INPUT_NEXT_L2_INPUT;
+
       if (!gtpu_decap_next_is_valid (gtm, is_ip6, a->decap_next_index))
 	return VNET_API_ERROR_INVALID_DECAP_NEXT;
 
@@ -413,12 +432,36 @@ int vnet_gtpu_add_del_tunnel
       else
 	hash_set (gtm->gtpu4_tunnel_by_key, key4.as_u64, t - gtm->tunnels);
 
+      /* add path to paths pool --- add by anhua */
+      if (p_path)
+	{
+	  path = pool_elt_at_index (gtm->path_manage.paths, p_path[0]);
+	  path->tunnel_count += 1;
+	}
+      else
+	{
+	  pool_get (gtm->path_manage.paths, path);
+	  path->src = a->src;
+	  path->dst = a->dst;
+	  path->tunnel_count = 1;
+
+	  if (is_ip6)
+	    hash_set_mem_alloc (&gtm->path_manage.gtpu6_path_by_key,
+				&key6_path, path - gtm->path_manage.paths);
+	  else
+	    hash_set (gtm->path_manage.gtpu4_path_by_key, key4_path.as_u64,
+		      path - gtm->path_manage.paths);
+	}
+
       vnet_hw_interface_t *hi;
       if (vec_len (gtm->free_gtpu_tunnel_hw_if_indices) > 0)
 	{
 	  vnet_interface_main_t *im = &vnm->interface_main;
-	  hw_if_index = gtm->free_gtpu_tunnel_hw_if_indices
-	    [vec_len (gtm->free_gtpu_tunnel_hw_if_indices) - 1];
+
+	  hw_if_index =
+	    gtm->free_gtpu_tunnel_hw_if_indices[vec_len
+						(gtm->free_gtpu_tunnel_hw_if_indices)
+						- 1];
 	  _vec_len (gtm->free_gtpu_tunnel_hw_if_indices) -= 1;
 
 	  hi = vnet_get_hw_interface (vnm, hw_if_index);
@@ -428,9 +471,9 @@ int vnet_gtpu_add_del_tunnel
 	  /* clear old stats of freed tunnel before reuse */
 	  sw_if_index = hi->sw_if_index;
 	  vnet_interface_counter_lock (im);
-	  vlib_zero_combined_counter
-	    (&im->combined_sw_if_counters[VNET_INTERFACE_COUNTER_TX],
-	     sw_if_index);
+	  vlib_zero_combined_counter (&im->combined_sw_if_counters
+				      [VNET_INTERFACE_COUNTER_TX],
+				      sw_if_index);
 	  vlib_zero_combined_counter (&im->combined_sw_if_counters
 				      [VNET_INTERFACE_COUNTER_RX],
 				      sw_if_index);
@@ -441,9 +484,11 @@ int vnet_gtpu_add_del_tunnel
 	}
       else
 	{
-	  hw_if_index = vnet_register_interface
-	    (vnm, gtpu_device_class.index, t - gtm->tunnels,
-	     gtpu_hw_class.index, t - gtm->tunnels);
+	  hw_if_index = vnet_register_interface (vnm,
+						 gtpu_device_class.index,
+						 t - gtm->tunnels,
+						 gtpu_hw_class.index,
+						 t - gtm->tunnels);
 	  hi = vnet_get_hw_interface (vnm, hw_if_index);
 	}
 
@@ -465,7 +510,10 @@ int vnet_gtpu_add_del_tunnel
       l2im->configs[sw_if_index].bd_index = 0;
 
       vnet_sw_interface_t *si = vnet_get_sw_interface (vnm, sw_if_index);
-      si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
+      /* default to hidden, by Jordy */
+      //si->flags &= ~VNET_SW_INTERFACE_FLAG_HIDDEN;
+      si->flags |= VNET_SW_INTERFACE_FLAG_HIDDEN;
+
       vnet_sw_interface_set_flags (vnm, sw_if_index,
 				   VNET_SW_INTERFACE_FLAG_ADMIN_UP);
 
@@ -483,11 +531,13 @@ int vnet_gtpu_add_del_tunnel
 	   * re-stack accordingly
 	   */
 	  vtep_addr_ref (&t->src);
-	  t->fib_entry_index = fib_table_entry_special_add
-	    (t->encap_fib_index, &tun_dst_pfx, FIB_SOURCE_RR,
-	     FIB_ENTRY_FLAG_NONE);
+	  t->fib_entry_index =
+	    fib_table_entry_special_add (t->encap_fib_index, &tun_dst_pfx,
+					 FIB_SOURCE_RR, FIB_ENTRY_FLAG_NONE);
+#if 0
 	  t->sibling_index = fib_entry_child_add
 	    (t->fib_entry_index, gtm->fib_node_type, t - gtm->tunnels);
+#endif
 	  gtpu_tunnel_restack_dpo (t);
 	}
       else
@@ -538,9 +588,9 @@ int vnet_gtpu_add_del_tunnel
 	      /*
 	       * Create the mcast adjacency to send traffic to the group
 	       */
-	      ai = adj_mcast_add_or_lock (fp,
-					  fib_proto_to_link (fp),
-					  a->mcast_sw_if_index);
+	      ai =
+		adj_mcast_add_or_lock (fp, fib_proto_to_link (fp),
+				       a->mcast_sw_if_index);
 
 	      /*
 	       * create a new end-point
@@ -592,7 +642,9 @@ int vnet_gtpu_add_del_tunnel
       if (!ip46_address_is_multicast (&t->dst))
 	{
 	  vtep_addr_unref (&t->src);
+#if 0
 	  fib_entry_child_remove (t->fib_entry_index, t->sibling_index);
+#endif
 	  fib_table_entry_delete_index (t->fib_entry_index, FIB_SOURCE_RR);
 	}
       else if (vtep_addr_unref (&t->dst) == 0)
@@ -603,6 +655,24 @@ int vnet_gtpu_add_del_tunnel
       fib_node_deinit (&t->node);
       vec_free (t->rewrite);
       pool_put (gtm->tunnels, t);
+
+      /* remove path --- add by anhua */
+      if (p_path)
+	{
+	  path = pool_elt_at_index (gtm->path_manage.paths, p_path[0]);
+	  path->tunnel_count -= 1;
+	  if (0 == path->tunnel_count)
+	    {
+	      pool_put (gtm->path_manage.paths, path);
+
+	      if (!is_ip6)
+		hash_unset (gtm->path_manage.gtpu4_path_by_key,
+			    key4_path.as_u64);
+	      else
+		hash_unset_mem_free (&gtm->path_manage.gtpu6_path_by_key,
+				     &key6_path);
+	    }
+	}
     }
 
   if (sw_if_indexp)
@@ -665,6 +735,7 @@ gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
   u32 mcast_sw_if_index = ~0;
   u32 decap_next_index = GTPU_INPUT_NEXT_L2_INPUT;
   u32 teid = 0;
+  u32 oteid = 0;
   u32 tmp;
   int rv;
   vnet_gtpu_add_del_tunnel_args_t _a, *a = &_a;
@@ -740,6 +811,8 @@ gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
 	;
       else if (unformat (line_input, "teid %d", &teid))
 	;
+      else if (unformat (line_input, "oteid %d", &oteid))
+	;
       else
 	{
 	  error = clib_error_return (0, "parse error: '%U'",
@@ -811,8 +884,9 @@ gtpu_add_del_tunnel_command_fn (vlib_main_t * vm,
     {
     case 0:
       if (is_add)
-	vlib_cli_output (vm, "%U\n", format_vnet_sw_if_index_name,
-			 vnet_get_main (), tunnel_sw_if_index);
+	vlib_cli_output (vm, "%U\n decap-next: %d",
+			 format_vnet_sw_if_index_name, vnet_get_main (),
+			 tunnel_sw_if_index, a->decap_next_index);
       break;
 
     case VNET_API_ERROR_TUNNEL_EXIST:
@@ -860,7 +934,7 @@ VLIB_CLI_COMMAND (create_gtpu_tunnel_command, static) = {
   .path = "create gtpu tunnel",
   .short_help =
   "create gtpu tunnel src <local-vtep-addr>"
-  " {dst <remote-vtep-addr>|group <mcast-vtep-addr> <intf-name>} teid <nn>"
+  " {dst <remote-vtep-addr>|group <mcast-vtep-addr> <intf-name>} teid <nn> oteid <nn>"
   " [encap-vrf-id <nn>] [decap-next [l2|ip4|ip6|node <name>]] [del]",
   .function = gtpu_add_del_tunnel_command_fn,
 };
@@ -873,16 +947,34 @@ show_gtpu_tunnel_command_fn (vlib_main_t * vm,
 {
   gtpu_main_t *gtm = &gtpu_main;
   gtpu_tunnel_t *t;
+  int verbose = 0;
+  clib_error_t *error;
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "verbose"))
+	verbose++;
+      else
+	{
+	  error = clib_error_return (0, "unknown input `%U'",
+				     format_unformat_error, input);
+	  return error;
+	}
+    }
 
   if (pool_elts (gtm->tunnels) == 0)
     vlib_cli_output (vm, "No gtpu tunnels configured...");
+  else
+    vlib_cli_output (vm, "%d gtpu tunnels configured!",
+		     pool_elts (gtm->tunnels));
 
-  pool_foreach (t, gtm->tunnels, (
-				   {
-				   vlib_cli_output (vm, "%U",
-						    format_gtpu_tunnel, t);
-				   }
-		));
+  if (verbose > 0)
+    pool_foreach (t, gtm->tunnels, (
+				     {
+				     vlib_cli_output (vm, "%U",
+						      format_gtpu_tunnel, t);
+				     }
+		  ));
 
   return 0;
 }
@@ -1073,10 +1165,291 @@ VLIB_CLI_COMMAND (set_interface_ip6_gtpu_bypass_command, static) = {
 };
 /* *INDENT-ON* */
 
+
+int
+gtpu_tunnels_init ()
+{
+  gtpu_main_t *gtm = &gtpu_main;
+  ip46_address_t src, dst;
+  u32 encap_fib_index = 0;
+  u32 mcast_sw_if_index = ~0;
+  u32 decap_next_index = GTPU_INPUT_NEXT_IP4_INPUT;
+  u32 teid = gtm->start_teid;
+  u32 oteid = gtm->start_oteid;
+  int rv;
+  vnet_gtpu_add_del_tunnel_args_t _a, *a = &_a;
+  u32 tunnel_sw_if_index;
+  u32 i;
+
+  /* Cant "universally zero init" (={0}) due to GCC bug 53119 */
+  memset (&src, 0, sizeof src);
+  memset (&dst, 0, sizeof dst);
+  src = gtm->src;
+  dst = gtm->dst;
+
+  memset (a, 0, sizeof (*a));
+
+  a->is_add = 1;
+  a->is_ip6 = 0;
+#define _(x) a->x = x;
+  foreach_copy_field;
+#undef _
+
+  /* add */
+  for (i = 0; i < gtm->prealloc_tunnels; i++, a->teid++)
+    {
+      rv = vnet_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
+      switch (rv)
+	{
+	case 0:
+	  break;
+
+	case VNET_API_ERROR_TUNNEL_EXIST:
+	  clib_warning ("tunnel already exists...");
+	  break;
+
+	case VNET_API_ERROR_NO_SUCH_ENTRY:
+	  clib_warning ("tunnel does not exist...");
+	  break;
+
+	default:
+	  clib_warning ("vnet_gtpu_add_del_tunnel returned %d", rv);
+	  break;
+	}
+    }
+
+  /* del */
+  a->is_add = 0;
+  a->teid = gtm->start_teid;
+  for (i = 0; i < gtm->prealloc_tunnels; i++, a->teid++)
+    {
+      rv = vnet_gtpu_add_del_tunnel (a, &tunnel_sw_if_index);
+      switch (rv)
+	{
+	case 0:
+	  break;
+
+	case VNET_API_ERROR_TUNNEL_EXIST:
+	  clib_warning ("tunnel already exists...");
+	  break;
+
+	case VNET_API_ERROR_NO_SUCH_ENTRY:
+	  clib_warning ("tunnel does not exist...");
+	  break;
+
+	default:
+	  clib_warning ("vnet_gtpu_add_del_tunnel returned %d", rv);
+	  break;
+	}
+    }
+
+  return 0;
+}
+
+static clib_error_t *
+gtpu_config (vlib_main_t * vm, unformat_input_t * input)
+{
+  gtpu_main_t *gtm = &gtpu_main;
+  clib_error_t *error = 0;
+
+  gtm->prealloc_tunnels = 0;
+  gtm->start_teid = 1;
+  gtm->src.ip4.as_u32 = clib_host_to_net_u32 (0x01010101);
+  gtm->dst.ip4.as_u32 = clib_host_to_net_u32 (0x02020202);
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "src %U", unformat_ip4_address, &gtm->src.ip4))
+	{
+	}
+      else if (unformat (input, "dst %U",
+			 unformat_ip4_address, &gtm->dst.ip4))
+	{
+	}
+      else if (unformat (input, "teid %d", &gtm->start_teid))
+	;
+      else if (unformat (input, "oteid %d", &gtm->start_oteid))
+	;
+      else if (unformat (input, "capacity %d", &gtm->prealloc_tunnels))
+	;
+      else
+	{
+	  return clib_error_return (0, "unknown input `%U'",
+				    format_unformat_error, input);
+	}
+    }
+
+  if (gtm->prealloc_tunnels > 0)
+    {
+      gtpu_tunnels_init ();
+    }
+
+  return error;
+}
+
+VLIB_CONFIG_FUNCTION (gtpu_config, "gtpu");
+
+
+
+/**************************Start of pg***************************/
+
+#define GTPU_PG_EDIT_LENGTH (1 << 0)
+
+typedef struct
+{
+  pg_edit_t ver_flags;
+  pg_edit_t type;
+  pg_edit_t length;
+  pg_edit_t teid;
+  pg_edit_t sequence;
+  pg_edit_t pdu_number;
+  pg_edit_t next_ext_type;
+} pg_gtpu_header_t;
+
+always_inline void
+gtpu_pg_edit_function_inline (pg_main_t * pg,
+			      pg_stream_t * s,
+			      pg_edit_group_t * g,
+			      u32 * packets, u32 n_packets, u32 flags)
+{
+  vlib_main_t *vm = vlib_get_main ();
+  u32 gtpu_offset;
+
+  gtpu_offset = g->start_byte_offset;
+
+  while (n_packets >= 1)
+    {
+      vlib_buffer_t *p0;
+      gtpu_header_t *gtpu0;
+      u32 gtpu_len0;
+
+      p0 = vlib_get_buffer (vm, packets[0]);
+      n_packets -= 1;
+      packets += 1;
+
+      gtpu0 = (void *) (p0->data + gtpu_offset);
+      gtpu_len0 =
+	vlib_buffer_length_in_chain (vm, p0) - gtpu_offset - GTPU_HEADER_MIN;
+
+      if (flags & GTPU_PG_EDIT_LENGTH)
+	gtpu0->length = clib_host_to_net_u16 (gtpu_len0);
+    }
+}
+
+static void
+gtpu_pg_edit_function (pg_main_t * pg,
+		       pg_stream_t * s,
+		       pg_edit_group_t * g, u32 * packets, u32 n_packets)
+{
+  switch (g->edit_function_opaque)
+    {
+    case GTPU_PG_EDIT_LENGTH:
+      gtpu_pg_edit_function_inline (pg, s, g, packets, n_packets,
+				    GTPU_PG_EDIT_LENGTH);
+      break;
+
+    default:
+      ASSERT (0);
+      break;
+    }
+}
+
+static inline void
+pg_gtpu_header_init (pg_gtpu_header_t * p)
+{
+  /* Initialize fields that are not bit fields in the IP header. */
+#define _(f) pg_edit_init (&p->f, gtpu_header_t, f);
+  _(ver_flags);
+  _(type);
+  _(length);
+  _(teid);
+  _(sequence);
+  _(pdu_number);
+  _(next_ext_type);
+#undef _
+}
+
+uword
+unformat_pg_gtpu_header (unformat_input_t * input, va_list * args)
+{
+  pg_stream_t *s = va_arg (*args, pg_stream_t *);
+  unformat_input_t sub_input = { 0 };
+  pg_gtpu_header_t *p;
+  u32 group_index;
+
+  p =
+    pg_create_edit_group (s, sizeof (p[0]), sizeof (gtpu_header_t),
+			  &group_index);
+  pg_gtpu_header_init (p);
+
+  /* Defaults. */
+  pg_edit_set_fixed (&p->ver_flags, GTPU_V1_VER | GTPU_PT_GTP | GTPU_S_BIT);
+  pg_edit_set_fixed (&p->type, GTPU_TYPE_GTPU);
+  pg_edit_set_fixed (&p->sequence, 0);
+  pg_edit_set_fixed (&p->pdu_number, 0);
+  pg_edit_set_fixed (&p->next_ext_type, 0);
+
+  p->teid.type = PG_EDIT_UNSPECIFIED;
+  p->length.type = PG_EDIT_UNSPECIFIED;
+
+  if (!unformat (input, "GTPU %U", unformat_input, &sub_input))
+    goto error;
+
+  /* Parse options. */
+  while (1)
+    {
+      if (unformat (&sub_input, "teid %U",
+		    unformat_pg_edit, unformat_pg_number, &p->teid))
+	;
+
+      else if (unformat (&sub_input, "length %U",
+			 unformat_pg_edit, unformat_pg_number, &p->length))
+	;
+
+      else if (unformat (&sub_input, "type %U",
+			 unformat_pg_edit, unformat_pg_number, &p->type))
+	;
+
+      /* Can't parse input: try next protocol level. */
+      else
+	break;
+    }
+
+  {
+    if (!unformat_user (&sub_input, unformat_pg_payload, s))
+      goto error;
+
+    p = pg_get_edit_group (s, group_index);
+    if (p->length.type == PG_EDIT_UNSPECIFIED)
+      {
+	pg_edit_group_t *g = pg_stream_get_group (s, group_index);
+	g->edit_function = gtpu_pg_edit_function;
+	g->edit_function_opaque = 0;
+	if (p->length.type == PG_EDIT_UNSPECIFIED)
+	  g->edit_function_opaque |= GTPU_PG_EDIT_LENGTH;
+      }
+
+    unformat_free (&sub_input);
+    return 1;
+  }
+
+error:
+  /* Free up any edits we may have added. */
+  pg_free_edit_group (s);
+  unformat_free (&sub_input);
+
+  return 0;
+}
+
+/***************************End of pg****************************/
+
+
 clib_error_t *
 gtpu_init (vlib_main_t * vm)
 {
   gtpu_main_t *gtm = &gtpu_main;
+  udp_dst_port_info_t *pi;
+  pg_node_t *pn;
 
   gtm->vnet_main = vnet_get_main ();
   gtm->vlib_main = vm;
@@ -1085,17 +1458,44 @@ gtpu_init (vlib_main_t * vm)
   gtm->gtpu6_tunnel_by_key = hash_create_mem (0,
 					      sizeof (gtpu6_tunnel_key_t),
 					      sizeof (uword));
+
+  /* initialize the ip6 path hash --- add by anhua */
+  gtm->path_manage.gtpu6_path_by_key = hash_create_mem (0,
+							sizeof
+							(gtpu6_tunnel_key_t),
+							sizeof (uword));
   gtm->vtep6 = hash_create_mem (0, sizeof (ip6_address_t), sizeof (uword));
   gtm->mcast_shared = hash_create_mem (0,
 				       sizeof (ip46_address_t),
 				       sizeof (mcast_shared_t));
 
-  udp_register_dst_port (vm, UDP_DST_PORT_GTPU,
+  udp_register_dst_port (vm, GTPU_UDP_DST_PORT,
 			 gtpu4_input_node.index, /* is_ip4 */ 1);
-  udp_register_dst_port (vm, UDP_DST_PORT_GTPU6,
+  udp_register_dst_port (vm, GTPU6_UDP_DST_PORT,
 			 gtpu6_input_node.index, /* is_ip4 */ 0);
 
+  /* Added for PG, brant */
+  pn = pg_get_node (gtpu4_input_node.index);
+  pn->unformat_edit = unformat_pg_gtpu_header;
+
+  pn = pg_get_node (gtpu6_input_node.index);
+  pn->unformat_edit = unformat_pg_gtpu_header;
+
+  pi = udp_get_dst_port_info (&udp_main, GTPU_UDP_DST_PORT, 1);
+  if (pi)
+    pi->unformat_pg_edit = unformat_pg_gtpu_header;
+
+  pi = udp_get_dst_port_info (&udp_main, GTPU6_UDP_DST_PORT, 0);
+  if (pi)
+    pi->unformat_pg_edit = unformat_pg_gtpu_header;
+
   gtm->fib_node_type = fib_node_register_new_type (&gtpu_vft);
+
+  if (vm->max_capacity)
+    {
+      pool_init_aligned (gtm->tunnels, vm->max_capacity,
+			 CLIB_CACHE_LINE_BYTES);
+    }
 
   return 0;
 }

@@ -28,6 +28,8 @@
 
 
 ipsec_main_t ipsec_main;
+ipsec_proto_main_t ipsec_proto_main;
+
 
 u32
 ipsec_get_sa_index_by_sa_id (u32 sa_id)
@@ -413,14 +415,12 @@ ipsec_is_sa_used (u32 sa_index)
 }
 
 int
-ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add,
-		  u8 udp_encap)
+ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add)
 {
   ipsec_main_t *im = &ipsec_main;
   ipsec_sa_t *sa = 0;
   uword *p;
   u32 sa_index;
-  clib_error_t *err;
 
   clib_warning ("id %u spi %u", new_sa->id, new_sa->spi);
 
@@ -440,27 +440,23 @@ ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add,
 	  return VNET_API_ERROR_SYSCALL_ERROR_1;	/* sa used in policy */
 	}
       hash_unset (im->sa_index_by_sa_id, sa->id);
+
       if (im->cb.add_del_sa_sess_cb)
-	{
-	  err = im->cb.add_del_sa_sess_cb (sa_index, 0);
-	  if (err)
-	    return VNET_API_ERROR_SYSCALL_ERROR_1;
-	}
+	im->cb.add_del_sa_sess_cb (sa_index, 0);
+
+      ipsec_delete_sa_contexts (sa);
       pool_put (im->sad, sa);
     }
   else				/* create new SA */
     {
       pool_get (im->sad, sa);
-      clib_memcpy (sa, new_sa, sizeof (*sa));
       sa_index = sa - im->sad;
-      sa->udp_encap = udp_encap ? 1 : 0;
-      hash_set (im->sa_index_by_sa_id, sa->id, sa_index);
+      clib_memcpy (sa, new_sa, sizeof (*sa));
+      ipsec_create_sa_contexts (sa);
       if (im->cb.add_del_sa_sess_cb)
-	{
-	  err = im->cb.add_del_sa_sess_cb (sa_index, 1);
-	  if (err)
-	    return VNET_API_ERROR_SYSCALL_ERROR_1;
-	}
+	im->cb.add_del_sa_sess_cb (sa_index, 1);
+
+      hash_set (im->sa_index_by_sa_id, sa->id, sa_index);
     }
   return 0;
 }
@@ -472,7 +468,6 @@ ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update)
   uword *p;
   u32 sa_index;
   ipsec_sa_t *sa = 0;
-  clib_error_t *err;
 
   p = hash_get (im->sa_index_by_sa_id, sa_update->id);
   if (!p)
@@ -497,17 +492,54 @@ ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update)
       sa->integ_key_len = sa_update->integ_key_len;
     }
 
-  if (0 < sa_update->crypto_key_len || 0 < sa_update->integ_key_len)
+  ipsec_set_sa_contexts_integ_key (sa);
+  ipsec_set_sa_contexts_crypto_key (sa);
+
+  if (im->cb.update_sa_sess_cb)
     {
-      if (im->cb.add_del_sa_sess_cb)
+      clib_error_t *e;
+
+      e = im->cb.update_sa_sess_cb (sa_index);
+      if (e)
 	{
-	  err = im->cb.add_del_sa_sess_cb (sa_index, 0);
-	  if (err)
-	    return VNET_API_ERROR_SYSCALL_ERROR_1;
+	  clib_error_free (e);
+	  return VNET_API_ERROR_SYSCALL_ERROR_1;
 	}
     }
 
   return 0;
+}
+
+static void
+ipsec_rand_engine (void)
+{
+  ENGINE *engine;
+  ENGINE_load_rdrand ();
+
+  engine = ENGINE_by_id ("rdrand");
+  if (engine == NULL)
+    {
+      clib_warning ("OPENSSL rdrand ENGINE_load_rdrand returned %lu",
+		    ERR_get_error ());
+      return;
+    }
+  if (!ENGINE_init (engine))
+    {
+      clib_warning ("ENGINE_init returned %lu", ERR_get_error ());
+      return;
+    }
+  if (!ENGINE_set_default (engine, ENGINE_METHOD_RAND))
+    {
+      clib_warning ("ENGINE_set_default returned %lu", ERR_get_error ());
+      return;
+    }
+
+  /* maybe clean up this engine somewhere ? */
+  /*
+     ENGINE_finish(engine);
+     ENGINE_free(engine);
+     ENGINE_cleanup();
+   */
 }
 
 static void
@@ -528,23 +560,15 @@ ipsec_rand_seed (void)
 }
 
 static clib_error_t *
-ipsec_check_support (ipsec_sa_t * sa)
-{
-  if (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_128)
-    return clib_error_return (0, "unsupported aes-gcm-128 crypto-alg");
-  if (sa->integ_alg == IPSEC_INTEG_ALG_NONE)
-    return clib_error_return (0, "unsupported none integ-alg");
-
-  return 0;
-}
-
-static clib_error_t *
 ipsec_init (vlib_main_t * vm)
 {
   clib_error_t *error;
   ipsec_main_t *im = &ipsec_main;
-  vlib_thread_main_t *tm = vlib_get_thread_main ();
   vlib_node_t *node;
+
+  //CRYPTO_set_mem_functions (clib_mem_alloc, clib_mem_realloc2, clib_mem_free);
+
+  ipsec_rand_engine ();
 
   ipsec_rand_seed ();
 
@@ -556,9 +580,6 @@ ipsec_init (vlib_main_t * vm)
   im->spd_index_by_spd_id = hash_create (0, sizeof (uword));
   im->sa_index_by_sa_id = hash_create (0, sizeof (uword));
   im->spd_index_by_sw_if_index = hash_create (0, sizeof (uword));
-
-  vec_validate_aligned (im->empty_buffers, tm->n_vlib_mains - 1,
-			CLIB_CACHE_LINE_BYTES);
 
   node = vlib_get_node_by_name (vm, (u8 *) "error-drop");
   ASSERT (node);
@@ -585,8 +606,6 @@ ipsec_init (vlib_main_t * vm)
   im->ah_encrypt_next_index = IPSEC_OUTPUT_NEXT_AH_ENCRYPT;
   im->ah_decrypt_next_index = IPSEC_INPUT_NEXT_AH_DECRYPT;
 
-  im->cb.check_support_cb = ipsec_check_support;
-
   if ((error = vlib_call_init_function (vm, ipsec_cli_init)))
     return error;
 
@@ -595,8 +614,19 @@ ipsec_init (vlib_main_t * vm)
 
   ipsec_proto_init ();
 
+  im->debug_fformat = 1;
+
   if ((error = ikev2_init (vm)))
     return error;
+
+  im->ipsec_if_pool_index_by_key = hash_create (0, sizeof (uword));
+
+  if (vm->max_capacity)
+    {
+      pool_init (im->sad, vm->max_capacity * 2);
+      pool_init (im->tunnel_interfaces, vm->max_capacity);
+    }
+
 
   return 0;
 }

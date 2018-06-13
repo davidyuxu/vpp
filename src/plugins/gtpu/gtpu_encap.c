@@ -51,6 +51,7 @@ typedef enum {
 typedef struct {
   u32 tunnel_index;
   u32 teid;
+  u32 oteid;
 } gtpu_encap_trace_t;
 
 u8 * format_gtpu_encap_trace (u8 * s, va_list * args)
@@ -60,8 +61,8 @@ u8 * format_gtpu_encap_trace (u8 * s, va_list * args)
   gtpu_encap_trace_t * t
       = va_arg (*args, gtpu_encap_trace_t *);
 
-  s = format (s, "GTPU encap to gtpu_tunnel%d teid %d",
-	      t->tunnel_index, t->teid);
+  s = format (s, "GTPU encap to gtpu_tunnel%d oteid %d",
+	      t->tunnel_index, t->oteid);
   return s;
 }
 
@@ -467,7 +468,7 @@ gtpu_encap_inline (vlib_main_t * vm,
               gtpu_encap_trace_t *tr =
                 vlib_add_trace (vm, node, b0, sizeof (*tr));
               tr->tunnel_index = t0 - gtm->tunnels;
-              tr->teid = t0->teid;
+              tr->teid = t0->oteid;
            }
 
           if (PREDICT_FALSE(b1->flags & VLIB_BUFFER_IS_TRACED))
@@ -475,7 +476,7 @@ gtpu_encap_inline (vlib_main_t * vm,
               gtpu_encap_trace_t *tr =
                 vlib_add_trace (vm, node, b1, sizeof (*tr));
               tr->tunnel_index = t1 - gtm->tunnels;
-              tr->teid = t1->teid;
+              tr->teid = t1->oteid;
             }
 
 	  vlib_validate_buffer_enqueue_x4 (vm, node, next_index,
@@ -624,7 +625,7 @@ gtpu_encap_inline (vlib_main_t * vm,
               gtpu_encap_trace_t *tr =
                 vlib_add_trace (vm, node, b0, sizeof (*tr));
               tr->tunnel_index = t0 - gtm->tunnels;
-              tr->teid = t0->teid;
+              tr->teid = t0->oteid;
             }
 	  vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
 					   to_next, n_left_to_next,
@@ -702,4 +703,5 @@ VLIB_REGISTER_NODE (gtpu6_encap_node) = {
 };
 
 VLIB_NODE_FUNCTION_MULTIARCH (gtpu6_encap_node, gtpu6_encap)
+
 

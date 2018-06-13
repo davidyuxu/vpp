@@ -185,7 +185,6 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
   vl_api_ipsec_sad_add_del_entry_reply_t *rmp;
   int rv;
 #if WITH_LIBSSL > 0
-  ipsec_main_t *im = &ipsec_main;
   ipsec_sa_t sa;
 
   memset (&sa, 0, sizeof (sa));
@@ -220,6 +219,7 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
   sa.use_esn = mp->use_extended_sequence_number;
   sa.is_tunnel = mp->is_tunnel;
   sa.is_tunnel_ip6 = mp->is_tunnel_ipv6;
+  sa.udp_encap = mp->udp_encap;
   if (sa.is_tunnel_ip6)
     {
       clib_memcpy (&sa.tunnel_src_addr, mp->tunnel_src_address, 16);
@@ -232,16 +232,7 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
     }
   sa.use_anti_replay = mp->use_anti_replay;
 
-  ASSERT (im->cb.check_support_cb);
-  clib_error_t *err = im->cb.check_support_cb (&sa);
-  if (err)
-    {
-      clib_warning ("%s", err->what);
-      rv = VNET_API_ERROR_UNIMPLEMENTED;
-      goto out;
-    }
-
-  rv = ipsec_add_del_sa (vm, &sa, mp->is_add, mp->udp_encap);
+  rv = ipsec_add_del_sa (vm, &sa, mp->is_add);
 #else
   rv = VNET_API_ERROR_UNIMPLEMENTED;
   goto out;
