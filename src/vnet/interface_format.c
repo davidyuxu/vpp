@@ -193,7 +193,7 @@ format_vnet_hw_if_index_name (u8 * s, va_list * args)
 
 u8 *
 format_vnet_sw_interface_cntrs (u8 * s, vnet_interface_main_t * im,
-				vnet_sw_interface_t * si)
+				vnet_sw_interface_t * si, u8 verbose)
 {
   u32 indent, n_printed;
   int i, j, n_counters;
@@ -203,6 +203,23 @@ format_vnet_sw_interface_cntrs (u8 * s, vnet_interface_main_t * im,
 
   indent = format_get_indent (s);
   n_printed = 0;
+
+  vnet_interface_counter_t *if_counter;
+
+  if_counter = pool_elt_at_index (im->instant_if_counters, si->counter_index);
+
+  f64 this_time = vlib_time_now (vlib_get_main ());
+  f64 duration = this_time - if_counter->last_show_time;
+  if_counter->last_show_time = this_time;
+
+  vlib_counter_t counter;
+  f64 *packets_rate = 0;
+  f64 *bytes_rate = 0;
+
+  vlib_thread_main_t *tm = vlib_get_thread_main ();
+
+  vec_validate (packets_rate, tm->n_vlib_mains - 1);
+  vec_validate (bytes_rate, tm->n_vlib_mains - 1);
 
   {
     vlib_combined_counter_main_t *cm;
@@ -227,18 +244,47 @@ format_vnet_sw_interface_cntrs (u8 * s, vnet_interface_main_t * im,
 	vtotal.packets = 0;
 	vtotal.bytes = 0;
 
+	cm = im->combined_sw_if_counters + j;
+
 	for (i = 0; i < vec_len (my_vnet_mains); i++)
 	  {
 	    im = &my_vnet_mains[i]->interface_main;
-	    cm = im->combined_sw_if_counters + j;
 	    vlib_get_combined_counter (cm, si->sw_if_index, &v);
 	    vtotal.packets += v.packets;
 	    vtotal.bytes += v.bytes;
+
+	    vlib_counter_t *last = if_counter->combined_per_thread[j];
+
+	    for (int k = 0; k < vec_len (last); k++)
+	      {
+		vlib_get_combined_counter_per_thread (cm, si->sw_if_index, k,
+						      &v);
+
+		vlib_counter_t *this_one = vec_elt_at_index (last, k);
+
+		counter.packets = v.packets - this_one->packets;
+		counter.bytes = v.bytes - this_one->bytes;
+		this_one->packets = v.packets;
+		this_one->bytes = v.bytes;
+
+		packets_rate[k] = counter.packets / duration;
+		bytes_rate[k] = counter.bytes / duration;
+	      }
 	  }
 
 	/* Only display non-zero counters. */
 	if (vtotal.packets == 0)
 	  continue;
+
+	vlib_counter_t *last = &if_counter->combined_total[j];
+
+	counter.packets = vtotal.packets - last->packets;
+	counter.bytes = vtotal.bytes - last->bytes;
+	last->packets = vtotal.packets;
+	last->bytes = vtotal.bytes;
+
+	f64 packet_rate = counter.packets / duration;
+	f64 byte_rate = counter.bytes / duration;
 
 	if (n_printed > 0)
 	  s = format (s, "\n%U", format_white_space, indent);
@@ -247,12 +293,35 @@ format_vnet_sw_interface_cntrs (u8 * s, vnet_interface_main_t * im,
 	if (n)
 	  _vec_len (n) = 0;
 	n = format (n, "%s packets", cm->name);
-	s = format (s, "%-16v%16Ld", n, vtotal.packets);
+	s =
+	  format (s, "%-16v%16Ld %U pps", n, vtotal.packets,
+		  format_mbps_pps_1000, packet_rate);
+
+	if (verbose)
+	  for (i = 0; i < vec_len (packets_rate); i++)
+	    {
+	      if (packets_rate[i] > 0)
+		s =
+		  format (s, "\n%U Thread %u %-10v: %U", format_white_space,
+			  indent + 12, i, vlib_worker_threads[i].name,
+			  format_mbps_pps_1000, packets_rate[i]);
+	    }
 
 	_vec_len (n) = 0;
 	n = format (n, "%s bytes", cm->name);
-	s = format (s, "\n%U%-16v%16Ld",
-		    format_white_space, indent, n, vtotal.bytes);
+	s = format (s, "\n%U%-16v%16Ld %U bps",
+		    format_white_space, indent, n, vtotal.bytes,
+		    format_mbps_pps_1000, byte_rate * 8);
+
+	if (verbose)
+	  for (i = 0; i < vec_len (packets_rate); i++)
+	    {
+	      if (packets_rate[i] > 0)
+		s =
+		  format (s, "\n%U Thread %u %-10v: %U", format_white_space,
+			  indent + 12, i, vlib_worker_threads[i].name,
+			  format_mbps_pps_1000, bytes_rate[i] * 8);
+	    }
       }
     vec_free (n);
   }
@@ -274,23 +343,58 @@ format_vnet_sw_interface_cntrs (u8 * s, vnet_interface_main_t * im,
 
 	    v = vlib_get_simple_counter (cm, si->sw_if_index);
 	    vtotal += v;
+
+	    counter_t *last = if_counter->simple_per_thread[j];
+
+	    for (int k = 0; k < vec_len (last); k++)
+	      {
+		v =
+		  vlib_get_simple_counter_per_thread (cm, si->sw_if_index, k);
+
+		counter_t this_one = vec_elt (last, k);
+
+		counter_t tmp = v - this_one;
+		vec_elt (last, k) = v;
+
+		packets_rate[k] = tmp / duration;
+	      }
 	  }
 
 	/* Only display non-zero counters. */
 	if (vtotal == 0)
 	  continue;
 
+	counter_t tmp;
+	counter_t *last = &if_counter->simple_total[j];
+
+	tmp = vtotal - *last;
+	*last = vtotal;
+	f64 rate = tmp / duration;
+
 	if (n_printed > 0)
 	  s = format (s, "\n%U", format_white_space, indent);
 	n_printed += 1;
 
-	s = format (s, "%-16s%16Ld", cm->name, vtotal);
+	s =
+	  format (s, "%-16s%16Ld %U", cm->name, vtotal, format_mbps_pps_1000,
+		  rate);
+	if (verbose)
+	  for (i = 0; i < vec_len (packets_rate); i++)
+	    {
+	      if (packets_rate[i] > 0)
+		s =
+		  format (s, "\n%U Thread %u %-10v: %U", format_white_space,
+			  indent + 12, i, vlib_worker_threads[i].name,
+			  format_mbps_pps_1000, packets_rate[i]);
+	    }
       }
   }
 
+  vec_free (packets_rate);
+  vec_free (bytes_rate);
+
   return s;
 }
-
 static u8 *
 format_vnet_sw_interface_mtu (u8 * s, va_list * args)
 {
@@ -307,18 +411,19 @@ format_vnet_sw_interface (u8 * s, va_list * args)
   vnet_main_t *vnm = va_arg (*args, vnet_main_t *);
   vnet_sw_interface_t *si = va_arg (*args, vnet_sw_interface_t *);
   vnet_interface_main_t *im = &vnm->interface_main;
+  u8 verbose = va_arg (*args, u8 *);
 
   if (!si)
-    return format (s, "%=32s%=5s%=10s%=21s%=16s%=16s",
+    return format (s, "%=32s%=8s%=10s%=21s%=16s%=16s%=16s",
 		   "Name", "Idx", "State", "MTU (L3/IP4/IP6/MPLS)", "Counter",
-		   "Count");
+		   "Count", "Rate");
 
-  s = format (s, "%-32U%=5d%=10U%=21U",
+  s = format (s, "%-32U%=8d%=10U%=21U",
 	      format_vnet_sw_interface_name, vnm, si, si->sw_if_index,
 	      format_vnet_sw_interface_flags, si->flags,
 	      format_vnet_sw_interface_mtu, si);
 
-  s = format_vnet_sw_interface_cntrs (s, im, si);
+  s = format_vnet_sw_interface_cntrs (s, im, si, verbose);
 
   return s;
 }
@@ -341,7 +446,7 @@ format_vnet_sw_interface_name_override (u8 * s, va_list * args)
 	      name, si->sw_if_index,
 	      format_vnet_sw_interface_flags, si->flags);
 
-  s = format_vnet_sw_interface_cntrs (s, im, si);
+  s = format_vnet_sw_interface_cntrs (s, im, si, 0);
 
   return s;
 }

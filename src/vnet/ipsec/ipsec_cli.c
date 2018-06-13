@@ -72,7 +72,6 @@ ipsec_sa_add_del_command_fn (vlib_main_t * vm,
 			     unformat_input_t * input,
 			     vlib_cli_command_t * cmd)
 {
-  ipsec_main_t *im = &ipsec_main;
   unformat_input_t _line_input, *line_input = &_line_input;
   ipsec_sa_t sa;
   int is_add = ~0;
@@ -171,14 +170,6 @@ ipsec_sa_add_del_command_fn (vlib_main_t * vm,
 
   if (ik)
     strncpy ((char *) sa.integ_key, (char *) ik, sa.integ_key_len);
-
-  if (is_add)
-    {
-      ASSERT (im->cb.check_support_cb);
-      error = im->cb.check_support_cb (&sa);
-      if (error)
-	goto done;
-    }
 
   ipsec_add_del_sa (vm, &sa, is_add);
 
@@ -669,8 +660,8 @@ show_ipsec_command_fn (vlib_main_t * vm,
     hi = vnet_get_hw_interface (im->vnet_main, t->hw_if_index);
     vlib_cli_output(vm, "  %s seq", hi->name);
     sa = pool_elt_at_index(im->sad, t->output_sa_index);
-    vlib_cli_output(vm, "   seq %u seq-hi %u esn %u anti-replay %u udp-encap %u",
-                    sa->seq, sa->seq_hi, sa->use_esn, sa->use_anti_replay, sa->udp_encap);
+    vlib_cli_output(vm, "   sa-id %u salt %x seq %u seq-hi %u esn %u anti-replay %u",
+                    sa->id, sa->salt, sa->seq, sa->seq_hi, sa->use_esn, sa->use_anti_replay);
     vlib_cli_output(vm, "   local-spi %u local-ip %U", sa->spi,
                     format_ip4_address, &sa->tunnel_src_addr.ip4);
     vlib_cli_output(vm, "   local-crypto %U %U",
@@ -768,10 +759,10 @@ create_ipsec_tunnel_command_fn (vlib_main_t * vm,
 	num_m_args++;
       else if (unformat (line_input, "instance %u", &a.show_instance))
 	a.renumber = 1;
-      else if (unformat (line_input, "del"))
-	a.is_add = 0;
       else if (unformat (line_input, "udp-encap"))
 	a.udp_encap = 1;
+      else if (unformat (line_input, "del"))
+	a.is_add = 0;
       else
 	{
 	  error = clib_error_return (0, "unknown input `%U'",
@@ -901,6 +892,66 @@ VLIB_CLI_COMMAND (set_interface_key_command, static) = {
     .function = set_interface_key_command_fn,
 };
 /* *INDENT-ON* */
+
+static clib_error_t *
+debug_ipsec_output_command_fn (vlib_main_t * vm,
+			       unformat_input_t * input,
+			       vlib_cli_command_t * cmd)
+{
+  ipsec_main_t *im = &ipsec_main;
+  unformat_input_t _line_input, *line_input = &_line_input;
+  clib_error_t *error = 0;
+
+  /* Get a line of input. */
+  if (!unformat_user (input, unformat_line_input, line_input))
+    return 0;
+
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (line_input, "on"))
+	{
+	  if (im->debug_fformat == 0)
+	    {
+	      im->debug_fformat = 1;
+	    }
+	  else
+	    {
+	      vlib_cli_output (vm, "IPSEC debug_fformat already on...");
+	      break;
+	    }
+	}
+      else if (unformat (line_input, "off"))
+	{
+	  if (im->debug_fformat)
+	    {
+	      im->debug_fformat = 0;
+	    }
+	  else
+	    {
+	      vlib_cli_output (vm, "IPSEC debug_fformat already off...");
+	      break;
+	    }
+	}
+      else
+	{
+	  error = clib_error_return (0, "unknown input `%U'",
+				     format_unformat_error, line_input);
+	  break;
+	}
+    }
+  unformat_free (line_input);
+
+  return error;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (debug_ipsec_output_command, static) = {
+    .path = "debug ipsec output",
+    .short_help = "debug ipsec output [on|off]",
+    .function = debug_ipsec_output_command_fn,
+};
+/* *INDENT-ON* */
+
 
 clib_error_t *
 ipsec_cli_init (vlib_main_t * vm)

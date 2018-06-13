@@ -18,8 +18,19 @@
 #include <vnet/ip/ip.h>
 #include <vnet/feature/feature.h>
 
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
+#include <openssl/evp.h>
+#include <openssl/cmac.h>
+#include <openssl/engine.h>
+
+
+
 #define IPSEC_FLAG_IPSEC_GRE_TUNNEL (1 << 0)
 
+#if CLIB_DEBUG > 0
+#define IPSEC_DEBUG_OUTPUT
+#endif
 
 #define foreach_ipsec_output_next                \
 _(DROP, "error-drop")                            \
@@ -75,7 +86,9 @@ typedef enum
   _(8, AES_GCM_192, "aes-gcm-192")  \
   _(9, AES_GCM_256, "aes-gcm-256")  \
   _(10, DES_CBC, "des-cbc")         \
-  _(11, 3DES_CBC, "3des-cbc")
+  _(11, 3DES_CBC, "3des-cbc")       \
+  _(12, ZUC_EEA3, "zuc-eea3")       \
+  _(13, SNOW3G_UEA2, "snow3g-uea2") \
 
 typedef enum
 {
@@ -89,10 +102,15 @@ typedef enum
   _(0, NONE,  "none")                                                     \
   _(1, MD5_96, "md5-96")           /* RFC2403 */                          \
   _(2, SHA1_96, "sha1-96")         /* RFC2404 */                          \
-  _(3, SHA_256_96, "sha-256-96")   /* draft-ietf-ipsec-ciph-sha-256-00 */ \
-  _(4, SHA_256_128, "sha-256-128") /* RFC4868 */                          \
-  _(5, SHA_384_192, "sha-384-192") /* RFC4868 */                          \
-  _(6, SHA_512_256, "sha-512-256")	/* RFC4868 */
+  _(3, SHA_256_96, "sha-256-96")   /* draft-ietf-ipsec-ciph-sha-256-00 */ 			\
+  _(4, SHA_224_112, "sha-224-112") /* RFC 3874 */  												\
+  _(5, SHA_256_128, "sha-256-128") /* RFC4868 */                          \
+  _(6, SHA_384_192, "sha-384-192") /* RFC4868 */                          \
+  _(7, SHA_512_256, "sha-512-256")	/* RFC4868 */													\
+  _(8, AES_XCBC, "aes-xcbc")				/* RFC3566 */													\
+  _(9, AES_CMAC, "aes-cmac")	/* kingwel test only */ \
+  _(10, ZUC_EIA3, "zuc-eia3")	/* kingwel test only */ \
+  _(11, SNOW3G_UIA2, "snow3g-uia2")	/* kingwel test only */
 
 typedef enum
 {
@@ -110,6 +128,51 @@ typedef enum
 
 typedef struct
 {
+  const EVP_CIPHER *type;
+  u8 iv_size;
+  u8 block_size;
+} ipsec_proto_main_crypto_alg_t;
+
+typedef struct
+{
+  const EVP_MD *md;
+  u32 mac_size;
+  u32 trunc_size;
+} ipsec_proto_main_integ_alg_t;
+
+typedef struct
+{
+  ipsec_proto_main_crypto_alg_t *ipsec_proto_main_crypto_algs;
+  ipsec_proto_main_integ_alg_t *ipsec_proto_main_integ_algs;
+
+  xoshiro256starstar_t *rand_state;
+
+  struct
+  {
+    CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+    struct random_data data;
+    i8 buf[32];
+  } *rand_data;
+
+} ipsec_proto_main_t;
+
+typedef struct
+{
+  EVP_CIPHER_CTX *cipher_ctx;
+  HMAC_CTX *hmac_ctx;
+  CMAC_CTX *cmac_ctx;
+
+  /* context initialized by worker? */
+  u8 ctx_initialized;
+} ipsec_sa_per_thread_data_t;
+
+typedef struct
+{
+  /* Required for vec_validate_aligned */
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+
+  ipsec_sa_per_thread_data_t *context;
+
   u32 id;
   u32 spi;
   ipsec_protocol_t protocol;
@@ -157,6 +220,7 @@ typedef struct
 typedef struct
 {
   u8 is_add;
+  u8 udp_encap;
   u8 esn;
   u8 anti_replay;
   ip4_address_t local_ip, remote_ip;
@@ -174,7 +238,6 @@ typedef struct
   u8 remote_integ_key[128];
   u8 renumber;
   u32 show_instance;
-  u8 udp_encap;
 } ipsec_add_del_tunnel_args_t;
 
 typedef struct
@@ -220,9 +283,14 @@ typedef struct
 
 typedef struct
 {
-  u32 id;
+  /* Required for vec_validate_aligned */
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+
   /* pool of policies */
   ipsec_policy_t *policies;
+
+  u32 id;
+
   /* vectors of policy indices */
   u32 *ipv4_outbound_policies;
   u32 *ipv6_outbound_policies;
@@ -255,7 +323,7 @@ typedef struct
 typedef struct
 {
   clib_error_t *(*add_del_sa_sess_cb) (u32 sa_index, u8 is_add);
-  clib_error_t *(*check_support_cb) (ipsec_sa_t * sa);
+  clib_error_t *(*update_sa_sess_cb) (u32 sa_index);
 } ipsec_main_callbacks_t;
 
 typedef struct
@@ -267,8 +335,6 @@ typedef struct
   /* pool of tunnel interfaces */
   ipsec_tunnel_if_t *tunnel_interfaces;
   u32 *free_tunnel_if_indices;
-
-  u32 **empty_buffers;
 
   uword *tunnel_index_by_key;
 
@@ -301,16 +367,18 @@ typedef struct
   /* callbacks */
   ipsec_main_callbacks_t cb;
 
-  /* helper for sort function */
-  ipsec_spd_t *spd_to_sort;
+  /* debug fformat, generate HEXDUMP  */
+  u8 debug_fformat;
 } ipsec_main_t;
 
 extern ipsec_main_t ipsec_main;
+extern ipsec_proto_main_t ipsec_proto_main;
 
 extern vlib_node_registration_t esp_encrypt_node;
 extern vlib_node_registration_t esp_decrypt_node;
 extern vlib_node_registration_t ah_encrypt_node;
 extern vlib_node_registration_t ah_decrypt_node;
+extern vlib_node_registration_t ipsec_if_output_node;
 extern vlib_node_registration_t ipsec_if_input_node;
 
 
@@ -327,6 +395,7 @@ int ipsec_set_sa_key (vlib_main_t * vm, ipsec_sa_t * sa_update);
 
 u32 ipsec_get_sa_index_by_sa_id (u32 sa_id);
 u8 ipsec_is_sa_used (u32 sa_index);
+u8 *format_ipsec_if_output_trace (u8 * s, va_list * args);
 u8 *format_ipsec_policy_action (u8 * s, va_list * args);
 u8 *format_ipsec_crypto_alg (u8 * s, va_list * args);
 u8 *format_ipsec_integ_alg (u8 * s, va_list * args);
@@ -347,31 +416,12 @@ int ipsec_set_interface_key (vnet_main_t * vnm, u32 hw_if_index,
 int ipsec_set_interface_sa (vnet_main_t * vnm, u32 hw_if_index, u32 sa_id,
 			    u8 is_outbound);
 
+/* per sa context */
+void ipsec_set_sa_contexts_integ_key (ipsec_sa_t * sa);
+void ipsec_set_sa_contexts_crypto_key (ipsec_sa_t * sa);
+void ipsec_create_sa_contexts (ipsec_sa_t * sa);
+void ipsec_delete_sa_contexts (ipsec_sa_t * sa);
 
-/*
- *  inline functions
- */
-
-always_inline void
-ipsec_alloc_empty_buffers (vlib_main_t * vm, ipsec_main_t * im)
-{
-  u32 thread_index = vm->thread_index;
-  uword l = vec_len (im->empty_buffers[thread_index]);
-  uword n_alloc = 0;
-
-  if (PREDICT_FALSE (l < VLIB_FRAME_SIZE))
-    {
-      if (!im->empty_buffers[thread_index])
-	{
-	  vec_alloc (im->empty_buffers[thread_index], 2 * VLIB_FRAME_SIZE);
-	}
-
-      n_alloc = vlib_buffer_alloc (vm, im->empty_buffers[thread_index] + l,
-				   2 * VLIB_FRAME_SIZE - l);
-
-      _vec_len (im->empty_buffers[thread_index]) = l + n_alloc;
-    }
-}
 
 static_always_inline u32
 get_next_output_feature_node_index (vlib_buffer_t * b,
@@ -384,6 +434,61 @@ get_next_output_feature_node_index (vlib_buffer_t * b,
   vnet_feature_next (&next, b);
   return node->next_nodes[next];
 }
+
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
+static_always_inline HMAC_CTX *
+HMAC_CTX_new (void)
+{
+  HMAC_CTX *ctx = OPENSSL_malloc (sizeof (*ctx));
+
+  if (ctx != NULL)
+    HMAC_CTX_init (ctx);
+  return ctx;
+}
+
+static_always_inline void
+HMAC_CTX_free (HMAC_CTX * ctx)
+{
+  if (ctx != NULL)
+    {
+      HMAC_CTX_cleanup (ctx);
+      OPENSSL_free (ctx);
+    }
+}
+#endif
+
+
+
+static_always_inline void
+ipsec_make_sa_contexts (u8 thread_id, ipsec_sa_t * sa, u8 is_outbound)
+{
+  if (PREDICT_TRUE (sa->context[thread_id].ctx_initialized))
+    return;
+
+  ipsec_proto_main_t *em = &ipsec_proto_main;
+
+  const EVP_MD *md = em->ipsec_proto_main_integ_algs[sa->integ_alg].md;
+  const EVP_CIPHER *cipher =
+    em->ipsec_proto_main_crypto_algs[sa->crypto_alg].type;
+
+  if (!sa->context[thread_id].hmac_ctx)
+    sa->context[thread_id].hmac_ctx = HMAC_CTX_new ();
+  if (!sa->context[thread_id].cipher_ctx)
+    sa->context[thread_id].cipher_ctx = EVP_CIPHER_CTX_new ();
+  if (!sa->context[thread_id].cmac_ctx)
+    sa->context[thread_id].cmac_ctx = CMAC_CTX_new ();
+
+  HMAC_Init_ex (sa->context[thread_id].hmac_ctx, sa->integ_key,
+		sa->integ_key_len, md, NULL);
+  EVP_CipherInit_ex (sa->context[thread_id].cipher_ctx, cipher, NULL,
+		     sa->crypto_key, NULL, is_outbound > 0 ? 1 : 0);
+  EVP_CIPHER_CTX_set_padding (sa->context[thread_id].cipher_ctx, 0);
+  CMAC_Init (sa->context[thread_id].cmac_ctx, sa->integ_key, 16,
+	     EVP_aes_128_cbc (), NULL);
+
+  sa->context[thread_id].ctx_initialized = 1;
+}
+
 
 #endif /* __IPSEC_H__ */
 

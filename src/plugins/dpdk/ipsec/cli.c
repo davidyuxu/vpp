@@ -18,6 +18,24 @@
 #include <dpdk/ipsec/ipsec.h>
 
 static u8 *
+format_crypto_resource (u8 * s, va_list * args)
+{
+  dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
+
+  u32 indent = va_arg (*args, u32);
+  u32 res_idx = va_arg (*args, u32);
+
+  crypto_resource_t *res = vec_elt_at_index (dcm->resource, res_idx);
+
+  s =
+    format (s, "%U numa %2u thr_id %3d qp %2u/%-2u inflight %2u/%-2u\n",
+	    format_white_space, indent, res->numa, (i16) res->thread_idx,
+	    res->qp_id, res->qp_id + 1, res->inflights[0], res->inflights[1]);
+
+  return s;
+}
+
+static u8 *
 format_crypto (u8 * s, va_list * args)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
@@ -29,9 +47,11 @@ format_crypto (u8 * s, va_list * args)
 
   s = format (s, "%-25s%-20s%-10s\n", dev->name, drv->name,
 	      rte_cryptodevs[dev->id].data->dev_started ? "up" : "down");
-  s = format (s, "  numa_node %u, max_queues %u\n", dev->numa, dev->max_qp);
-  s = format (s, "  free_resources %u, used_resources %u\n",
-	      vec_len (dev->free_resources), vec_len (dev->used_resources));
+  s =
+    format (s,
+	    "  id %u drv_id %u numa_node %u, max_queues %u, max_nb_sessions %u, max_nb_sessions_per_qp %u \n",
+	    dev->id, dev->drv_id, dev->numa, dev->max_qp,
+	    dev->max_nb_sessions, dev->max_nb_sessions_per_qp);
 
   if (dev->features)
     {
@@ -67,10 +87,76 @@ format_crypto (u8 * s, va_list * args)
 	s = format (s, "%s%s", pre, dcm->auth_algs[i].name);
 	pre = ", ";
       }
-  s = format (s, "\n\n");
+  s = format (s, "\n");
+
+  struct rte_cryptodev_stats stats;
+  rte_cryptodev_stats_get (dev->id, &stats);
+
+  s =
+    format (s,
+	    "  enqueue %-10lu dequeue %-10lu enqueue_err %-10lu dequeue_err %-10lu \n",
+	    stats.enqueued_count, stats.dequeued_count,
+	    stats.enqueue_err_count, stats.dequeue_err_count);
+
+  /* *INDENT-OFF* */
+	u16 *res_idx;
+  s = format (s, "  free_resources %u :", vec_len (dev->free_resources));
+
+	u32 indent = format_get_indent (s);
+
+  s = format (s, "\n");
+
+  vec_foreach (res_idx, dev->free_resources)
+    format (s, "%U", format_crypto_resource, indent, res_idx[0]);
+
+  s = format (s, "  used_resources %u :", vec_len (dev->used_resources));
+	indent = format_get_indent (s);
+
+  s = format (s, "\n");
+
+  vec_foreach (res_idx, dev->used_resources)
+    format (s, "%U", format_crypto_resource, indent, res_idx[0]);
+  /* *INDENT-ON* */
+
+  s = format (s, "\n");
 
   return s;
 }
+
+
+static clib_error_t *
+clear_crypto_stats_fn (vlib_main_t * vm, unformat_input_t * input,
+		       vlib_cli_command_t * cmd)
+{
+  dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
+  crypto_dev_t *dev;
+
+  /* *INDENT-OFF* */
+  vec_foreach (dev, dcm->dev)
+    rte_cryptodev_stats_reset (dev->id);
+  /* *INDENT-ON* */
+
+  return NULL;
+}
+
+/*?
+ * This command is used to clear the DPDK Crypto device statistics.
+ *
+ * @cliexpar
+ * Example of how to clear the DPDK Crypto device statistics:
+ * @cliexsart{clear dpdk crypto devices statistics}
+ * vpp# clear dpdk crypto devices statistics
+ * @cliexend
+ * Example of clearing the DPDK Crypto device statistic data:
+ * @cliexend
+?*/
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (clear_dpdk_crypto_stats, static) = {
+    .path = "clear dpdk crypto devices statistics",
+    .short_help = "clear dpdk crypto devices statistics",
+    .function = clear_crypto_stats_fn,
+};
+
 
 static clib_error_t *
 show_dpdk_crypto_fn (vlib_main_t * vm, unformat_input_t * input,
@@ -84,7 +170,7 @@ show_dpdk_crypto_fn (vlib_main_t * vm, unformat_input_t * input,
     vlib_cli_output (vm, "%U", format_crypto, dev);
   /* *INDENT-ON* */
 
-  return NULL;
+return NULL;
 }
 
 /*?
@@ -141,8 +227,8 @@ format_crypto_worker (u8 * s, va_list * args)
     {
       ind = "  ";
       res = vec_elt_at_index (dcm->resource, res_idx[0]);
-      s = format (s, "%s%-20s dev-id %2u inbound-queue %2u outbound-queue %2u\n",
-		  ind, vec_elt_at_index (dcm->dev, res->dev_id)->name,
+      s = format (s, "%s%-20s res-idx %3u dev-id %2u inbound-queue %2u outbound-queue %2u\n",
+		  ind, vec_elt_at_index (dcm->dev, res->dev_id)->name, res_idx[0],
 		  res->dev_id, res->qp_id, res->qp_id + 1);
 
       ind = "    ";
@@ -528,17 +614,16 @@ show_dpdk_crypto_pools_fn (vlib_main_t * vm,
   crypto_data_t *data;
 
   /* *INDENT-OFF* */
-  vec_foreach (data, dcm->data)
+  vec_foreach (data, dcm->per_numa_data)
   {
     if (data->crypto_op)
       vlib_cli_output (vm, "%U\n", format_dpdk_mempool, data->crypto_op);
     if (data->session_h)
       vlib_cli_output (vm, "%U\n", format_dpdk_mempool, data->session_h);
+    if (data->session_drv)
+      vlib_cli_output (vm, "%U\n", format_dpdk_mempool, data->session_drv);
 
-    struct rte_mempool **mp;
-    vec_foreach (mp, data->session_drv)
-      if (mp[0])
-	vlib_cli_output (vm, "%U\n", format_dpdk_mempool, mp[0]);
+		vlib_cli_output (vm, " sess-fail %10u drv-fail %10u\n\n", data->session_h_failed, data->session_drv_failed);
   }
   /* *INDENT-ON* */
 

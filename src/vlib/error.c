@@ -191,7 +191,7 @@ vlib_register_errors (vlib_main_t * vm,
   oldheap = vlib_stats_push_heap ();
 
   /* Allocate a counter/elog type for each error. */
-  vec_validate (em->counters, l - 1);
+  vec_validate_aligned (em->counters, l - 1, CLIB_CACHE_LINE_BYTES);
 
   /* Zero counters for re-registrations of errors. */
   if (n->error_heap_index + n_errors <= vec_len (em->counters_last_clear))
@@ -250,45 +250,62 @@ show_errors (vlib_main_t * vm,
   else if (unformat (input, "verbose"))
     verbose = 1;
 
-  vec_validate (sums, vec_len (em->counters));
+  /* kingwel make sure rate counters have enough space */
+  f64 duration;
+  u64 *tmp = 0;
+  u64 *tmp_sum = 0;
 
   if (verbose)
-    vlib_cli_output (vm, "%=10s%=40s%=20s%=6s", "Count", "Node", "Reason",
-		     "Index");
+    vlib_cli_output (vm, "%=10s%=15s%=40s%-28s%=10s", "Count", "Rate", "Node",
+		     "Reason", "Index");
   else
-    vlib_cli_output (vm, "%=10s%=40s%=6s", "Count", "Node", "Reason");
+    vlib_cli_output (vm, "%=10s%=15s%=40s%-28s", "Count", "Rate", "Node",
+		     "Reason");
 
+
+  duration = vlib_time_now (vm) - em->last_show_time;
+  em->last_show_time = vlib_time_now (vm);
 
   /* *INDENT-OFF* */
   foreach_vlib_main(({
+
     em = &this_vlib_main->error_main;
 
+		int len = vec_len (em->counters);
+
+		vec_validate (sums, len - 1);
+		vec_validate (tmp, len - 1);
+		vec_validate (tmp_sum, len - 1);
+		vec_validate_aligned (em->rate_counters, len - 1, CLIB_CACHE_LINE_BYTES);
+
     if (verbose)
-      vlib_cli_output(vm, "Thread %u (%v):", index,
-                      vlib_worker_threads[index].name);
+      vlib_cli_output(vm, "Thread %u (%v):", index, vlib_worker_threads[index].name);
 
     for (ni = 0; ni < vec_len (this_vlib_main->node_main.nodes); ni++)
-      {
-	n = vlib_get_node (this_vlib_main, ni);
-	for (code = 0; code < n->n_errors; code++)
-	  {
-	    i = n->error_heap_index + code;
-	    c = em->counters[i];
-	    if (i < vec_len (em->counters_last_clear))
-	      c -= em->counters_last_clear[i];
-	    sums[i] += c;
+    {
+			n = vlib_get_node (this_vlib_main, ni);
+			for (code = 0; code < n->n_errors; code++)
+		  {
+		    i = n->error_heap_index + code;
+		    c = em->counters[i];
+		    if (i < vec_len (em->counters_last_clear))
+		      c -= em->counters_last_clear[i];
+		    sums[i] += c;
 
-	    if (c == 0 && verbose < 2)
-	      continue;
+				tmp[i] = em->counters[i] - em->rate_counters[i];
+				tmp_sum[i] += tmp[i];
+		    if (c == 0 && verbose < 2)
+		      continue;
 
-            if (verbose)
-              vlib_cli_output (vm, "%10Ld%=40v%=20s%=6d", c, n->name,
-                               em->error_strings_heap[i], i);
-            else
-              vlib_cli_output (vm, "%10d%=40v%s", c, n->name,
-                               em->error_strings_heap[i]);
-	  }
-      }
+	      vlib_cli_output (vm, "%10Ld %U   %=40v%-28s%=10d", c, format_mbps_pps, tmp[i]/duration, n->name,
+	                       em->error_strings_heap[i], i);
+		  }
+    }
+
+
+		/* remember what we got this time */
+		vec_copy (em->rate_counters, em->counters);
+
     index++;
   }));
   /* *INDENT-ON* */
@@ -305,13 +322,17 @@ show_errors (vlib_main_t * vm,
 	  if (sums[i])
 	    {
 	      if (verbose)
-		vlib_cli_output (vm, "%10Ld%=40v%=20s%=10d", sums[i], n->name,
-				 em->error_strings_heap[i], i);
+		vlib_cli_output (vm, "%10Ld %U   %=40v%-28s%=10d", sums[i],
+				 format_mbps_pps, tmp_sum[i] / duration,
+				 n->name, em->error_strings_heap[i], i);
 	    }
 	}
     }
 
   vec_free (sums);
+
+  vec_free (tmp);
+  vec_free (tmp_sum);
 
   return 0;
 }
@@ -342,7 +363,7 @@ clear_error_counters (vlib_main_t * vm,
   /* *INDENT-OFF* */
   foreach_vlib_main(({
     em = &this_vlib_main->error_main;
-    vec_validate (em->counters_last_clear, vec_len (em->counters) - 1);
+    vec_validate_aligned (em->counters_last_clear, vec_len (em->counters) - 1, CLIB_CACHE_LINE_BYTES);
     for (i = 0; i < vec_len (em->counters); i++)
       em->counters_last_clear[i] = em->counters[i];
   }));

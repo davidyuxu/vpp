@@ -873,7 +873,12 @@ dpdk_bind_devices_to_uio (dpdk_config_main_t * conf)
       ;
     /* all Intel network devices */
     else if (d->vendor_id == 0x8086 && d->device_class == PCI_CLASS_NETWORK_ETHERNET)
-      ;
+      {
+        clib_warning ("Skip Intel Network PCI device 0x%04x:0x%04x found "
+		  "at PCI address %s\n", (u16) d->vendor_id, (u16) d->device_id,
+		  pci_addr);
+        //continue;
+      }
     /* all Intel QAT devices VFs */
     else if (d->vendor_id == 0x8086 && d->device_class == PCI_CLASS_PROCESSOR_CO &&
         (d->device_id == 0x0443 || d->device_id == 0x37c9 || d->device_id == 0x19e3))
@@ -1031,6 +1036,7 @@ dpdk_device_config (dpdk_config_main_t * conf, vlib_pci_addr_t pci_addr,
   return error;
 }
 
+#if 0
 static clib_error_t *
 dpdk_log_read_ready (clib_file_t * uf)
 {
@@ -1061,6 +1067,7 @@ dpdk_log_read_ready (clib_file_t * uf)
   unformat_free (&input);
   return 0;
 }
+#endif
 
 static clib_error_t *
 dpdk_config (vlib_main_t * vm, unformat_input_t * input)
@@ -1410,6 +1417,7 @@ dpdk_config (vlib_main_t * vm, unformat_input_t * input)
   /* Set up DPDK eal and packet mbuf pool early. */
 
   rte_log_set_global_level (log_level);
+#if 0  
   int log_fds[2] = { 0 };
   if (pipe (log_fds) == 0)
     {
@@ -1431,6 +1439,7 @@ dpdk_config (vlib_main_t * vm, unformat_input_t * input)
 	  close (log_fds[1]);
 	}
     }
+#endif
 
   vm = vlib_get_main ();
 

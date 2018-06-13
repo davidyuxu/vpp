@@ -384,6 +384,27 @@ typedef struct
       u64 pg_replay_timestamp;
     };
     u32 unused[10];
+
+    struct
+    {
+      struct
+      {
+	u32 count;
+	u32 sn;
+	u8 integrity_status;
+	u8 bypass_reorder;
+	u8 dir;
+	u8 reserved;
+      } pdcp;
+
+      struct
+      {
+	u8 sb_num;
+	u8 sb_id[3];
+      } path;
+
+      u32 tunnel_id[VLIB_N_RX_TX_TUNNEL];
+    } ppf_du_metadata;
   };
 } vnet_buffer_opaque2_t;
 
