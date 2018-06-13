@@ -147,6 +147,14 @@ if ENABLE_UNITTEST_PLUGIN
 include unittest.am
 endif
 
+if ENABLE_GTPLO_PLUGIN
+include gtplo.am
+endif
+
+if ENABLE_PPFU_PLUGIN
+include ppfu.am
+endif
+
 include ../suffix-rules.mk
 
 # Remove *.la files

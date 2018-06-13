@@ -41,6 +41,12 @@ static BVT(clib_bihash) **adj_nbr_tables[FIB_PROTOCOL_MAX];
     (((_itf) < vec_len(adj_nbr_tables[_proto])) &&	\
      (NULL != adj_nbr_tables[_proto][sw_if_index]))
 
+/* Allow all p2p interfaces to use a separate mheap, by Jordy */
+uword adj_nbr_mheap_size = 0;
+static void *adj_nbr_mheap_p2p = NULL;
+#define ADJ_NBR_P2P_HASH_NUM_BUCKETS (1)
+#define ADJ_NBR_P2P_HASH_MEMORY_SIZE (32<<20)
+
 static void
 adj_nbr_insert (fib_protocol_t nh_proto,
 		vnet_link_t link_type,
@@ -63,6 +69,13 @@ adj_nbr_insert (fib_protocol_t nh_proto,
 	       0,
 	       sizeof(BVT(clib_bihash)));
 
+	if (vnet_sw_interface_is_p2p(vnet_get_main(), sw_if_index)) {
+		BV(clib_bihash_set_mheap) (adj_nbr_tables[nh_proto][sw_if_index], adj_nbr_mheap_p2p);
+		BV(clib_bihash_init) (adj_nbr_tables[nh_proto][sw_if_index],
+				      "Adjacency Neighbour table",
+				      ADJ_NBR_P2P_HASH_NUM_BUCKETS,
+				      ADJ_NBR_P2P_HASH_MEMORY_SIZE);
+	} else
 	BV(clib_bihash_init) (adj_nbr_tables[nh_proto][sw_if_index],
 			      "Adjacency Neighbour table",
 			      ADJ_NBR_DEFAULT_HASH_NUM_BUCKETS,
@@ -116,6 +129,56 @@ adj_nbr_find (fib_protocol_t nh_proto,
 	return (kv.value);
     }
 }
+
+static clib_error_t *
+dump_adj_hash (vlib_main_t * vm,
+             unformat_input_t * input, vlib_cli_command_t * cmd)
+{
+  vnet_main_t *vnm = vnet_get_main();
+  u32 sw_if_index = ~0;
+  fib_protocol_t proto;
+  int verbose = 0;
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat (input, "%U", unformat_vnet_sw_interface, vnm, &sw_if_index))
+	;
+    else if (unformat (input, "verbose"))
+	verbose = 1;
+    else
+    	break;
+  }
+
+  if (~0 == sw_if_index) {
+    vlib_cli_output (vm, "P2p Adj mheap:\n %U\n",
+	      format_mheap, adj_nbr_mheap_p2p, verbose);
+    return 0;
+  }
+
+  FOR_EACH_FIB_PROTOCOL (proto)
+  {
+    if (!ADJ_NBR_ITF_OK(proto, sw_if_index)) {
+      vlib_cli_output (vm, "No Hash Table for proto %U, interface %U\n",
+  	      format_fib_protocol, proto,
+  	      format_vnet_sw_interface_name,
+  	      vnm, vnet_get_sw_interface(vnm, sw_if_index));
+      continue;
+    }
+    
+    vlib_cli_output (vm, "Adj Hash Table for proto %U, interface %U:\n%U\n",
+        	format_fib_protocol, proto,
+        	format_vnet_sw_interface_name,
+        	vnm, vnet_get_sw_interface(vnm, sw_if_index),
+    		BV (format_bihash), adj_nbr_tables[proto][sw_if_index], verbose);
+  }
+
+  return 0;
+}
+
+VLIB_CLI_COMMAND (dump_adj_hash_command, static) = {
+    .path = "dump adj-hash",
+    .short_help = "dump adj-hash <interface> [verbose]",
+    .function = dump_adj_hash,
+};
 
 static inline u32
 adj_get_nd_node (fib_protocol_t proto)
@@ -1096,4 +1159,9 @@ adj_nbr_module_init (void)
     dpo_register(DPO_ADJACENCY_INCOMPLETE,
                  &adj_nbr_incompl_dpo_vft,
                  nbr_incomplete_nodes);
+
+    if (0 == adj_nbr_mheap_size)
+      adj_nbr_mheap_size = ADJ_NBR_P2P_HASH_MEMORY_SIZE;
+
+    adj_nbr_mheap_p2p = mheap_alloc (0 /* use VM */ , adj_nbr_mheap_size);
 }

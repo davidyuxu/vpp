@@ -115,6 +115,23 @@ static void vl_api_gtpu_add_del_tunnel_reply_t_handler
     }
 }
 
+static void vl_api_gtpu_add_del_tunnel_v2_reply_t_handler
+  (vl_api_gtpu_add_del_tunnel_v2_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  i32 retval = ntohl (mp->retval);
+  if (vam->async_mode)
+    {
+      vam->async_errors += (retval < 0);
+    }
+  else
+    {
+      vam->retval = retval;
+      vam->sw_if_index = ntohl (mp->sw_if_index);
+      vam->result_ready = 1;
+    }
+}
+
 
 #define foreach_standard_reply_retval_handler   \
     _(sw_interface_set_gtpu_bypass_reply)
@@ -142,6 +159,7 @@ static void vl_api_gtpu_add_del_tunnel_reply_t_handler
 #define foreach_vpe_api_reply_msg                               \
   _(SW_INTERFACE_SET_GTPU_BYPASS_REPLY, sw_interface_set_gtpu_bypass_reply) \
   _(GTPU_ADD_DEL_TUNNEL_REPLY, gtpu_add_del_tunnel_reply)               \
+  _(GTPU_ADD_DEL_TUNNEL_V2_REPLY, gtpu_add_del_tunnel_v2_reply)               \
   _(GTPU_TUNNEL_DETAILS, gtpu_tunnel_details)
 
 
@@ -227,6 +245,166 @@ static uword unformat_gtpu_decap_next
   else
     return 0;
   return 1;
+}
+
+static int
+api_gtpu_add_del_tunnel_v2 (vat_main_t * vam)
+{
+  unformat_input_t *line_input = vam->input;
+  vl_api_gtpu_add_del_tunnel_v2_t *mp;
+  ip46_address_t src, dst, inner;
+  u8 is_add = 1;
+  u8 ipv4_set = 0, ipv6_set = 0;
+  u8 src_set = 0;
+  u8 dst_set = 0;
+  u8 grp_set = 0;
+  u8 inner_set = 0;
+  u32 mcast_sw_if_index = ~0;
+  u32 encap_vrf_id = 0;
+  u32 decap_next_index = ~0;
+  u32 teid = 0;
+  int ret;
+
+  /* Can't "universally zero init" (={0}) due to GCC bug 53119 */
+  memset (&src, 0, sizeof src);
+  memset (&dst, 0, sizeof dst);
+
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (line_input, "del"))
+      is_add = 0;
+      else
+      if (unformat (line_input, "src %U", unformat_ip4_address, &src.ip4))
+      {
+	ipv4_set = 1;
+	src_set = 1;
+      }
+      else
+      if (unformat (line_input, "dst %U", unformat_ip4_address, &dst.ip4))
+      {
+	ipv4_set = 1;
+	dst_set = 1;
+      }
+      else
+      if (unformat (line_input, "src %U", unformat_ip6_address, &src.ip6))
+      {
+	ipv6_set = 1;
+	src_set = 1;
+      }
+    else
+    if (unformat (line_input, "inner_addr %U", unformat_ip4_address, &inner.ip4))
+    {
+  inner_set = 1;
+    }
+      else
+      if (unformat (line_input, "dst %U", unformat_ip6_address, &dst.ip6))
+      {
+	ipv6_set = 1;
+	dst_set = 1;
+      }
+      else if (unformat (line_input, "group %U %U",
+		       unformat_ip4_address, &dst.ip4,
+		       api_unformat_sw_if_index, vam, &mcast_sw_if_index))
+      {
+	grp_set = dst_set = 1;
+	ipv4_set = 1;
+      }
+      else if (unformat (line_input, "group %U",
+		       unformat_ip4_address, &dst.ip4))
+      {
+	grp_set = dst_set = 1;
+	ipv4_set = 1;
+      }
+      else if (unformat (line_input, "group %U %U",
+		       unformat_ip6_address, &dst.ip6,
+		       api_unformat_sw_if_index, vam, &mcast_sw_if_index))
+      {
+	grp_set = dst_set = 1;
+	ipv6_set = 1;
+      }
+      else if (unformat (line_input, "group %U",
+		       unformat_ip6_address, &dst.ip6))
+      {
+	grp_set = dst_set = 1;
+	ipv6_set = 1;
+      }
+      else
+      if (unformat (line_input, "mcast_sw_if_index %u", &mcast_sw_if_index))
+      ;
+      else if (unformat (line_input, "encap-vrf-id %d", &encap_vrf_id))
+      ;
+      else if (unformat (line_input, "decap-next %U",
+		       unformat_gtpu_decap_next, &decap_next_index))
+      ;
+      else if (unformat (line_input, "teid %d", &teid))
+      ;
+      else
+      {
+	errmsg ("parse error '%U'", format_unformat_error, line_input);
+	return -99;
+      }
+    }
+
+  if (src_set == 0)
+    {
+      errmsg ("tunnel src address not specified");
+      return -99;
+    }
+  if (dst_set == 0)
+    {
+      errmsg ("tunnel dst address not specified");
+      return -99;
+    }
+
+  if (grp_set && !ip46_address_is_multicast (&dst))
+    {
+      errmsg ("tunnel group address not multicast");
+      return -99;
+    }
+  if (grp_set && mcast_sw_if_index == ~0)
+    {
+      errmsg ("tunnel nonexistent multicast device");
+      return -99;
+    }
+  if (grp_set == 0 && ip46_address_is_multicast (&dst))
+    {
+      errmsg ("tunnel dst address must be unicast");
+      return -99;
+    }
+
+
+  if (ipv4_set && ipv6_set)
+    {
+      errmsg ("both IPv4 and IPv6 addresses specified");
+      return -99;
+    }
+
+  M (GTPU_ADD_DEL_TUNNEL_V2, mp);
+
+  if(inner_set) {
+    clib_memcpy (mp->dst_address_r, &inner.ip4, sizeof (inner.ip4));
+  }
+
+  if (ipv6_set)
+    {
+      clib_memcpy (mp->src_address, &src.ip6, sizeof (src.ip6));
+      clib_memcpy (mp->dst_address, &dst.ip6, sizeof (dst.ip6));
+    }
+  else
+    {
+      clib_memcpy (mp->src_address, &src.ip4, sizeof (src.ip4));
+      clib_memcpy (mp->dst_address, &dst.ip4, sizeof (dst.ip4));
+    }
+  mp->encap_vrf_id = ntohl (encap_vrf_id);
+  mp->decap_next_index = ntohl (decap_next_index);
+  mp->mcast_sw_if_index = ntohl (mcast_sw_if_index);
+  mp->teid = ntohl (teid);
+  mp->is_add = is_add;
+  mp->is_ipv6 = ipv6_set;
+
+  S (mp);
+  W (ret);
+  return ret;
 }
 
 static int
@@ -447,6 +625,10 @@ _(gtpu_add_del_tunnel,                                                 \
         "src <ip-addr> { dst <ip-addr> | group <mcast-ip-addr>\n"      \
         "{ <intfc> | mcast_sw_if_index <nn> } }\n"                     \
         "teid <teid> [encap-vrf-id <nn>] [decap-next <l2|nn>] [del]")  \
+_(gtpu_add_del_tunnel_v2,                                                 \
+        "src <ip-addr> { dst <ip-addr> | group <mcast-ip-addr>\n"      \
+        "{ <intfc> | mcast_sw_if_index <nn> } }\n"                     \
+        "teid <teid> [encap-vrf-id <nn>] [decap-next <l2|nn>] inner_addr <inner_addr> [del]")  \
 _(gtpu_tunnel_dump, "[<intfc> | sw_if_index <nn>]")                    \
 
 static void

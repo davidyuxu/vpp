@@ -597,6 +597,44 @@ vnet_create_sw_interface_no_callbacks (vnet_main_t * vnm,
   return sw_if_index;
 }
 
+static void
+vnet_create_sw_interface_couter_rate (vnet_main_t * vnm, u32 sw_if_index,
+				      int no_rate)
+{
+  vnet_interface_main_t *im = &vnm->interface_main;
+
+  vnet_sw_interface_t *sw =
+    pool_elt_at_index (im->sw_interfaces, sw_if_index);
+
+  if (no_rate)
+    {
+      sw->counter_index = ~0;
+    }
+  else
+    {
+      vnet_interface_counter_t *c;
+      u32 index;
+
+      pool_get_aligned (im->instant_if_counters, c, CLIB_CACHE_LINE_BYTES);
+
+      index = c - im->instant_if_counters;
+
+      sw->counter_index = index;
+
+      vlib_thread_main_t *tm = vlib_get_thread_main ();
+
+      for (int i = 0; i < VNET_N_COMBINED_INTERFACE_COUNTER; i++)
+	{
+	  vec_validate (c->combined_per_thread[i], tm->n_vlib_mains - 1);
+	}
+      for (int i = 0; i < VNET_N_SIMPLE_INTERFACE_COUNTER; i++)
+	{
+	  vec_validate (c->simple_per_thread[i], tm->n_vlib_mains - 1);
+	}
+    }
+
+}
+
 clib_error_t *
 vnet_create_sw_interface (vnet_main_t * vnm, vnet_sw_interface_t * template,
 			  u32 * sw_if_index)
@@ -619,6 +657,14 @@ vnet_create_sw_interface (vnet_main_t * vnm, vnet_sw_interface_t * template,
     }
 
   *sw_if_index = vnet_create_sw_interface_no_callbacks (vnm, template);
+
+  /* kingwel, create counter for pps &  bps */
+  vnet_create_sw_interface_couter_rate (vnm, *sw_if_index,
+					vnet_get_hw_interface_class (vnm,
+								     hi->hw_class_index)->flags
+					&
+					VNET_HW_INTERFACE_CLASS_FLAG_NO_RATE);
+
   error = vnet_sw_interface_set_flags_helper
     (vnm, *sw_if_index, template->flags,
      VNET_INTERFACE_SET_FLAGS_HELPER_IS_CREATE);
@@ -819,6 +865,11 @@ vnet_register_interface (vnet_main_t * vnm,
     };
     hw->sw_if_index = vnet_create_sw_interface_no_callbacks (vnm, &sw);
   }
+
+  /* kingwel, create counter for pps &  bps */
+  vnet_create_sw_interface_couter_rate (vnm, hw->sw_if_index,
+					hw_class->flags &
+					VNET_HW_INTERFACE_CLASS_FLAG_NO_RATE);
 
   hw->dev_class_index = dev_class_index;
   hw->dev_instance = dev_instance;
@@ -1303,6 +1354,16 @@ vnet_sw_interface_is_p2p (vnet_main_t * vnm, u32 sw_if_index)
   return (hc->flags & VNET_HW_INTERFACE_CLASS_FLAG_P2P);
 }
 
+int
+vnet_sw_interface_has_rate (vnet_main_t * vnm, u32 sw_if_index)
+{
+  vnet_hw_interface_t *hw = vnet_get_sup_hw_interface (vnm, sw_if_index);
+  vnet_hw_interface_class_t *hc =
+    vnet_get_hw_interface_class (vnm, hw->hw_class_index);
+
+  return (!(hc->flags & VNET_HW_INTERFACE_CLASS_FLAG_NO_RATE));
+}
+
 clib_error_t *
 vnet_interface_init (vlib_main_t * vm)
 {
@@ -1311,6 +1372,14 @@ vnet_interface_init (vlib_main_t * vm)
   vlib_buffer_t *b = 0;
   vnet_buffer_opaque_t *o = 0;
   clib_error_t *error;
+
+  /* Init interface pool, by Jordy */
+  if (vm->max_interfaces)
+    {
+      pool_alloc (im->hw_interfaces, vm->max_interfaces);
+      pool_init (im->sw_interfaces, vm->max_interfaces);
+      //pool_alloc (im->instant_if_counters, vm->max_interfaces);
+    }
 
   /*
    * Keep people from shooting themselves in the foot.

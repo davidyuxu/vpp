@@ -57,52 +57,6 @@ typedef CLIB_PACKED (struct {
 }) ip6_and_esp_header_t;
 /* *INDENT-ON* */
 
-typedef struct
-{
-  const EVP_CIPHER *type;
-  u8 iv_size;
-  u8 block_size;
-} ipsec_proto_main_crypto_alg_t;
-
-typedef struct
-{
-  const EVP_MD *md;
-  u8 trunc_size;
-} ipsec_proto_main_integ_alg_t;
-
-typedef struct
-{
-  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  EVP_CIPHER_CTX *encrypt_ctx;
-#else
-  EVP_CIPHER_CTX encrypt_ctx;
-#endif
-    CLIB_CACHE_LINE_ALIGN_MARK (cacheline1);
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  EVP_CIPHER_CTX *decrypt_ctx;
-#else
-  EVP_CIPHER_CTX decrypt_ctx;
-#endif
-    CLIB_CACHE_LINE_ALIGN_MARK (cacheline2);
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  HMAC_CTX *hmac_ctx;
-#else
-  HMAC_CTX hmac_ctx;
-#endif
-  ipsec_crypto_alg_t last_encrypt_alg;
-  ipsec_crypto_alg_t last_decrypt_alg;
-  ipsec_integ_alg_t last_integ_alg;
-} ipsec_proto_main_per_thread_data_t;
-
-typedef struct
-{
-  ipsec_proto_main_crypto_alg_t *ipsec_proto_main_crypto_algs;
-  ipsec_proto_main_integ_alg_t *ipsec_proto_main_integ_algs;
-  ipsec_proto_main_per_thread_data_t *per_thread_data;
-} ipsec_proto_main_t;
-
-extern ipsec_proto_main_t ipsec_proto_main;
 
 #define ESP_WINDOW_SIZE		(64)
 #define ESP_SEQ_MAX 		(4294967295UL)
@@ -257,112 +211,211 @@ always_inline void
 ipsec_proto_init ()
 {
   ipsec_proto_main_t *em = &ipsec_proto_main;
-  vlib_thread_main_t *tm = vlib_get_thread_main ();
-
   memset (em, 0, sizeof (em[0]));
 
+  vlib_thread_main_t *tm = vlib_get_thread_main ();
+
+  vec_validate (em->rand_state, tm->n_vlib_mains - 1);
+  vec_validate (em->rand_data, tm->n_vlib_mains - 1);
+
+  for (int i = 0; i < vec_len (em->rand_state); i++)
+    {
+      xoshiro256starstar_seed (&em->rand_state[i]);
+      initstate_r (0, (char *) em->rand_data[i].buf, 32,
+		   &em->rand_data[i].data);
+    }
+
   vec_validate (em->ipsec_proto_main_crypto_algs, IPSEC_CRYPTO_N_ALG - 1);
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128].type =
-    EVP_aes_128_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].type =
-    EVP_aes_192_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].type =
-    EVP_aes_256_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128].iv_size = 16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].iv_size = 16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].iv_size = 16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128].block_size =
-    16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192].block_size =
-    16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256].block_size =
-    16;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC].type =
-    EVP_des_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC].type =
-    EVP_des_ede3_cbc ();
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC].block_size = 8;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC].block_size = 8;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC].iv_size = 8;
-  em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC].iv_size = 8;
+
+  ipsec_proto_main_crypto_alg_t *c;
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_NONE];
+  c->type = NULL;
+  c->iv_size = 0;
+  c->block_size = 4;
+
+  /* CBC */
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_128];
+  c->type = EVP_aes_128_cbc ();
+  c->iv_size = 16;
+  c->block_size = 16;
+
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_192];
+  c->type = EVP_aes_192_cbc ();
+  c->iv_size = 16;
+  c->block_size = 16;
+
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CBC_256];
+  c->type = EVP_aes_256_cbc ();
+  c->iv_size = 16;
+  c->block_size = 16;
+
+  /* CTR */
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_128];
+  c->type = EVP_aes_128_ctr ();
+  c->iv_size = 8;
+  c->block_size = 4;
+
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_192];
+  c->type = EVP_aes_192_ctr ();
+  c->iv_size = 8;
+  c->block_size = 4;
+
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_CTR_256];
+  c->type = EVP_aes_256_ctr ();
+  c->iv_size = 8;
+  c->block_size = 4;
+
+  /* GCM */
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_128];
+  c->type = EVP_aes_128_gcm ();
+  c->iv_size = 8;
+  c->block_size = 4;
+
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_192];
+  c->type = EVP_aes_192_gcm ();
+  c->iv_size = 8;
+  c->block_size = 4;
+
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_AES_GCM_256];
+  c->type = EVP_aes_256_gcm ();
+  c->iv_size = 8;
+  c->block_size = 4;
+
+  /* DES 3DES */
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_DES_CBC];
+  c->type = EVP_des_cbc ();
+  c->iv_size = 8;
+  c->block_size = 8;
+
+  c = &em->ipsec_proto_main_crypto_algs[IPSEC_CRYPTO_ALG_3DES_CBC];
+  c->type = EVP_des_ede3_cbc ();
+  c->iv_size = 8;
+  c->block_size = 8;
 
   vec_validate (em->ipsec_proto_main_integ_algs, IPSEC_INTEG_N_ALG - 1);
   ipsec_proto_main_integ_alg_t *i;
 
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_NONE];
+  i->md = NULL;
+  i->mac_size = 0;
+  i->trunc_size = 0;
+
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_MD5_96];
+  i->md = EVP_md5 ();
+  i->mac_size = 12;
+  i->trunc_size = 12;
+
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA1_96];
   i->md = EVP_sha1 ();
+  i->mac_size = 12;
   i->trunc_size = 12;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_256_96];
   i->md = EVP_sha256 ();
+  i->mac_size = 32;
   i->trunc_size = 12;
+
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_224_112];
+  i->md = EVP_sha224 ();
+  i->mac_size = 28;
+  i->trunc_size = 14;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_256_128];
   i->md = EVP_sha256 ();
+  i->mac_size = 32;
   i->trunc_size = 16;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_384_192];
   i->md = EVP_sha384 ();
+  i->mac_size = 48;
   i->trunc_size = 24;
 
   i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_SHA_512_256];
   i->md = EVP_sha512 ();
+  i->mac_size = 64;
   i->trunc_size = 32;
 
-  vec_validate_aligned (em->per_thread_data, tm->n_vlib_mains - 1,
-			CLIB_CACHE_LINE_BYTES);
-  int thread_id;
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_AES_XCBC];
+  i->md = NULL;
+  i->mac_size = 16;
+  i->trunc_size = 12;
 
-  for (thread_id = 0; thread_id < tm->n_vlib_mains; thread_id++)
-    {
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-      em->per_thread_data[thread_id].encrypt_ctx = EVP_CIPHER_CTX_new ();
-      em->per_thread_data[thread_id].decrypt_ctx = EVP_CIPHER_CTX_new ();
-      em->per_thread_data[thread_id].hmac_ctx = HMAC_CTX_new ();
-#else
-      EVP_CIPHER_CTX_init (&(em->per_thread_data[thread_id].encrypt_ctx));
-      EVP_CIPHER_CTX_init (&(em->per_thread_data[thread_id].decrypt_ctx));
-      HMAC_CTX_init (&(em->per_thread_data[thread_id].hmac_ctx));
-#endif
-    }
+  i = &em->ipsec_proto_main_integ_algs[IPSEC_INTEG_ALG_AES_CMAC];
+  i->md = NULL;
+  i->mac_size = 16;
+  i->trunc_size = 4;
 }
 
-always_inline unsigned int
-hmac_calc (ipsec_integ_alg_t alg,
-	   u8 * key,
-	   int key_len,
-	   u8 * data, int data_len, u8 * signature, u8 use_esn, u32 seq_hi)
+typedef void (*MAC_FUNC) (ipsec_sa_t * sa, int thread_index, u8 * data,
+			  int data_len, u8 * signature);
+
+always_inline void
+hmac_calc (ipsec_sa_t * sa, int thread_index, u8 * data, int data_len,
+	   u8 * signature)
 {
-  ipsec_proto_main_t *em = &ipsec_proto_main;
-  u32 thread_index = vlib_get_thread_index ();
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-  HMAC_CTX *ctx = em->per_thread_data[thread_index].hmac_ctx;
-#else
-  HMAC_CTX *ctx = &(em->per_thread_data[thread_index].hmac_ctx);
-#endif
-  const EVP_MD *md = NULL;
+  HMAC_CTX *ctx = sa->context[thread_index].hmac_ctx;
+
   unsigned int len;
 
-  ASSERT (alg < IPSEC_INTEG_N_ALG);
+  ASSERT (sa->integ_alg < IPSEC_INTEG_N_ALG
+	  && sa->integ_alg > IPSEC_INTEG_ALG_NONE
+	  && sa->integ_alg != IPSEC_INTEG_ALG_AES_CMAC);
 
-  if (PREDICT_FALSE (em->ipsec_proto_main_integ_algs[alg].md == 0))
-    return 0;
-
-  if (PREDICT_FALSE (alg != em->per_thread_data[thread_index].last_integ_alg))
-    {
-      md = em->ipsec_proto_main_integ_algs[alg].md;
-      em->per_thread_data[thread_index].last_integ_alg = alg;
-    }
-
-  HMAC_Init_ex (ctx, key, key_len, md, NULL);
+  HMAC_Init_ex (ctx, NULL, 0, NULL, NULL);
 
   HMAC_Update (ctx, data, data_len);
 
-  if (PREDICT_TRUE (use_esn))
-    HMAC_Update (ctx, (u8 *) & seq_hi, sizeof (seq_hi));
+  if (PREDICT_TRUE (sa->use_esn))
+    HMAC_Update (ctx, (u8 *) & sa->seq_hi, sizeof (sa->seq_hi));
+
   HMAC_Final (ctx, signature, &len);
 
-  return em->ipsec_proto_main_integ_algs[alg].trunc_size;
+  //fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
+}
+
+always_inline void
+cmac_calc (ipsec_sa_t * sa, int thread_index, u8 * data, int data_len,
+	   u8 * signature)
+{
+  CMAC_CTX *ctx = sa->context[thread_index].cmac_ctx;
+
+  size_t len;
+
+  ASSERT (sa->integ_alg == IPSEC_INTEG_ALG_AES_CMAC);
+
+  CMAC_Init (ctx, NULL, 0, NULL, NULL);
+  //CMAC_Init(ctx, "1234567890", 16, EVP_aes_128_cbc(), NULL);
+
+  CMAC_Update (ctx, data, data_len);
+
+  if (PREDICT_TRUE (sa->use_esn))
+    CMAC_Update (ctx, (u8 *) & sa->seq_hi, sizeof (sa->seq_hi));
+
+  CMAC_Final (ctx, signature, &len);
+
+  //fformat (stdout, "HASH: %U \n", format_hexdump, signature, len);
+}
+
+always_inline void
+rand_bytes (void *buf, int num, xoshiro256starstar_t * s)
+{
+  u64 *_iv = (u64 *) buf;
+
+  for (int i = 0; i < num / sizeof (u64); i++)
+    {
+      _iv[i] = xoshiro256starstar (s);
+    }
+}
+
+always_inline void
+c_rand_bytes (void *buf, int num, struct random_data *s)
+{
+  i32 *_iv = (i32 *) buf;
+
+  for (int i = 0; i < num / sizeof (i32); i++)
+    {
+      random_r (s, &_iv[i]);
+    }
 }
 
 #endif /* __ESP_H__ */

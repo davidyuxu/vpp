@@ -185,7 +185,6 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
   vl_api_ipsec_sad_add_del_entry_reply_t *rmp;
   int rv;
 #if WITH_LIBSSL > 0
-  ipsec_main_t *im = &ipsec_main;
   ipsec_sa_t sa;
 
   memset (&sa, 0, sizeof (sa));
@@ -194,7 +193,8 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
   sa.spi = ntohl (mp->spi);
   sa.protocol = mp->protocol;
   /* check for unsupported crypto-alg */
-  if (mp->crypto_algorithm >= IPSEC_CRYPTO_N_ALG)
+  if (mp->crypto_algorithm < IPSEC_CRYPTO_ALG_NONE ||
+      mp->crypto_algorithm >= IPSEC_CRYPTO_N_ALG)
     {
       clib_warning ("unsupported crypto-alg: '%U'", format_ipsec_crypto_alg,
 		    mp->crypto_algorithm);
@@ -231,15 +231,6 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
       clib_memcpy (&sa.tunnel_dst_addr.ip4.data, mp->tunnel_dst_address, 4);
     }
   sa.use_anti_replay = mp->use_anti_replay;
-
-  ASSERT (im->cb.check_support_cb);
-  clib_error_t *err = im->cb.check_support_cb (&sa);
-  if (err)
-    {
-      clib_warning ("%s", err->what);
-      rv = VNET_API_ERROR_UNIMPLEMENTED;
-      goto out;
-    }
 
   rv = ipsec_add_del_sa (vm, &sa, mp->is_add);
 #else

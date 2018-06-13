@@ -378,6 +378,8 @@ typedef enum vnet_hw_interface_class_flags_t_
    * @brief a point 2 point interface
    */
   VNET_HW_INTERFACE_CLASS_FLAG_P2P = (1 << 0),
+  /* Dont have counter rate */
+  VNET_HW_INTERFACE_CLASS_FLAG_NO_RATE = (1 << 1),
 } vnet_hw_interface_class_flags_t;
 
 /* Layer-2 (e.g. Ethernet) interface class. */
@@ -733,6 +735,7 @@ typedef struct
 
   /* VNET_SW_INTERFACE_TYPE_HARDWARE. */
   u32 hw_if_index;
+  u32 counter_index;
 
   /* MTU for network layer (not including L2 headers) */
   u32 mtu[VNET_N_MTU];
@@ -770,6 +773,21 @@ typedef enum
   VNET_INTERFACE_COUNTER_TX_BROADCAST = 7,
   VNET_N_COMBINED_INTERFACE_COUNTER = 8,
 } vnet_interface_counter_type_t;
+
+/* A copy of Interfcae counters for any visible interface */
+typedef struct
+{
+	/**
+	 * required for pool_get_aligned.
+	 *	memebers used in the switch path come first!
+	 */
+	CLIB_CACHE_LINE_ALIGN_MARK(cacheline0);
+  f64 last_show_time;	/**< Last show cpu time. */
+  vlib_counter_t *combined_per_thread[VNET_N_COMBINED_INTERFACE_COUNTER];	  /**< Last show counter . */
+  vlib_counter_t combined_total[VNET_N_COMBINED_INTERFACE_COUNTER];
+  counter_t *simple_per_thread[VNET_N_SIMPLE_INTERFACE_COUNTER]; /**< Last show counter . */
+  counter_t simple_total[VNET_N_SIMPLE_INTERFACE_COUNTER];
+} vnet_interface_counter_t;
 
 #define foreach_rx_combined_interface_counter(_x)               \
   for (_x = VNET_INTERFACE_COUNTER_RX;                          \
@@ -843,6 +861,8 @@ typedef struct
 
   /* Software interfaces. */
   vnet_sw_interface_t *sw_interfaces;
+
+  vnet_interface_counter_t *instant_if_counters;
 
   /* Hash table mapping sub intfc sw_if_index by sup sw_if_index and sub id */
   uword *sw_if_index_by_sup_and_sub;

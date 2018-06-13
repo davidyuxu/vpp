@@ -86,7 +86,8 @@ ah_decrypt_node_fn (vlib_main_t * vm,
   ipsec_proto_main_t *em = &ipsec_proto_main;
   from = vlib_frame_vector_args (from_frame);
   n_left_from = from_frame->n_vectors;
-  int icv_size = 0;
+  int thread_id = vlib_get_thread_index ();
+  int icv_size;
 
   next_index = node->cached_next_index;
 
@@ -154,20 +155,19 @@ ah_decrypt_node_fn (vlib_main_t * vm,
 		}
 	    }
 
-
 	  sa0->total_data_size += i_b0->current_length;
+
 	  icv_size =
 	    em->ipsec_proto_main_integ_algs[sa0->integ_alg].trunc_size;
 	  if (PREDICT_TRUE (sa0->integ_alg != IPSEC_INTEG_ALG_NONE))
 	    {
 	      u8 sig[64];
-	      u8 digest[64];
-	      memset (sig, 0, sizeof (sig));
-	      memset (digest, 0, sizeof (digest));
+	      u8 digest[icv_size];
+
 	      u8 *icv =
 		vlib_buffer_get_current (i_b0) + ip_hdr_size +
 		sizeof (ah_header_t);
-	      memcpy (digest, icv, icv_size);
+	      clib_memcpy (digest, icv, icv_size);
 	      memset (icv, 0, icv_size);
 
 	      if ((ih4->ip_version_and_header_length & 0xF0) == 0x40)
@@ -179,9 +179,9 @@ ah_decrypt_node_fn (vlib_main_t * vm,
 		  ih4->checksum = 0;
 		  ih4->flags_and_fragment_offset = 0;
 		}		//TODO else part for IPv6
-	      hmac_calc (sa0->integ_alg, sa0->integ_key, sa0->integ_key_len,
-			 (u8 *) ih4, i_b0->current_length, sig, sa0->use_esn,
-			 sa0->seq_hi);
+
+	      hmac_calc (sa0, thread_id, (u8 *) ih4, i_b0->current_length,
+			 sig);
 
 	      if (PREDICT_FALSE (memcmp (digest, sig, icv_size)))
 		{
@@ -201,7 +201,6 @@ ah_decrypt_node_fn (vlib_main_t * vm,
 		  else
 		    esp_replay_advance (sa0, seq);
 		}
-
 	    }
 
 

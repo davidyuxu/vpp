@@ -181,4 +181,8 @@ extern void adj_nbr_module_init(void);
  */
 extern u32 adj_nbr_db_size(void);
 
+/* dedicated mheap for the adj nbr hash table of p2p interfaces, by Jordy */
+extern uword adj_nbr_mheap_size;
+
+
 #endif
