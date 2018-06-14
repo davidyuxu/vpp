@@ -147,18 +147,33 @@ unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
 	if (get_time_string (timestamp, sizeof (timestamp) - 1))
 	  {
 	    snprintf (filename, sizeof (filename), "%s/crashdump-%s.log",
-		      "..", timestamp);
-	    printf ("write crashdump to %s\n", filename);
+		      ".", timestamp);
+	    printf ("Writing crashdump to %s ...\n", filename);
 
 	    crash_file = fopen (filename, "w");
 	    if (crash_file)
 	      {
-		//backtrace_print (bt_state, 0, crash_file);
+		/* Address of callers: outer first, inner last. */
+		uword callers[15];
+		uword n_callers = clib_backtrace (callers, ARRAY_LEN (callers), 0);
+
+		for (int i = 0; i < n_callers; i++)
+		  {
+#ifdef CLIB_UNIX
+		    fformat (crash_file, "#%-2d 0x%016lx %U\n", i, callers[i], format_clib_elf_symbol_with_address,
+			      callers[i]);
+		    fformat (stdout, "#%-2d 0x%016lx %U\n", i, callers[i], format_clib_elf_symbol_with_address,
+			      callers[i]);
+
+#else
+		    fformat (crash_file, "#%-2d 0x%016lx\n", i, callers[i]);
+		    fformat (stdout, "#%-2d 0x%016lx\n", i, callers[i]);
+#endif
+		  }		
+		
 		fclose (crash_file);
 	      }
 	  }
-
-	//backtrace_full (bt_state, 0, full_callback, error_callback, &bt_state);
       }
       if (signum == SIGABRT)
 	unsetup_signal_handlers (signum);
