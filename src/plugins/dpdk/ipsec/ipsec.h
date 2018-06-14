@@ -68,6 +68,9 @@ typedef struct
 
 typedef struct
 {
+  /* Required for vec_validate_aligned */
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+
   u16 *resource_idx;
   struct rte_crypto_op **ops;
   u16 cipher_resource_idx[IPSEC_CRYPTO_N_ALG];
@@ -76,6 +79,9 @@ typedef struct
 
 typedef struct
 {
+  /* Required for vec_validate_aligned */
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+
   char *name;
   enum rte_crypto_sym_xform_type type;
   u32 alg;

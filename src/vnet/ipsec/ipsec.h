@@ -164,11 +164,14 @@ typedef struct
 
 typedef struct
 {
+  /* Required for vec_validate_aligned */
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+
+  ipsec_sa_per_thread_data_t *context;
+	
   u32 id;
   u32 spi;
   ipsec_protocol_t protocol;
-
-  ipsec_sa_per_thread_data_t *context;
 
   ipsec_crypto_alg_t crypto_alg;
   u8 crypto_key_len;
@@ -276,9 +279,14 @@ typedef struct
 
 typedef struct
 {
-  u32 id;
+  /* Required for vec_validate_aligned */
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+
   /* pool of policies */
   ipsec_policy_t *policies;
+
+  u32 id;
+
   /* vectors of policy indices */
   u32 *ipv4_outbound_policies;
   u32 *ipv6_outbound_policies;

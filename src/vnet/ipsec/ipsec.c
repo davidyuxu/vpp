@@ -125,7 +125,7 @@ ipsec_add_del_spd (vlib_main_t * vm, u32 spd_id, int is_add)
     }
   else				/* create new SPD */
     {
-      pool_get (im->spds, spd);
+      pool_get_aligned (im->spds, spd, CLIB_CACHE_LINE_BYTES);
       memset (spd, 0, sizeof (*spd));
       spd_index = spd - im->spds;
       spd->id = spd_id;
@@ -449,7 +449,7 @@ ipsec_add_del_sa (vlib_main_t * vm, ipsec_sa_t * new_sa, int is_add)
     }
   else				/* create new SA */
     {
-      pool_get (im->sad, sa);
+      pool_get_aligned (im->sad, sa, CLIB_CACHE_LINE_BYTES);
       sa_index = sa - im->sad;
       clib_memcpy (sa, new_sa, sizeof (*sa));
       ipsec_create_sa_contexts (sa);
@@ -623,8 +623,8 @@ ipsec_init (vlib_main_t * vm)
 
   if (vm->max_capacity)
     {
-      pool_init (im->sad, vm->max_capacity * 2);
-      pool_init (im->tunnel_interfaces, vm->max_capacity);
+      pool_init_aligned (im->sad, vm->max_capacity * 2, CLIB_CACHE_LINE_BYTES);
+      pool_init_aligned (im->tunnel_interfaces, vm->max_capacity, CLIB_CACHE_LINE_BYTES);
     }
 
 
