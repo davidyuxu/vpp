@@ -148,29 +148,30 @@ unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
 	  {
 	    snprintf (filename, sizeof (filename), "%s/crashdump-%s.log",
 		      ".", timestamp);
-	    printf ("Writing crashdump to %s ...\n", filename);
+	    fformat (stderr, "Writing crashdump to %s ...\n", filename);
 
 	    crash_file = fopen (filename, "w");
 	    if (crash_file)
 	      {
 		/* Address of callers: outer first, inner last. */
 		uword callers[15];
-		uword n_callers = clib_backtrace (callers, ARRAY_LEN (callers), 0);
+		uword n_callers =
+		  clib_backtrace (callers, ARRAY_LEN (callers), 0);
 
 		for (int i = 0; i < n_callers; i++)
 		  {
 #ifdef CLIB_UNIX
-		    fformat (crash_file, "#%-2d 0x%016lx %U\n", i, callers[i], format_clib_elf_symbol_with_address,
-			      callers[i]);
-		    fformat (stdout, "#%-2d 0x%016lx %U\n", i, callers[i], format_clib_elf_symbol_with_address,
-			      callers[i]);
+		    fformat (crash_file, "#%-2d 0x%016lx %U\n", i, callers[i],
+			     format_clib_elf_symbol_with_address, callers[i]);
+		    fformat (stderr, "#%-2d 0x%016lx %U\n", i, callers[i],
+			     format_clib_elf_symbol_with_address, callers[i]);
 
 #else
 		    fformat (crash_file, "#%-2d 0x%016lx\n", i, callers[i]);
-		    fformat (stdout, "#%-2d 0x%016lx\n", i, callers[i]);
+		    fformat (stderr, "#%-2d 0x%016lx\n", i, callers[i]);
 #endif
-		  }		
-		
+		  }
+
 		fclose (crash_file);
 	      }
 	  }
@@ -743,7 +744,7 @@ vlib_unix_main (int argc, char *argv[])
   unformat_free (&input);
 
 #ifdef CLIB_UNIX
-  /* load symbols for memory trace in debug version, by Jordy */
+  /* always load symbols, for signal handler and mheap memory get/put backtrace */
   clib_elf_main_init (vm->name);
 #endif
 

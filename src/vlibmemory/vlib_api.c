@@ -38,7 +38,7 @@
 /*? %%clicmd:group_label Binary API CLI %% ?*/
 /*? %%syscfg:group_label Binary API configuration %% ?*/
 
-#define TRACE_VLIB_MEMORY_QUEUE 1
+#define TRACE_VLIB_MEMORY_QUEUE 0
 
 #include <vlibmemory/vl_memory_msg_enum.h>	/* enumerate all vlib messages */
 

@@ -258,7 +258,7 @@ backtrace_done:
     return i - n_frames_to_skip;
 }
 
-/* kingwel, use glibc backtrace for stack trace */
+/* use glibc backtrace for stack trace */
 #include <execinfo.h>
 
 uword
