@@ -68,6 +68,9 @@ typedef struct
 
 typedef struct
 {
+  /* Required for vec_validate_aligned */
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+
   u16 *resource_idx;
   struct rte_crypto_op **ops;
   u16 cipher_resource_idx[IPSEC_CRYPTO_N_ALG];
@@ -76,6 +79,9 @@ typedef struct
 
 typedef struct
 {
+  /* Required for vec_validate_aligned */
+  CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
+
   char *name;
   enum rte_crypto_sym_xform_type type;
   u32 alg;
@@ -227,6 +233,10 @@ crypto_get_resource (crypto_worker_main_t * cwm, ipsec_sa_t * sa,
     return cipher_res;
 
   if (cs->is_aead)
+    return cipher_res;
+
+  /* kingwel, if integ is NONE, return cipher resource */
+  if (sa->integ_alg == IPSEC_INTEG_ALG_NONE)
     return cipher_res;
 
   return (u16) ~ 0;

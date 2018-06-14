@@ -304,6 +304,17 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
       }
     }
 
+		/* kingwel, bit mode for snow3g & zuc */
+		if (PREDICT_FALSE
+		    (cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_ZUC_EEA3
+		     || cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_SNOW3G_UEA2))
+		  {
+		    cipher_off = cipher_off << 3;
+		    cipher_len = cipher_len << 3;
+		    auth_len = auth_len << 3;
+		  }
+
+
 		/* setup op */
 	  crypto_op_setup (cs0->is_aead, mb0, op, cs0->sessions[thread_idx], cipher_off, cipher_len,
 			   0, auth_len, aad, digest, digest_paddr);
@@ -433,7 +444,6 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 	  crypto_alg_t *cipher_alg, *auth_alg;
 	  esp_header_t *esp0;
 	  u8 trunc_size, is_aead;
-	  u16 udp_encap_adv = 0;
 
 	  next0 = ESP_DECRYPT_NEXT_DROP;
 
@@ -476,22 +486,6 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 		esp_replay_advance(sa0, seq);
 	    }
 
-<<<<<<< fcf9497d3bcd34b8b5090ee053575296cf56c5e6
-	  /* if UDP encapsulation is used adjust the address of the IP header */
-          if (sa0->udp_encap && (b0->flags & VNET_BUFFER_F_IS_IP4))
-            {
-              udp_encap_adv = sizeof (udp_header_t);
-            }
-
-          if (b0->flags & VNET_BUFFER_F_IS_IP4)
-            ih4 = (ip4_header_t *)
-               ((u8 *) esp0 - udp_encap_adv - sizeof (ip4_header_t));
-          else
-            ih4 =
-               (ip4_header_t *) ((u8 *) esp0 - sizeof (ip6_header_t));
-
-=======
->>>>>>> New begining
 	  vlib_buffer_advance (b0, sizeof (esp_header_t) + iv_size);
 
 	  b0->flags |= VLIB_BUFFER_TOTAL_LENGTH_VALID;
@@ -551,24 +545,10 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 			
 	      if (is_ip4)
 		{
-<<<<<<< fcf9497d3bcd34b8b5090ee053575296cf56c5e6
-                  u16 ih4_len = ip4_header_bytes (ih4);
-                  vlib_buffer_advance (b0, - ih4_len - udp_encap_adv);
-                  next0 = ESP_DECRYPT_NEXT_IP4_INPUT;
-	          if (!sa0->udp_encap)
-	            {
-	                  oh4 = vlib_buffer_get_current (b0);
-	                  memmove(oh4, ih4, ih4_len);
-	                  oh4->protocol = f0->next_header;
-	                  oh4->length = clib_host_to_net_u16 (b0->current_length);
-	                  oh4->checksum = ip4_header_checksum(oh4);
-	            }
-=======
 		  next0 = ESP_DECRYPT_NEXT_IP4_INPUT;
 		  ih4->protocol = f0->next_header;
 		  ih4->length = clib_host_to_net_u16 (b0->current_length);
 		  ih4->checksum = ip4_header_checksum(oh4);
->>>>>>> New begining
 		}
 	      else if (is_ip6)
 		{
