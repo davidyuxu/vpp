@@ -201,7 +201,7 @@ algos_init (u32 n_mains)
   a->type = RTE_CRYPTO_SYM_XFORM_AUTH;
   a->alg = RTE_CRYPTO_AUTH_AES_CMAC;
   a->key_len = 16;
-  a->trunc_size = 4;
+  a->trunc_size = 16;
 }
 
 static u8
@@ -367,6 +367,10 @@ crypto_make_session (u8 thread_idx, crypto_session_t * cs, ipsec_sa_t * sa,
 	{
 	  cipher_xform.next = &auth_xform;
 	  xfs = &cipher_xform;
+
+	  /* kingwel, DPDK bug? AES_CMAC, have to set digest_len in cipher_form */
+	  if (cs->auth_alg->alg == RTE_CRYPTO_AUTH_AES_CMAC)
+	    cipher_xform.auth.digest_length = cs->auth_alg->trunc_size;	  
 	}
       else
 	{
@@ -891,7 +895,11 @@ crypto_create_session_h_pool (vlib_main_t * vm, u8 numa, u32 elts)
 
   pool_name = format (0, "session_h_pool_numa%u%c", numa, 0);
 
+#if RTE_VERSION < RTE_VERSION_NUM(18, 5, 0, 0)
   elt_size = rte_cryptodev_get_header_session_size ();
+#else
+  elt_size = rte_cryptodev_sym_get_header_session_size ();
+#endif  
 
   error =
     dpdk_pool_create (vm, pool_name, elt_size, elts, 0, 512, numa, &mp, &pri);
@@ -948,7 +956,11 @@ crypto_create_pools (vlib_main_t * vm, u32 * max_sessions)
 	/* *INDENT-OFF* */
 	vec_foreach (dev, dcm->dev)
 	{
-		sess_sz = rte_cryptodev_get_private_session_size(dev->id);
+#if RTE_VERSION < RTE_VERSION_NUM(18, 5, 0, 0)
+	    	sess_sz = rte_cryptodev_get_private_session_size(dev->id);
+#else
+	    	sess_sz = rte_cryptodev_sym_get_private_session_size(dev->id);
+#endif  
 		if (sess_sz > max_sess_size)
 			max_sess_size = sess_sz;
 
