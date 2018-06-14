@@ -459,16 +459,16 @@ dpdk_crypto_session_disposal (u64 ts)
     if (!(s->ts + dcm->session_timeout < ts))
 			break;
 
-		int index;
+    int index;
     vec_foreach_index (index, dcm->dev)
-		{
-			/* first clear driver based session private data */
-			ret = rte_cryptodev_sym_session_clear (index, s->session);
-		}
+    {
+      /* first clear driver based session private data */
+      ret = rte_cryptodev_sym_session_clear (index, s->session);		
+    }
 
     ret = rte_cryptodev_sym_session_free (s->session);
 
-		clib_warning ("free session %p rv=%d", s->session, ret);
+    clib_warning ("free session %p rv=%d", s->session, ret);
 
     ASSERT (!ret);
   }
@@ -1101,13 +1101,13 @@ dpdk_ipsec_process (vlib_main_t * vm, vlib_node_runtime_t * rt,
 
   dcm->session_timeout = 10e9;
 
-  vec_validate_init_empty_aligned (dcm->workers_main, n_mains - 1,
-				   (crypto_worker_main_t) EMPTY_STRUCT,
-				   CLIB_CACHE_LINE_BYTES);
+  vec_validate_aligned (dcm->workers_main, n_mains - 1,CLIB_CACHE_LINE_BYTES);
 
   /* *INDENT-OFF* */
   vec_foreach (cwm, dcm->workers_main)
     {
+      cwm->resource_idx = 0;
+      
       vec_validate_init_empty_aligned (cwm->ops, VLIB_FRAME_SIZE - 1, 0,
 				       CLIB_CACHE_LINE_BYTES);
       memset (cwm->cipher_resource_idx, ~0,
