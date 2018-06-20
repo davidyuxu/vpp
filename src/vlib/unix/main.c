@@ -168,6 +168,7 @@ unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
   if (fatal)
     {
       syslog (LOG_ERR | LOG_DAEMON, "%s", syslog_msg);
+      fformat (stderr, "%s\n", syslog_msg);
 
       /* Address of callers: outer first, inner last. */
       uword callers[15];
@@ -182,6 +183,7 @@ unix_signal_handler (int signum, siginfo_t * si, ucontext_t * uc)
 		    format_clib_elf_symbol_with_address, callers[i], 0);
 
 	  syslog (LOG_ERR | LOG_DAEMON, "%s", syslog_msg);
+	  fformat (stderr, "%s\n", syslog_msg);
 	}
 
       /* have to remove SIGABRT to avoid recusive - os_exit calling abort() */
