@@ -719,7 +719,7 @@ show_memory_usage (vlib_main_t * vm,
       if (unformat (input, "verbose %d", &verbose))
 	;
       else if (unformat (input, "verbose"))
-      	verbose = 1;
+	verbose = 1;
       else if (unformat (input, "api-segment"))
 	api_segment = 1;
       else
@@ -849,6 +849,25 @@ VLIB_CLI_COMMAND (show_counter_memory_usage_command, static) = {
   .path = "show counter memory",
   .short_help = "Show counter memory usage",
   .function = show_counter_memory_usage,
+};
+/* *INDENT-ON* */
+
+void test_mheap ();
+
+
+static clib_error_t *
+test_memory_usage (vlib_main_t * vm,
+		   unformat_input_t * input, vlib_cli_command_t * cmd)
+{
+  test_mheap ();
+  return 0;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (test_memory_usage_command, static) = {
+  .path = "test mheap",
+  .short_help = "test mheap",
+  .function = test_memory_usage,
 };
 /* *INDENT-ON* */
 
