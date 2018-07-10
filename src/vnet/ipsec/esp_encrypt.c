@@ -177,7 +177,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 
 	  ip4_and_esp_header_t *n_ih0;
-	  ip4_and_udp_and_esp_header_t *n_iuh0;
+	  ip4_and_udp_and_esp_header_t *n_iuh0 = 0;
 	  ip6_and_esp_header_t *n_ih6_0;
 
 	  esp_footer_t *f0;
@@ -248,7 +248,6 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 		sizeof (ip4_and_esp_header_t);
 
 	      n_ih0 = vlib_buffer_get_current (i_b0) - hd - IV_SIZE;
-	      n_iuh0 = (ip4_and_udp_and_esp_header_t *) n_ih0;
 
 	      n_ih0->ip4.ip_version_and_header_length = 0x45;
 	      n_ih0->ip4.tos = ih0->tos;
@@ -261,6 +260,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 	      if (sa0->udp_encap)
 		{
+		  n_iuh0 = (ip4_and_udp_and_esp_header_t *) n_ih0;
 		  n_iuh0->udp.src_port =
 		    clib_host_to_net_u16 (UDP_DST_PORT_ipsec);
 		  n_iuh0->udp.dst_port =
@@ -288,6 +288,7 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 	  else if (is_ipv6 && sa0->is_tunnel && sa0->is_tunnel_ip6)
 	    {
 	      ih6_0 = vlib_buffer_get_current (i_b0);
+
 	      ip_udp_hdr_size = sizeof (ip6_header_t);
 	      next_hdr_type = IP_PROTOCOL_IPV6;
 
@@ -318,12 +319,14 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 	  /* transport mode */
 	  else
 	    {
-	      ip_udp_hdr_size = ip4_header_bytes (ih0);
+	      size_t ip_hdr_size =
+		is_ipv6 ? sizeof (ip6_header_t) : sizeof (ip4_header_t);
 
-	      n_ih0 =
-		vlib_buffer_get_current (i_b0) - sizeof (esp_header_t) -
-		IV_SIZE;
-	      n_ih6_0 = (ip6_and_esp_header_t *) n_ih0;
+	      size_t hd =
+		sa0->udp_encap ? sizeof (esp_header_t) +
+		sizeof (udp_header_t) : sizeof (esp_header_t);
+
+	      n_ih0 = vlib_buffer_get_current (i_b0) - hd - IV_SIZE;
 
 	      if (vnet_buffer (i_b0)->sw_if_index[VLIB_TX] != ~0)
 		{
@@ -340,32 +343,52 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 		  next0 = ESP_ENCRYPT_NEXT_INTERFACE_OUTPUT;
 		}
 
-	      memmove (n_ih0, ih0, ip_udp_hdr_size);
+	      memmove (n_ih0, ih0, ip_hdr_size);
 
 	      if (PREDICT_FALSE (is_ipv6))
 		{
+		  n_ih6_0 = (ip6_and_esp_header_t *) n_ih0;
 		  next_hdr_type = n_ih6_0->ip6.protocol;
 
 		  n_ih6_0->ip6.protocol = IP_PROTOCOL_IPSEC_ESP;
 
 		  n_ih6_0->esp.spi = clib_net_to_host_u32 (sa0->spi);
 		  n_ih6_0->esp.seq = clib_net_to_host_u32 (sa0->seq);
+		  ip_udp_hdr_size = sizeof (ip6_header_t);
 
 		  next0 = ESP_ENCRYPT_NEXT_IP6_LOOKUP;
 		}
 	      else
 		{
+		  /* udp encap, fill the udp header */
+		  if (sa0->udp_encap)
+		    {
+		      n_iuh0 = (ip4_and_udp_and_esp_header_t *) n_ih0;
+		      n_iuh0->udp.src_port =
+			clib_host_to_net_u16 (UDP_DST_PORT_ipsec);
+		      n_iuh0->udp.dst_port =
+			clib_host_to_net_u16 (UDP_DST_PORT_ipsec);
+		      n_iuh0->udp.checksum = 0;
+		      n_iuh0->ip4.protocol = IP_PROTOCOL_UDP;
+		      n_iuh0->esp.spi = clib_net_to_host_u32 (sa0->spi);
+		      n_iuh0->esp.seq = clib_net_to_host_u32 (sa0->seq);
+		      ip_udp_hdr_size =
+			sizeof (udp_header_t) + sizeof (ip4_header_t);
+		    }
+		  else
+		    {
+		      n_ih0->ip4.protocol = IP_PROTOCOL_IPSEC_ESP;
+		      n_ih0->esp.spi = clib_net_to_host_u32 (sa0->spi);
+		      n_ih0->esp.seq = clib_net_to_host_u32 (sa0->seq);
+		      ip_udp_hdr_size = sizeof (ip4_header_t);
+		    }
+
 		  next_hdr_type = n_ih0->ip4.protocol;
-
-		  n_ih0->ip4.protocol = IP_PROTOCOL_IPSEC_ESP;
-
-		  n_ih0->esp.spi = clib_net_to_host_u32 (sa0->spi);
-		  n_ih0->esp.seq = clib_net_to_host_u32 (sa0->seq);
-
 		  next0 = ESP_ENCRYPT_NEXT_IP4_LOOKUP;
 		}
 
-	      vlib_buffer_advance (i_b0, ip_udp_hdr_size);
+	      /* skip the ip header, v4 or v6 */
+	      vlib_buffer_advance (i_b0, ip_hdr_size);
 	    }
 
 	  ASSERT (sa0->crypto_alg < IPSEC_CRYPTO_N_ALG);
@@ -518,6 +541,14 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 	      n_ih0->ip4.length =
 		clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, i_b0));
 	      n_ih0->ip4.checksum = ip4_header_checksum (&n_ih0->ip4);
+
+	      if (sa0->udp_encap)
+		{
+		  n_iuh0->udp.length =
+		    clib_host_to_net_u16 (clib_net_to_host_u16
+					  (n_iuh0->ip4.length) -
+					  ip4_header_bytes (&n_iuh0->ip4));
+		}
 	    }
 
 #ifdef IPSEC_DEBUG_OUTPUT

@@ -546,6 +546,8 @@ mheap_get_search_free_list (void *v,
     (align >
      MHEAP_USER_DATA_WORD_BYTES ? align + align_offset +
      sizeof (mheap_elt_t) : 0);
+  //comment it to enable modifier
+  //modifier = 0;
   bin = user_data_size_to_bin_index (n_user_bytes + modifier);
   for (i = bin / BITS (uword); i < ARRAY_LEN (h->non_empty_free_elt_heads);
        i++)
@@ -678,6 +680,10 @@ mheap_get_aligned (void *v,
     round_pow2 (n_user_data_bytes,
 		STRUCT_SIZE_OF (mheap_elt_t, user_data[0]));
 
+  // comment, round up small size to 'align - MHEAP_ELT_OVERHEAD_BYTES'
+  if (0 && align > MHEAP_ELT_OVERHEAD_BYTES)
+    n_user_data_bytes = clib_max (n_user_data_bytes,
+				  align - MHEAP_ELT_OVERHEAD_BYTES);
   if (!v)
     v = mheap_alloc (0, 640 << 20);
 
@@ -1738,6 +1744,46 @@ mheap_trace (void *v, int enable)
       mheap_trace_main_free (&h->trace_main);
       h->flags &= ~MHEAP_FLAG_TRACE;
     }
+}
+
+
+#include <vppinfra/random.h>
+
+uword offsets[200000];
+
+
+void
+test_mheap ()
+{
+  int i;
+  u32 max_object_size = 80;
+  u32 seed = random_default_seed ();
+
+  void *heap;
+  uword cpu;
+
+  cpu = os_get_thread_index ();
+  heap = clib_per_cpu_mheaps[cpu];
+
+  for (i = 0; i < 4000000; i++)
+    {
+      uword size, align, align_offset, offset;
+
+      size = (random_u32 (&seed) % max_object_size);
+      align = align_offset = 0;
+      if (1)
+	{
+	  align = 1 << (random_u32 (&seed) % 8);
+	  align_offset = round_pow2 (random_u32 (&seed) & (align - 1),
+				     sizeof (u32));
+	}
+
+      heap = mheap_get_aligned (heap, size, align, align_offset, &offset);
+      if (i % 10)
+	mheap_put (heap, offset);
+    }
+
+  fformat (stderr, "Afetr Test:\n%U\n", format_mheap, heap, 1);
 }
 
 /*

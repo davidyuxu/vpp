@@ -18,6 +18,7 @@
 #include <vnet/vnet.h>
 #include <vnet/api_errno.h>
 #include <vnet/ip/ip.h>
+#include <vnet/udp/udp.h>
 
 #include <vnet/ipsec/ipsec.h>
 #include <vnet/ipsec/esp.h>
@@ -103,7 +104,8 @@ ipsec_create_sa_contexts (ipsec_sa_t * sa)
 {
   vlib_thread_main_t *tm = vlib_get_thread_main ();
 
-  vec_validate_aligned (sa->context, tm->n_vlib_mains - 1, CLIB_CACHE_LINE_BYTES);
+  vec_validate_aligned (sa->context, tm->n_vlib_mains - 1,
+			CLIB_CACHE_LINE_BYTES);
   vec_zero (sa->context);
 
   ipsec_set_sa_contexts_integ_key (sa);
@@ -209,7 +211,7 @@ ipsec_add_del_tunnel_if_internal (vnet_main_t * vnm,
       hash_set (im->ipsec_if_real_dev_by_show_dev, t->show_instance,
 		dev_instance);
 
-      pool_get_aligned (im->sad, sa, CLIB_CACHE_LINE_BYTES);      
+      pool_get_aligned (im->sad, sa, CLIB_CACHE_LINE_BYTES);
       memset (sa, 0, sizeof (*sa));
       t->input_sa_index = sa - im->sad;
       sa->spi = args->remote_spi;
@@ -552,6 +554,9 @@ ipsec_tunnel_if_init (vlib_main_t * vm)
 
   im->ipsec_if_pool_index_by_key = hash_create (0, sizeof (uword));
   im->ipsec_if_real_dev_by_show_dev = hash_create (0, sizeof (uword));
+
+  udp_register_dst_port (vm, UDP_DST_PORT_ipsec, ipsec_if_input_node.index,
+			 1);
 
   return 0;
 }
