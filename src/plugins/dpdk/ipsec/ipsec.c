@@ -463,7 +463,7 @@ dpdk_crypto_session_disposal (u64 ts)
     vec_foreach_index (index, dcm->dev)
     {
       /* first clear driver based session private data */
-      ret = rte_cryptodev_sym_session_clear (index, s->session);		
+      ret = rte_cryptodev_sym_session_clear (index, s->session);
     }
 
     ret = rte_cryptodev_sym_session_free (s->session);
@@ -1008,7 +1008,7 @@ crypto_create_pools (vlib_main_t * vm, u32 * max_sessions)
 	    	sess_sz = rte_cryptodev_get_private_session_size(dev->id);
 #else
 	    	sess_sz = rte_cryptodev_sym_get_private_session_size(dev->id);
-#endif  
+#endif
 		if (sess_sz > max_sess_size)
 			max_sess_size = sess_sz;
 
@@ -1101,13 +1101,14 @@ dpdk_ipsec_process (vlib_main_t * vm, vlib_node_runtime_t * rt,
 
   dcm->session_timeout = 10e9;
 
-  vec_validate_aligned (dcm->workers_main, n_mains - 1,CLIB_CACHE_LINE_BYTES);
+  vec_validate_aligned (dcm->workers_main, n_mains - 1,
+			CLIB_CACHE_LINE_BYTES);
 
   /* *INDENT-OFF* */
   vec_foreach (cwm, dcm->workers_main)
     {
       cwm->resource_idx = 0;
-      
+
       vec_validate_init_empty_aligned (cwm->ops, VLIB_FRAME_SIZE - 1, 0,
 				       CLIB_CACHE_LINE_BYTES);
       memset (cwm->cipher_resource_idx, ~0,
