@@ -86,7 +86,8 @@ typedef enum
   _(8, AES_GCM_192, "aes-gcm-192")  \
   _(9, AES_GCM_256, "aes-gcm-256")  \
   _(10, DES_CBC, "des-cbc")         \
-  _(11, 3DES_CBC, "3des-cbc")
+  _(11, 3DES_CBC, "3des-cbc")       \
+  _(12, ZUC_EEA3, "zuc-eea3")
 
 typedef enum
 {
@@ -106,7 +107,8 @@ typedef enum
   _(6, SHA_384_192, "sha-384-192") /* RFC4868 */                          \
   _(7, SHA_512_256, "sha-512-256")	/* RFC4868 */													\
   _(8, AES_XCBC, "aes-xcbc")				/* RFC3566 */													\
-  _(9, AES_CMAC, "aes-cmac")	/* kingwel test only */
+  _(9, AES_CMAC, "aes-cmac")	/* kingwel test only */ \
+  _(10, ZUC_EIA3, "zuc-eia3")	/* kingwel test only */
 
 typedef enum
 {
@@ -168,7 +170,7 @@ typedef struct
   CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
 
   ipsec_sa_per_thread_data_t *context;
-	
+
   u32 id;
   u32 spi;
   ipsec_protocol_t protocol;

@@ -132,6 +132,12 @@ algos_init (u32 n_mains)
   a->key_len = 24;
   a->iv_len = 8;
 
+  a = &dcm->cipher_algs[IPSEC_CRYPTO_ALG_ZUC_EEA3];
+  a->type = RTE_CRYPTO_SYM_XFORM_CIPHER;
+  a->alg = RTE_CRYPTO_CIPHER_ZUC_EEA3;
+  a->boundary = 8;
+  a->key_len = 16;
+  a->iv_len = 16;
 
   vec_validate (dcm->auth_algs, IPSEC_INTEG_N_ALG - 1);
 
@@ -202,6 +208,12 @@ algos_init (u32 n_mains)
   a->alg = RTE_CRYPTO_AUTH_AES_CMAC;
   a->key_len = 16;
   a->trunc_size = 16;
+
+  a = &dcm->auth_algs[IPSEC_INTEG_ALG_ZUC_EIA3];
+  a->type = RTE_CRYPTO_SYM_XFORM_AUTH;
+  a->alg = RTE_CRYPTO_AUTH_ZUC_EIA3;
+  a->key_len = 16;
+  a->trunc_size = 4;
 }
 
 static u8
@@ -332,6 +344,14 @@ crypto_set_auth_xform (struct rte_crypto_sym_xform *xform, crypto_alg_t * a,
   xform->auth.digest_length = a->trunc_size;
   xform->next = NULL;
 
+  /* kingwel, TBD, make it work */
+  if (xform->auth.algo == RTE_CRYPTO_AUTH_ZUC_EIA3)
+    {
+      xform->auth.iv.length = 16;
+      xform->auth.iv.offset = 0;
+    }
+
+
   if (is_outbound)
     xform->auth.op = RTE_CRYPTO_AUTH_OP_GENERATE;
   else
@@ -370,7 +390,7 @@ crypto_make_session (u8 thread_idx, crypto_session_t * cs, ipsec_sa_t * sa,
 
 	  /* kingwel, DPDK bug? AES_CMAC, have to set digest_len in cipher_form */
 	  if (cs->auth_alg->alg == RTE_CRYPTO_AUTH_AES_CMAC)
-	    cipher_xform.auth.digest_length = cs->auth_alg->trunc_size;	  
+	    cipher_xform.auth.digest_length = cs->auth_alg->trunc_size;
 	}
       else
 	{
@@ -419,7 +439,7 @@ dpdk_crypto_session_disposal (u64 ts)
     vec_foreach_index (index, dcm->dev)
     {
       /* first clear driver based session private data */
-      ret = rte_cryptodev_sym_session_clear (index, s->session);		
+      ret = rte_cryptodev_sym_session_clear (index, s->session);
     }
 
     ret = rte_cryptodev_sym_session_free (s->session);
@@ -899,7 +919,7 @@ crypto_create_session_h_pool (vlib_main_t * vm, u8 numa, u32 elts)
   elt_size = rte_cryptodev_get_header_session_size ();
 #else
   elt_size = rte_cryptodev_sym_get_header_session_size ();
-#endif  
+#endif
 
   error =
     dpdk_pool_create (vm, pool_name, elt_size, elts, 0, 512, numa, &mp, &pri);
@@ -960,7 +980,7 @@ crypto_create_pools (vlib_main_t * vm, u32 * max_sessions)
 	    	sess_sz = rte_cryptodev_get_private_session_size(dev->id);
 #else
 	    	sess_sz = rte_cryptodev_sym_get_private_session_size(dev->id);
-#endif  
+#endif
 		if (sess_sz > max_sess_size)
 			max_sess_size = sess_sz;
 
@@ -1053,13 +1073,14 @@ dpdk_ipsec_process (vlib_main_t * vm, vlib_node_runtime_t * rt,
 
   dcm->session_timeout = 10e9;
 
-  vec_validate_aligned (dcm->workers_main, n_mains - 1,CLIB_CACHE_LINE_BYTES);
+  vec_validate_aligned (dcm->workers_main, n_mains - 1,
+			CLIB_CACHE_LINE_BYTES);
 
   /* *INDENT-OFF* */
   vec_foreach (cwm, dcm->workers_main)
     {
       cwm->resource_idx = 0;
-      
+
       vec_validate_init_empty_aligned (cwm->ops, VLIB_FRAME_SIZE - 1, 0,
 				       CLIB_CACHE_LINE_BYTES);
       memset (cwm->cipher_resource_idx, ~0,
