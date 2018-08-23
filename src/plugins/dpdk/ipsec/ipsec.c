@@ -139,6 +139,13 @@ algos_init (u32 n_mains)
   a->key_len = 16;
   a->iv_len = 16;
 
+  a = &dcm->cipher_algs[IPSEC_CRYPTO_ALG_SNOW3G_UEA2];
+  a->type = RTE_CRYPTO_SYM_XFORM_CIPHER;
+  a->alg = RTE_CRYPTO_CIPHER_SNOW3G_UEA2;
+  a->boundary = 8;
+  a->key_len = 16;
+  a->iv_len = 16;
+
   vec_validate (dcm->auth_algs, IPSEC_INTEG_N_ALG - 1);
 
   {
@@ -212,6 +219,12 @@ algos_init (u32 n_mains)
   a = &dcm->auth_algs[IPSEC_INTEG_ALG_ZUC_EIA3];
   a->type = RTE_CRYPTO_SYM_XFORM_AUTH;
   a->alg = RTE_CRYPTO_AUTH_ZUC_EIA3;
+  a->key_len = 16;
+  a->trunc_size = 4;
+
+  a = &dcm->auth_algs[IPSEC_INTEG_ALG_SNOW3G_UIA2];
+  a->type = RTE_CRYPTO_SYM_XFORM_AUTH;
+  a->alg = RTE_CRYPTO_AUTH_SNOW3G_UIA2;
   a->key_len = 16;
   a->trunc_size = 4;
 }
@@ -345,7 +358,8 @@ crypto_set_auth_xform (struct rte_crypto_sym_xform *xform, crypto_alg_t * a,
   xform->next = NULL;
 
   /* kingwel, TBD, make it work */
-  if (xform->auth.algo == RTE_CRYPTO_AUTH_ZUC_EIA3)
+  if (xform->auth.algo == RTE_CRYPTO_AUTH_ZUC_EIA3
+      || xform->auth.algo == RTE_CRYPTO_AUTH_SNOW3G_UIA2)
     {
       xform->auth.iv.length = 16;
       xform->auth.iv.offset = 0;

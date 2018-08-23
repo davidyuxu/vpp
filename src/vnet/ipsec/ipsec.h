@@ -87,7 +87,8 @@ typedef enum
   _(9, AES_GCM_256, "aes-gcm-256")  \
   _(10, DES_CBC, "des-cbc")         \
   _(11, 3DES_CBC, "3des-cbc")       \
-  _(12, ZUC_EEA3, "zuc-eea3")
+  _(12, ZUC_EEA3, "zuc-eea3")       \
+  _(13, SNOW3G_UEA2, "snow3g-uea2") \
 
 typedef enum
 {
@@ -108,7 +109,8 @@ typedef enum
   _(7, SHA_512_256, "sha-512-256")	/* RFC4868 */													\
   _(8, AES_XCBC, "aes-xcbc")				/* RFC3566 */													\
   _(9, AES_CMAC, "aes-cmac")	/* kingwel test only */ \
-  _(10, ZUC_EIA3, "zuc-eia3")	/* kingwel test only */
+  _(10, ZUC_EIA3, "zuc-eia3")	/* kingwel test only */ \
+  _(11, SNOW3G_UIA2, "snow3g-uia2")	/* kingwel test only */
 
 typedef enum
 {

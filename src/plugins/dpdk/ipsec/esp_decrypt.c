@@ -304,6 +304,17 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
       }
     }
 
+		/* kingwel, bit mode for snow3g & zuc */
+		if (PREDICT_FALSE
+		    (cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_ZUC_EEA3
+		     || cs0->cipher_alg->alg == RTE_CRYPTO_CIPHER_SNOW3G_UEA2))
+		  {
+		    cipher_off = cipher_off << 3;
+		    cipher_len = cipher_len << 3;
+		    auth_len = auth_len << 3;
+		  }
+
+
 		/* setup op */
 	  crypto_op_setup (cs0->is_aead, mb0, op, cs0->sessions[thread_idx], cipher_off, cipher_len,
 			   0, auth_len, aad, digest, digest_paddr);

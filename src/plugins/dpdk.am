@@ -22,6 +22,12 @@ endif
 if WITH_AESNI_MB_LIB
 dpdk_plugin_la_LDFLAGS += -Wl,--exclude-libs,libIPSec_MB.a,-l:libIPSec_MB.a
 endif
+if WITH_ZUC_LIB
+dpdk_plugin_la_LDFLAGS += -Wl,--exclude-libs,libsso_zuc.a,-l:libsso_zuc.a
+endif
+if WITH_SNOW3G_LIB
+dpdk_plugin_la_LDFLAGS += -Wl,--exclude-libs,libsso_snow3g.a,-l:libsso_snow3g.a
+endif
 if WITH_ISA_L_CRYPTO_LIB
 dpdk_plugin_la_LDFLAGS += -Wl,--exclude-libs,libisal_crypto.a,-l:libisal_crypto.a
 endif
