@@ -66,6 +66,12 @@ AESNIMB_LIB_TARBALL := v$(IPSEC_MB_VER).tar.gz
 AESNIMB_LIB_TARBALL_URL := http://github.com/01org/intel-ipsec-mb/archive/$(AESNIMB_LIB_TARBALL)
 AESNIMB_LIB_SOURCE := $(B)/intel-ipsec-mb-$(IPSEC_MB_VER)
 
+SNOW3G_LIB_TARBALL := libsso-snow3g-l-0-3-1-409-tar.gz
+ZUC_LIB_TARBALL := libsso-zuc-l-0-1-1-361-patched-tar.gz
+
+SNOW3G_LIB_SOURCE := $(B)/libsso_snow3g/snow3g
+ZUC_LIB_SOURCE := $(B)/zuc
+
 ifneq (,$(findstring clang,$(CC)))
 DPDK_CC=clang
 else ifneq (,$(findstring icc,$(CC)))
@@ -185,6 +191,8 @@ DPDK_EXTRA_CFLAGS += -L$(IPSEC_MB_BUILD_PATH) -I$(IPSEC_MB_BUILD_PATH)
 endif
 
 DPDK_MAKE_EXTRA_ARGS += AESNI_MULTI_BUFFER_LIB_PATH=$(AESNIMB_LIB_SOURCE)
+DPDK_MAKE_EXTRA_ARGS += LIBSSO_SNOW3G_PATH=$(SNOW3G_LIB_SOURCE)
+DPDK_MAKE_EXTRA_ARGS += LIBSSO_ZUC_PATH=$(ZUC_LIB_SOURCE)
 
 # assemble DPDK make arguments
 DPDK_MAKE_ARGS := -C $(DPDK_SOURCE) -j $(JOBS) \
@@ -230,8 +238,8 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	$(call set,RTE_LIBRTE_PMD_AESNI_MB,$(AESNI))
 	$(call set,RTE_LIBRTE_PMD_AESNI_GCM,$(AESNI))
 	$(call set,RTE_LIBRTE_PMD_OPENSSL,y)
-	$(call set,RTE_LIBRTE_PMD_SNOW3G,n)
-	$(call set,RTE_LIBRTE_PMD_ZUC,n)
+	$(call set,RTE_LIBRTE_PMD_SNOW3G,$(AESNI))
+	$(call set,RTE_LIBRTE_PMD_ZUC,$(AESNI))
 	$(call set,RTE_LIBRTE_MLX4_PMD,$(DPDK_MLX4_PMD))
 	$(call set,RTE_LIBRTE_MLX5_PMD,$(DPDK_MLX5_PMD))
 	$(call set,RTE_LIBRTE_PMD_SOFTNIC,n)
@@ -303,6 +311,10 @@ ifeq ($(AESNI),y)
 	@tar --directory $(B) --extract --file $(CURDIR)/$(NASM_TARBALL)
 	@echo --- extracting $(AESNIMB_LIB_TARBALL) ---
 	@tar --directory $(B) --extract --file $(CURDIR)/$(AESNIMB_LIB_TARBALL)
+	@echo --- extracting $(SNOW3G_LIB_TARBALL) ---
+	@tar --directory $(B) --extract --file $(CURDIR)/extras/$(SNOW3G_LIB_TARBALL)
+	@echo --- extracting $(ZUC_LIB_TARBALL) ---
+	@tar --directory $(B) --extract --file $(CURDIR)/extras/$(ZUC_LIB_TARBALL)
 endif
 	@touch $@
 
@@ -333,13 +345,21 @@ config: $(B)/.config.ok
 build-nasm:
 	cd $(NASM_SOURCE) && sh configure && make -j
 
-.PHONY: build-ipsec-mb
+.PHONY: build-ipsec-mb, build-snow3g-zuc
 build-ipsec-mb:
 	mkdir -p $(I)/lib/
 	# Do not build GCM stuff if we are building ISA_L
 	make -C $(AESNIMB_LIB_SOURCE) -j SHARED=n \
 	  EXTRA_CFLAGS=-fPIC NASM=$(NASM_SOURCE)/nasm
 	cp $(AESNIMB_LIB_SOURCE)/libIPSec_MB.a $(I)/lib/
+
+# Snow3G & ZUC
+build-snow3g-zuc:
+	mkdir -p $(I)/lib/
+	make -C $(SNOW3G_LIB_SOURCE) -j SHARED=n
+	make -C $(ZUC_LIB_SOURCE) -j
+	cp $(SNOW3G_LIB_SOURCE)/build/libsso_snow3g.a $(I)/lib/
+	cp $(ZUC_LIB_SOURCE)/build/libsso_zuc.a $(I)/lib/
 
 .PHONY: build-dpdk
 build-dpdk:
@@ -350,6 +370,7 @@ build-dpdk:
 ifeq ($(AESNI),y)
 BUILD_TARGETS += build-nasm
 BUILD_TARGETS += build-ipsec-mb
+BUILD_TARGETS += build-snow3g-zuc
 endif
 BUILD_TARGETS += build-dpdk
 

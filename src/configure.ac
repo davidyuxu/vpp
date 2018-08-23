@@ -372,6 +372,33 @@ AM_CONDITIONAL(WITH_AESNI_MB_LIB, test "$with_aesni_mb_lib" = "yes")
 m4_append([list_of_with], [isa_l_crypto_lib], [, ])
 AM_CONDITIONAL(WITH_ISA_L_CRYPTO_LIB, test "$with_isa_l_crypto_lib" = "yes")
 
+
+with_snow3g_lib=no
+with_zuc_lib=no
+
+DPDK_IS_PMD_ENABLED(LIBRTE_PMD_SNOW3G, dpdk_snow3g_pmd)
+DPDK_IS_PMD_ENABLED(LIBRTE_PMD_ZUC, dpdk_zuc_pmd)
+
+AM_COND_IF([WITH_DPDK_SNOW3G_PMD],
+[
+  AC_CHECK_LIB([sso_snow3g], [sso_snow3g_f8_1_buffer],
+    [with_snow3g_lib=yes],
+    [AC_MSG_ERROR([sso_snow3g library not found])])
+])
+
+AM_COND_IF([WITH_DPDK_ZUC_PMD],
+[
+  AC_CHECK_LIB([sso_zuc], [sso_zuc_eea3_1_buffer],
+    [with_zuc_lib=yes],
+    [AC_MSG_ERROR([sso_zuc library not found])])
+])
+
+m4_append([list_of_with], [snow3g_lib], [, ])
+AM_CONDITIONAL(WITH_SNOW3G_LIB, test "$with_snow3g_lib" = "yes")
+
+m4_append([list_of_with], [zuc_lib], [, ])
+AM_CONDITIONAL(WITH_ZUC_LIB, test "$with_zuc_lib" = "yes")
+
 AM_COND_IF([ENABLE_G2],
 [
   PKG_CHECK_MODULES(g2, gtk+-2.0)
