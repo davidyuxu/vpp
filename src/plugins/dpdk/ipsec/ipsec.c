@@ -402,25 +402,25 @@ crypto_make_session (u8 thread_idx, crypto_session_t * cs, ipsec_sa_t * sa,
 
       /* kingwel cihper only */
       if (sa->integ_alg == IPSEC_INTEG_ALG_NONE)
-      {
-      	xfs = &cipher_xform;
-      }
-      else
-      	{
-
-      crypto_set_auth_xform (&auth_xform, cs->auth_alg, sa, is_outbound);
-
-      if (is_outbound)
 	{
-	  cipher_xform.next = &auth_xform;
 	  xfs = &cipher_xform;
 	}
       else
 	{
-	  auth_xform.next = &cipher_xform;
-	  xfs = &auth_xform;
+
+	  crypto_set_auth_xform (&auth_xform, cs->auth_alg, sa, is_outbound);
+
+	  if (is_outbound)
+	    {
+	      cipher_xform.next = &auth_xform;
+	      xfs = &cipher_xform;
+	    }
+	  else
+	    {
+	      auth_xform.next = &cipher_xform;
+	      xfs = &auth_xform;
+	    }
 	}
-      	}
     }
 
   struct rte_cryptodev_sym_session *s =
