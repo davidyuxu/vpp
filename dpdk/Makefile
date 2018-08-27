@@ -66,7 +66,7 @@ AESNIMB_LIB_TARBALL := v$(IPSEC_MB_VER).tar.gz
 AESNIMB_LIB_TARBALL_URL := http://github.com/01org/intel-ipsec-mb/archive/$(AESNIMB_LIB_TARBALL)
 AESNIMB_LIB_SOURCE := $(B)/intel-ipsec-mb-$(IPSEC_MB_VER)
 
-SNOW3G_LIB_TARBALL := libsso-snow3g-l-0-3-1-409-tar.gz
+SNOW3G_LIB_TARBALL := libsso-snow3g-l-0-3-1-409-patched-tar.gz
 ZUC_LIB_TARBALL := libsso-zuc-l-0-1-1-361-patched-tar.gz
 
 SNOW3G_LIB_SOURCE := $(B)/libsso_snow3g/snow3g
