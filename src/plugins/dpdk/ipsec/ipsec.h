@@ -235,6 +235,10 @@ crypto_get_resource (crypto_worker_main_t * cwm, ipsec_sa_t * sa,
   if (cs->is_aead)
     return cipher_res;
 
+  /* kingwel, if integ is NONE, return cipher resource */
+  if (sa->integ_alg == IPSEC_INTEG_ALG_NONE)
+    return cipher_res;
+
   return (u16) ~ 0;
 }
 

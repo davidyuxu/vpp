@@ -395,22 +395,32 @@ crypto_make_session (u8 thread_idx, crypto_session_t * cs, ipsec_sa_t * sa,
     {
       crypto_set_cipher_xform (&cipher_xform, cs->cipher_alg, sa,
 			       is_outbound);
+
+      /* kingwel, DPDK bug? AES_CMAC, have to set digest_len in cipher_form */
+      if (cs->auth_alg->alg == RTE_CRYPTO_AUTH_AES_CMAC)
+	cipher_xform.auth.digest_length = cs->auth_alg->trunc_size;
+
+      /* kingwel cihper only */
+      if (sa->integ_alg == IPSEC_INTEG_ALG_NONE)
+      {
+      	xfs = &cipher_xform;
+      }
+      else
+      	{
+
       crypto_set_auth_xform (&auth_xform, cs->auth_alg, sa, is_outbound);
 
       if (is_outbound)
 	{
 	  cipher_xform.next = &auth_xform;
 	  xfs = &cipher_xform;
-
-	  /* kingwel, DPDK bug? AES_CMAC, have to set digest_len in cipher_form */
-	  if (cs->auth_alg->alg == RTE_CRYPTO_AUTH_AES_CMAC)
-	    cipher_xform.auth.digest_length = cs->auth_alg->trunc_size;
 	}
       else
 	{
 	  auth_xform.next = &cipher_xform;
 	  xfs = &auth_xform;
 	}
+      	}
     }
 
   struct rte_cryptodev_sym_session *s =
