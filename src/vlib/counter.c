@@ -81,7 +81,11 @@ void
 vlib_counter_heap_init (uword size)
 {
   if (size > 0)
-    counter_heap = mheap_alloc (0, size);
+#if USE_DLMALLOC == 0
+    	counter_heap = mheap_alloc (0, size);
+#else
+	counter_heap = create_mspace (size, 1 /* locked */ );
+#endif
 }
 void *vlib_stats_push_heap (void) __attribute__ ((weak));
 void *

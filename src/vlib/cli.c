@@ -852,26 +852,6 @@ VLIB_CLI_COMMAND (show_counter_memory_usage_command, static) = {
 };
 /* *INDENT-ON* */
 
-void test_mheap ();
-
-
-static clib_error_t *
-test_memory_usage (vlib_main_t * vm,
-		   unformat_input_t * input, vlib_cli_command_t * cmd)
-{
-  test_mheap ();
-  return 0;
-}
-
-/* *INDENT-OFF* */
-VLIB_CLI_COMMAND (test_memory_usage_command, static) = {
-  .path = "test mheap",
-  .short_help = "test mheap",
-  .function = test_memory_usage,
-};
-/* *INDENT-ON* */
-
-
 static clib_error_t *
 show_cpu (vlib_main_t * vm, unformat_input_t * input,
 	  vlib_cli_command_t * cmd)

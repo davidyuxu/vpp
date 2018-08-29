@@ -476,6 +476,7 @@ list(APPEND VNET_SOURCES
   ipsec/ipsec_input.c
   ipsec/ipsec_if.c
   ipsec/ipsec_if_in.c
+  ipsec/ipsec_if_out.c
   ipsec/esp_format.c
   ipsec/esp_encrypt.c
   ipsec/esp_decrypt.c

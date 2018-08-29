@@ -70,7 +70,7 @@ adj_nbr_insert (fib_protocol_t nh_proto,
 	       sizeof(BVT(clib_bihash)));
 
 	if (vnet_sw_interface_is_p2p(vnet_get_main(), sw_if_index)) {
-		BV(clib_bihash_set_mheap) (adj_nbr_tables[nh_proto][sw_if_index], adj_nbr_mheap_p2p);
+		// FIX later!!! BV(clib_bihash_set_mheap) (adj_nbr_tables[nh_proto][sw_if_index], adj_nbr_mheap_p2p);
 		BV(clib_bihash_init) (adj_nbr_tables[nh_proto][sw_if_index],
 				      "Adjacency Neighbour table",
 				      ADJ_NBR_P2P_HASH_NUM_BUCKETS,
@@ -1163,5 +1163,9 @@ adj_nbr_module_init (void)
     if (0 == adj_nbr_mheap_size)
       adj_nbr_mheap_size = ADJ_NBR_P2P_HASH_MEMORY_SIZE;
 
+#if USE_DLMALLOC == 0
     adj_nbr_mheap_p2p = mheap_alloc (0 /* use VM */ , adj_nbr_mheap_size);
+#else
+    adj_nbr_mheap_p2p = create_mspace (adj_nbr_mheap_size, 1 /* locked */ );
+#endif
 }
