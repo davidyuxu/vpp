@@ -35,6 +35,12 @@ int main()
 #ifdef RTE_LIBRTE_PMD_AESNI_GCM
   printf(\"RTE_LIBRTE_PMD_AESNI_GCM=%u\\n\", RTE_LIBRTE_PMD_AESNI_GCM);
 #endif
+#ifdef RTE_LIBRTE_PMD_SNOW3G
+  printf(\"RTE_LIBRTE_PMD_SNOW3G=%u\\n\", RTE_LIBRTE_PMD_SNOW3G);
+#endif
+#ifdef RTE_LIBRTE_PMD_ZUC
+  printf(\"RTE_LIBRTE_PMD_ZUC=%u\\n\", RTE_LIBRTE_PMD_ZUC);
+#endif
   return 0;
 }
 ")
@@ -88,6 +94,14 @@ if(DPDK_INCLUDE_DIR AND DPDK_LIB)
   if(DPDK_RTE_LIBRTE_PMD_AESNI_MB OR DPDK_RTE_LIBRTE_PMD_AESNI_GCM)
     set(DPDK_LINK_FLAGS "${DPDK_LINK_FLAGS} -Wl,--exclude-libs,libIPSec_MB.a,-l:libIPSec_MB.a")
     message(STATUS "DPDK depends on IPSec MB library")
+  endif()
+  if(DPDK_RTE_LIBRTE_PMD_SNOW3G)
+    set(DPDK_LINK_FLAGS "${DPDK_LINK_FLAGS} -Wl,--exclude-libs,libsso_snow3g.a,-l:libsso_snow3g.a")
+    message(STATUS "DPDK depends on SNOW3G library")
+  endif()
+  if(DPDK_RTE_LIBRTE_PMD_ZUC)
+    set(DPDK_LINK_FLAGS "${DPDK_LINK_FLAGS} -Wl,--exclude-libs,libsso_zuc.a,-l:libsso_zuc.a")
+    message(STATUS "DPDK depends on ZUC library")
   endif()
   set(DPDK_LINK_FLAGS "${DPDK_LINK_FLAGS} -Wl,-lnuma")
   add_vpp_plugin(dpdk
