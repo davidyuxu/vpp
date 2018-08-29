@@ -994,7 +994,7 @@ crypto_create_pools (vlib_main_t * vm, u32 * max_sessions)
   crypto_dev_t *dev;
 
   u32 max_sess_size = 0, sess_sz;
-  u32 max_num_sessions = 0, num_sessions;
+  u32 max_num_sessions = *max_sessions, num_sessions;
 
   /* figure out the best fit private session size */
 	/* *INDENT-OFF* */
@@ -1116,7 +1116,7 @@ dpdk_ipsec_process (vlib_main_t * vm, vlib_node_runtime_t * rt,
 
   crypto_auto_placement ();
 
-  u32 max_sessions = 256;
+  u32 max_sessions = 1000;
   error = crypto_create_pools (vm, &max_sessions);
   if (error)
     {
