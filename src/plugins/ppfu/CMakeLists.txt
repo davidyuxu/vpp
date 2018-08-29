@@ -11,22 +11,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_vpp_plugin(gtpu
+add_vpp_plugin(ppfu
   SOURCES
-  gtpu.c
-  gtpu_api.c
-  gtpu_decap.c
-  gtpu_encap.c
-  gtpu_process.c
+  ppf_gtpu_encap.c
+  ppf_gtpu_decap.c
+  ppf_gtpu.c
+  ppf_pdcp_decrypt.c
+  ppf_pdcp_encrypt.c
+  ppf_pdcp_input.c
+  ppf_sb_path_lb.c
+  ppf_srb_nb_rx.c
+  ppf_srb_nb_tx.c
+  ppf_srb.c
+  ppf_pdcp.c
+  ppfu.c
+  ppfu_api.c
+  snow3g.c
 
   API_FILES
-  gtpu.api
-
+  ppfu.api
+  ppf_gtpu.api
+  
   INSTALL_HEADERS
-  gtpu_all_api_h.h
-  gtpu_msg_enum.h
-
+  ppf_gtpu_all_api_h.h
+  ppf_gtpu_msg_enum.h
+  ppfu_all_api_h.h
+  ppfu_msg_enum.h
+  
   API_TEST_SOURCES
-  gtpu_test.c
+  ppfu_test.c 
 )
 
