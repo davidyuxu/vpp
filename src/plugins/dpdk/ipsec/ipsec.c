@@ -746,7 +746,7 @@ crypto_scan_devs (u32 n_mains)
       dev->features = info.feature_flags;
       dev->max_qp = info.max_nb_queue_pairs;
       dev->max_nb_sessions = info.sym.max_nb_sessions;
-      dev->max_nb_sessions_per_qp = info.sym.max_nb_sessions_per_qp;
+      dev->max_nb_sessions_per_qp = 0; // FIXME: info.sym.max_nb_sessions_per_qp;
       drv_id = info.driver_id;
       if (drv_id >= vec_len (dcm->drv))
 	vec_validate_init_empty (dcm->drv, drv_id,
