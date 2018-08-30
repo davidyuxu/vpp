@@ -49,9 +49,9 @@ format_crypto (u8 * s, va_list * args)
 	      rte_cryptodevs[dev->id].data->dev_started ? "up" : "down");
   s =
     format (s,
-	    "  id %u drv_id %u numa_node %u, max_queues %u, max_nb_sessions %u, max_nb_sessions_per_qp %u \n",
+	    "  id %u drv_id %u numa_node %u, max_queues %u, max_nb_sessions %u\n",
 	    dev->id, dev->drv_id, dev->numa, dev->max_qp,
-	    dev->max_nb_sessions, dev->max_nb_sessions_per_qp);
+	    dev->max_nb_sessions);
 
   if (dev->features)
     {
