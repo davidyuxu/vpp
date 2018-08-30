@@ -27,6 +27,7 @@ add_vpp_plugin(ppfu
   ppfu.c
   ppfu_api.c
   snow3g.c
+  ppfu_handoff.c
 
   API_FILES
   ppfu.api
