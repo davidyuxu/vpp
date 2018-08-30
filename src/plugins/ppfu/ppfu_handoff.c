@@ -152,7 +152,7 @@ worker_ppfu_handoff_node_fn (vlib_main_t * vm,
       //Fix me, need set next id according to IP header type
       /* if input node did not specify next index, then packet
          should go to eternet-input */
-      vnet_buffer (b0)->handoff.next_index =
+      vnet_buffer2 (b0)->handoff.next_index =
 	PPFU_HANDOFF_DISPATCH_NEXT_GTPU_IP4_INPUT;
 
       if (PREDICT_TRUE (is_pow2 (hm->num_workers)))
@@ -358,8 +358,8 @@ ppfu_handoff_dispatch_node_fn (vlib_main_t * vm,
 	  b0 = vlib_get_buffer (vm, bi0);
 	  b1 = vlib_get_buffer (vm, bi1);
 
-	  next0 = vnet_buffer (b0)->handoff.next_index;
-	  next1 = vnet_buffer (b1)->handoff.next_index;
+	  next0 = vnet_buffer2 (b0)->handoff.next_index;
+	  next1 = vnet_buffer2 (b1)->handoff.next_index;
 
 	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
 	    {
@@ -405,7 +405,7 @@ ppfu_handoff_dispatch_node_fn (vlib_main_t * vm,
 
 	  b0 = vlib_get_buffer (vm, bi0);
 
-	  next0 = vnet_buffer (b0)->handoff.next_index;
+	  next0 = vnet_buffer2 (b0)->handoff.next_index;
 
 	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
 	    {
@@ -649,10 +649,10 @@ ppf_pdcp_handoff_node_fn (vlib_main_t * vm,
       if ((rx_tunnel_index0 != INVALID_TUNNEL_ID)
 	  && ((t0->tunnel_type == PPF_GTPU_SB)
 	      || (t0->tunnel_type == PPF_GTPU_SRB)))
-	vnet_buffer (b0)->handoff.next_index =
+	vnet_buffer2 (b0)->handoff.next_index =
 	  PPF_PDCP_HANDOFF_DISPATCH_NEXT_PDCP_DECRYPT;
       else
-	vnet_buffer (b0)->handoff.next_index =
+	vnet_buffer2 (b0)->handoff.next_index =
 	  PPF_PDCP_HANDOFF_DISPATCH_NEXT_PDCP_ENCRYPT;
 
       if (PREDICT_TRUE (is_pow2 (hm->num_pdcp_workers)))
@@ -874,8 +874,8 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
 	  b0 = vlib_get_buffer (vm, bi0);
 	  b1 = vlib_get_buffer (vm, bi1);
 
-	  next0 = vnet_buffer (b0)->handoff.next_index;
-	  next1 = vnet_buffer (b1)->handoff.next_index;
+	  next0 = vnet_buffer2 (b0)->handoff.next_index;
+	  next1 = vnet_buffer2 (b1)->handoff.next_index;
 
 	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
 	    {
@@ -923,7 +923,7 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
 
 	  b0 = vlib_get_buffer (vm, bi0);
 
-	  next0 = vnet_buffer (b0)->handoff.next_index;
+	  next0 = vnet_buffer2 (b0)->handoff.next_index;
 
 	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
 	    {
@@ -1140,12 +1140,12 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
       /* Compute hash, fix later!!! will use call-id + count */
       hash = call_id0;		//(u32) clib_xxhash (call_id0);
 
-      vnet_buffer (b0)->handoff.next_index =
+      vnet_buffer2 (b0)->handoff.next_index =
 	PPF_TX_HANDOFF_DISPATCH_NEXT_GTPU4_ENCAP;
       if (PREDICT_FALSE
 	  ((INVALID_TUNNEL_ID != rx_tunnel_index0)
 	   && (t0->tunnel_type == PPF_GTPU_SRB)))
-	vnet_buffer (b0)->handoff.next_index =
+	vnet_buffer2 (b0)->handoff.next_index =
 	  PPF_TX_HANDOFF_DISPATCH_NEXT_SRB_NB_TX;
 
       if (PREDICT_FALSE
@@ -1169,7 +1169,7 @@ ppf_tx_handoff_node_fn (vlib_main_t * vm,
 	    }
 
 	  if (c0->lbo_mode == PPF_LBO_MODE)
-	    vnet_buffer (b0)->handoff.next_index =
+	    vnet_buffer2 (b0)->handoff.next_index =
 	      PPF_TX_HANDOFF_DISPATCH_NEXT_IP4_LOOKUP;
 	}
 
@@ -1361,8 +1361,8 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
 	  b0 = vlib_get_buffer (vm, bi0);
 	  b1 = vlib_get_buffer (vm, bi1);
 
-	  next0 = vnet_buffer (b0)->handoff.next_index;
-	  next1 = vnet_buffer (b1)->handoff.next_index;
+	  next0 = vnet_buffer2 (b0)->handoff.next_index;
+	  next1 = vnet_buffer2 (b1)->handoff.next_index;
 
 	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
 	    {
@@ -1410,7 +1410,7 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
 
 	  b0 = vlib_get_buffer (vm, bi0);
 
-	  next0 = vnet_buffer (b0)->handoff.next_index;
+	  next0 = vnet_buffer2 (b0)->handoff.next_index;
 
 	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
 	    {

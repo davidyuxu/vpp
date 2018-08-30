@@ -385,6 +385,11 @@ typedef struct
 
     struct
     {
+      u32 next_index;
+    } handoff;
+
+    struct
+    {
       struct
       {
 	u32 count;
