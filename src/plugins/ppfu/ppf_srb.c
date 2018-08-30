@@ -324,6 +324,7 @@ ppf_srb_init (vlib_main_t * vm)
   ppf_sb_main_t *psm = &ppf_sb_main;
   udp_dst_port_info_t *pi;
   pg_node_t *pn = pg_get_node (ppf_srb_nb_rx_node.index);
+  clib_error_t *error = 0;
 
   pn->unformat_edit = unformat_pg_ppf_srb_header;
 
@@ -334,6 +335,9 @@ ppf_srb_init (vlib_main_t * vm)
   psm->sb_lb_next_index = PPF_SB_PATH_LB_NEXT_PPF_PDCP_ENCRYPT;
 
   psm->want_feedback = 0;
+
+  if ((error = vlib_call_init_function (vm, ip_checksum_init)))
+    return error;
 
   ppf_srb_ip_udp_rewrite ();
 
