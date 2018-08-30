@@ -746,7 +746,6 @@ crypto_scan_devs (u32 n_mains)
       dev->features = info.feature_flags;
       dev->max_qp = info.max_nb_queue_pairs;
       dev->max_nb_sessions = info.sym.max_nb_sessions;
-      dev->max_nb_sessions_per_qp = 0; // FIXME: info.sym.max_nb_sessions_per_qp;
       drv_id = info.driver_id;
       if (drv_id >= vec_len (dcm->drv))
 	vec_validate_init_empty (dcm->drv, drv_id,
@@ -987,58 +986,50 @@ crypto_create_session_drv_pool (vlib_main_t * vm, u8 numa, u32 elt_size,
 }
 
 static clib_error_t *
-crypto_create_pools (vlib_main_t * vm, u32 * max_sessions)
+crypto_create_pools (vlib_main_t * vm, u32 max_sessions)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   clib_error_t *error = NULL;
   crypto_dev_t *dev;
 
   u32 max_sess_size = 0, sess_sz;
-  u32 max_num_sessions = *max_sessions, num_sessions;
 
   /* figure out the best fit private session size */
 	/* *INDENT-OFF* */
 	vec_foreach (dev, dcm->dev)
 	{
 #if RTE_VERSION < RTE_VERSION_NUM(18, 5, 0, 0)
-	    	sess_sz = rte_cryptodev_get_private_session_size(dev->id);
+	  sess_sz = rte_cryptodev_get_private_session_size(dev->id);
 #else
-	    	sess_sz = rte_cryptodev_sym_get_private_session_size(dev->id);
+	  sess_sz = rte_cryptodev_sym_get_private_session_size(dev->id);
 #endif
-		if (sess_sz > max_sess_size)
-			max_sess_size = sess_sz;
-
-		num_sessions = dev->max_nb_sessions;
-		if (num_sessions > max_num_sessions)
-			max_num_sessions = num_sessions;
+	  if (sess_sz > max_sess_size)
+	    max_sess_size = sess_sz;
 	}
 	/* *INDENT-ON* */
-
-  *max_sessions = max_num_sessions;
 
   /* *INDENT-OFF* */
   vec_foreach (dev, dcm->dev)
   {
     vec_validate_aligned (dcm->per_numa_data, dev->numa, CLIB_CACHE_LINE_BYTES);
-	}
-  /* *INDENT-ON* */
-
-  /* *INDENT-OFF* */
-  for (int i = 0; i < vec_len (dcm->per_numa_data); i++)
-  {
-    error = crypto_create_crypto_op_pool (vm, i);
-    if (error)
-			return error;
-
-    error = crypto_create_session_h_pool (vm, i, max_num_sessions);
-    if (error)
-			return error;
-
-    error = crypto_create_session_drv_pool (vm, i, max_sess_size, max_num_sessions);
-    if (error)
-			return error;
   }
   /* *INDENT-ON* */
+
+  for (int i = 0; i < vec_len (dcm->per_numa_data); i++)
+    {
+      error = crypto_create_crypto_op_pool (vm, i);
+      if (error)
+	return error;
+
+      error = crypto_create_session_h_pool (vm, i, max_sessions);
+      if (error)
+	return error;
+
+      error =
+	crypto_create_session_drv_pool (vm, i, max_sess_size, max_sessions);
+      if (error)
+	return error;
+    }
 
   return NULL;
 }
@@ -1116,8 +1107,9 @@ dpdk_ipsec_process (vlib_main_t * vm, vlib_node_runtime_t * rt,
 
   crypto_auto_placement ();
 
-  u32 max_sessions = 1000;
-  error = crypto_create_pools (vm, &max_sessions);
+  /* FIXME: MAX sessions */
+  u32 max_sessions = vm->max_capacity;
+  error = crypto_create_pools (vm, max_sessions);
   if (error)
     {
       clib_error_report (error);
