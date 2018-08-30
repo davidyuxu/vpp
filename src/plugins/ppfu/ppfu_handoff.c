@@ -361,8 +361,6 @@ ppfu_handoff_dispatch_node_fn (vlib_main_t * vm,
 	  next0 = vnet_buffer2 (b0)->handoff.next_index;
 	  next1 = vnet_buffer2 (b1)->handoff.next_index;
 
-	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
-	    {
 	      if (PREDICT_FALSE (b0->flags & VLIB_BUFFER_IS_TRACED))
 		{
 		  vlib_trace_buffer (vm, node, next0, b0,	/* follow_chain */
@@ -381,7 +379,6 @@ ppfu_handoff_dispatch_node_fn (vlib_main_t * vm,
 		  t->next_index = next1;
 		  t->buffer_index = bi1;
 		}
-	    }
 
 	  /* verify speculative enqueues, maybe switch current next frame */
 	  vlib_validate_buffer_enqueue_x2 (vm, node, next_index,
@@ -407,8 +404,6 @@ ppfu_handoff_dispatch_node_fn (vlib_main_t * vm,
 
 	  next0 = vnet_buffer2 (b0)->handoff.next_index;
 
-	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
-	    {
 	      if (PREDICT_FALSE (b0->flags & VLIB_BUFFER_IS_TRACED))
 		{
 		  vlib_trace_buffer (vm, node, next0, b0,	/* follow_chain */
@@ -418,7 +413,6 @@ ppfu_handoff_dispatch_node_fn (vlib_main_t * vm,
 		  t->next_index = next0;
 		  t->buffer_index = bi0;
 		}
-	    }
 
 	  /* verify speculative enqueue, maybe switch current next frame */
 	  vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
@@ -877,8 +871,6 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
 	  next0 = vnet_buffer2 (b0)->handoff.next_index;
 	  next1 = vnet_buffer2 (b1)->handoff.next_index;
 
-	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
-	    {
 	      if (PREDICT_FALSE (b0->flags & VLIB_BUFFER_IS_TRACED))
 		{
 		  vlib_trace_buffer (vm, node, next0, b0,	/* follow_chain */
@@ -897,7 +889,6 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
 		  t->next_index = next1;
 		  t->buffer_index = bi1;
 		}
-	    }
 
 	  pkts_processed += 2;
 
@@ -925,8 +916,6 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
 
 	  next0 = vnet_buffer2 (b0)->handoff.next_index;
 
-	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
-	    {
 	      if (PREDICT_FALSE (b0->flags & VLIB_BUFFER_IS_TRACED))
 		{
 		  vlib_trace_buffer (vm, node, next0, b0,	/* follow_chain */
@@ -936,7 +925,6 @@ ppf_pdcp_handoff_dispatch_node_fn (vlib_main_t * vm,
 		  t->next_index = next0;
 		  t->buffer_index = bi0;
 		}
-	    }
 
 	  pkts_processed += 1;
 
@@ -1364,8 +1352,6 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
 	  next0 = vnet_buffer2 (b0)->handoff.next_index;
 	  next1 = vnet_buffer2 (b1)->handoff.next_index;
 
-	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
-	    {
 	      if (PREDICT_FALSE (b0->flags & VLIB_BUFFER_IS_TRACED))
 		{
 		  vlib_trace_buffer (vm, node, next0, b0,	/* follow_chain */
@@ -1384,7 +1370,6 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
 		  t->next_index = next1;
 		  t->buffer_index = bi1;
 		}
-	    }
 
 	  pkts_processed += 2;
 
@@ -1412,8 +1397,6 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
 
 	  next0 = vnet_buffer2 (b0)->handoff.next_index;
 
-	  if (PREDICT_FALSE (vm->trace_main.trace_active_hint))
-	    {
 	      if (PREDICT_FALSE (b0->flags & VLIB_BUFFER_IS_TRACED))
 		{
 		  vlib_trace_buffer (vm, node, next0, b0,	/* follow_chain */
@@ -1423,7 +1406,6 @@ ppf_tx_handoff_dispatch_node_fn (vlib_main_t * vm,
 		  t->next_index = next0;
 		  t->buffer_index = bi0;
 		}
-	    }
 
 	  pkts_processed += 1;
 
