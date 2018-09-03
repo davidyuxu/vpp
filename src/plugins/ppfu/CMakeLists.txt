@@ -11,6 +11,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+find_path(DPDK_INCLUDE_DIR PATH_SUFFIXES dpdk NAMES rte_config.h HINTS
+	  ${DPDK_INCLUDE_DIR_HINT})
+find_library(DPDK_LIB NAMES libdpdk.a HINTS ${DPDK_LIB_DIR_HINT})
+
+include_directories (${DPDK_INCLUDE_DIR})
+
+#message(STATUS ${DPDK_INCLUDE_DIR_HINT})
+#message(STATUS ${DPDK_INCLUDE_DIR})
+
+message(STATUS ${DPDK_LIB})
+
+#include_directories (${DPDK_INCLUDE_DIR}/zuc/include)
+#include_directories (${DPDK_INCLUDE_DIR}/snow3g/include)
+
+
+get_filename_component(DPDK_LIB_DIR ${DPDK_LIB} DIRECTORY)
+set(DPDK_LINK_FLAGS "-L${DPDK_LIB_DIR} -Wl,--whole-archive,-l:libsso_snow3g.a,-l:libsso_zuc.a,--no-whole-archive")
+
 add_vpp_plugin(ppfu
   SOURCES
   ppf_gtpu_encap.c
@@ -41,5 +59,8 @@ add_vpp_plugin(ppfu
   
   API_TEST_SOURCES
   ppfu_test.c 
+  
+  LINK_FLAGS
+  ${DPDK_LINK_FLAGS}
 )
 

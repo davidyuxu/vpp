@@ -358,7 +358,11 @@ build-snow3g-zuc:
 	mkdir -p $(I)/lib/
 	make -C $(SNOW3G_LIB_SOURCE) -j SHARED=n
 	make -C $(ZUC_LIB_SOURCE) -j
+	mkdir -p $(I)/include/dpdk/snow3g/include/
+	cp $(SNOW3G_LIB_SOURCE)/include/* $(I)/include/dpdk/snow3g/include/
 	cp $(SNOW3G_LIB_SOURCE)/build/libsso_snow3g.a $(I)/lib/
+	mkdir -p $(I)/include/dpdk/zuc/include/
+	cp $(ZUC_LIB_SOURCE)/include/* $(I)/include/dpdk/zuc/include/
 	cp $(ZUC_LIB_SOURCE)/build/libsso_zuc.a $(I)/lib/
 
 .PHONY: build-dpdk
