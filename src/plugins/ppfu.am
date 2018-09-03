@@ -14,6 +14,8 @@
 vppapitestplugins_LTLIBRARIES += ppf_gtpu_test_plugin.la
 vppplugins_LTLIBRARIES += ppfu_plugin.la
 
+ppfu_plugin_la_LDFLAGS = $(AM_LDFLAGS) -Wl,--whole-archive,-l:libsso_snow3g.a,-l:libsso_zuc.a,--no-whole-archive
+
 ppfu_plugin_la_SOURCES =		\
 	ppfu/ppf_gtpu_encap.c		    \
 	ppfu/ppf_gtpu_decap.c		    \

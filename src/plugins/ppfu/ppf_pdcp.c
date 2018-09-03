@@ -32,6 +32,10 @@
 #include <ppfu/ppfu.h>
 #include <ppfu/snow3g.h>
 
+#include <zuc/include/sso_zuc.h>
+#include <snow3g/include/sso_snow3g.h>
+
+
 
 ppf_pdcp_main_t ppf_pdcp_main;
 
@@ -266,6 +270,8 @@ ppf_pdcp_eea1_enc (u8 * in, u8 * out, u32 size, void *security_parameters)
 
   snow3g_encrypt (ctx, sec_para->pdcp_sess->crypto_key, sec_para->count,
 		  sec_para->bearer, sec_para->dir, in, out, size);
+
+  //sso_snow3g_f8_n_buffer(NULL, 0, 0, 0, NULL, 0);
 
 
   return 0;

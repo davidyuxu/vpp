@@ -1782,44 +1782,7 @@ mheap_trace (void *v, int enable)
 }
 
 
-#include <vppinfra/random.h>
 
-uword offsets[200000];
-
-
-void
-test_mheap ()
-{
-  int i;
-  u32 max_object_size = 80;
-  u32 seed = random_default_seed ();
-
-  void *heap;
-  uword cpu;
-
-  cpu = os_get_thread_index ();
-  heap = clib_per_cpu_mheaps[cpu];
-
-  for (i = 0; i < 4000000; i++)
-    {
-      uword size, align, align_offset, offset;
-
-      size = (random_u32 (&seed) % max_object_size);
-      align = align_offset = 0;
-      if (1)
-	{
-	  align = 1 << (random_u32 (&seed) % 8);
-	  align_offset = round_pow2 (random_u32 (&seed) & (align - 1),
-				     sizeof (u32));
-	}
-
-      heap = mheap_get_aligned (heap, size, align, align_offset, &offset);
-      if (i % 10)
-	mheap_put (heap, offset);
-    }
-
-  fformat (stderr, "Afetr Test:\n%U\n", format_mheap, heap, 1);
-}
 
 /*
  * fd.io coding-style-patch-verification: ON

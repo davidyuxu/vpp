@@ -852,6 +852,63 @@ VLIB_CLI_COMMAND (show_counter_memory_usage_command, static) = {
 };
 /* *INDENT-ON* */
 
+#if 1
+#include <vppinfra/random.h>
+
+static void* ppp[4000000];
+
+void
+static test_mheap ()
+{
+  int i;
+  u32 max_object_size = 80;
+  u32 seed = random_default_seed ();
+
+  for (i = 0; i < 4000000; i++)
+    {
+      uword size, align, align_offset;
+
+      size = (random_u32 (&seed) % max_object_size);
+      align = align_offset = 0;
+      if (1)
+	{
+	  align = 1 << (random_u32 (&seed) % 8);
+	  align_offset = round_pow2 (random_u32 (&seed) & (align - 1),
+				     sizeof (u32));
+	}
+
+      ppp[i] = clib_mem_alloc_aligned_at_offset (size, align, align_offset, 1);
+      if (i % 10)
+	clib_mem_free (ppp[i]);
+    }
+
+}
+
+
+static clib_error_t *
+test_memory_usage (vlib_main_t * vm,
+			   unformat_input_t * input, vlib_cli_command_t * cmd)
+{
+  f64 t1 = vlib_time_now (vm);
+
+  test_mheap ();
+
+  f64 t2 = vlib_time_now (vm);
+
+  vlib_cli_output (vm, "duration : %0.3f \n", t2-t1);
+
+  return 0;
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (test_memory_usage_command, static) = {
+  .path = "test memory usage",
+  .short_help = "Test memory usage",
+  .function = test_memory_usage,
+};
+/* *INDENT-ON* */
+#endif
+
 static clib_error_t *
 show_cpu (vlib_main_t * vm, unformat_input_t * input,
 	  vlib_cli_command_t * cmd)
