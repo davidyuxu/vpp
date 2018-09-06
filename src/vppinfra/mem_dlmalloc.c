@@ -27,11 +27,13 @@ typedef struct
   /* Address of callers: outer first, inner last. */
   uword callers[12];
 
-  /* Count of allocations with this traceback. */
+    /* Count of allocations with this traceback. */
 #if CLIB_VEC64 > 0
-  u64 n_allocations;
+    u64 n_allocations;
+    u64 n_gets;
 #else
-  u32 n_allocations;
+    u32 n_allocations;
+    u32 n_gets;
 #endif
 
   /* Count of bytes allocated with this traceback. */
@@ -135,11 +137,14 @@ mheap_get_trace (uword offset, uword size)
       t = tm->traces + trace_index;
       t[0] = trace;
       t->n_allocations = 0;
+      t->n_gets = 0;
       t->n_bytes = 0;
       hash_set_mem (tm->trace_by_callers, t->callers, trace_index);
     }
 
+
   t->n_allocations += 1;
+  t->n_gets += 1;
   t->n_bytes += size;
   t->offset = offset;		/* keep a sample to autopsy */
   hash_set (tm->trace_index_by_offset, offset, t - tm->traces);
@@ -309,6 +314,20 @@ mheap_trace_sort (const void *_t1, const void *_t2)
   return cmp;
 }
 
+static int
+mheap_trace_sort2 (const void *_t1, const void *_t2)
+{
+  const mheap_trace_t *t1 = _t1;
+  const mheap_trace_t *t2 = _t2;
+  word cmp;
+
+  cmp = (word) t2->n_allocations - (word) t1->n_allocations;
+  if (!cmp)
+    cmp = (word) t2->n_bytes - (word) t1->n_bytes;
+  return cmp;
+}
+
+
 u8 *
 format_mheap_trace (u8 * s, va_list * va)
 {
@@ -328,8 +347,12 @@ format_mheap_trace (u8 * s, va_list * va)
 
       traces_copy = vec_dup (tm->traces);
 
-      qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
-	     mheap_trace_sort);
+      if (verbose == 8)
+	qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
+	       mheap_trace_sort);
+      else
+	qsort (traces_copy, vec_len (traces_copy), sizeof (traces_copy[0]),
+	       mheap_trace_sort2);
 
       total_objects_traced = 0;
       s = format (s, "\n");
@@ -346,9 +369,13 @@ format_mheap_trace (u8 * s, va_list * va)
 	  continue;
 
 	if (t == traces_copy)
-	  s = format (s, "%=9s%=9s %=10s Traceback\n", "Bytes", "Count",
-		      "Sample");
-	s = format (s, "%9d%9d %p", t->n_bytes, t->n_allocations, t->offset);
+	  s =
+	    format (s, "%9s%9s%9s %=14s Traceback\n", "Bytes", "Allocs",
+		    "Count", "Sample");
+	s =
+	  format (s, "%9d%9d%9d %p", t->n_bytes, t->n_gets, t->n_allocations,
+		  t->offset);
+
 	indent = format_get_indent (s);
 	for (i = 0; i < ARRAY_LEN (t->callers) && t->callers[i]; i++)
 	  {
