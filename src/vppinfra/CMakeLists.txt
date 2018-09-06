@@ -59,7 +59,7 @@ set(VPPINFRA_SRCS
   mhash.c
   pool.c
   ptclosure.c
-  qsort.c
+  #qsort.c
   random.c
   random_buffer.c
   random_isaac.c
