@@ -111,7 +111,9 @@ qsort (void *base, uword n, uword size,
    */
   for (min = base; (hi = min += q->qsz) < max;)
     {
-      while ((*q->qcmp) (hi -= q->qsz, min) > 0);
+      while ((*q->qcmp) (hi -= q->qsz, min) > 0)
+	if ((char *) base >= hi)
+	  break;
       if ((hi += q->qsz) != min)
 	{
 	  for (lo = min + q->qsz; --lo >= min;)
