@@ -855,10 +855,10 @@ VLIB_CLI_COMMAND (show_counter_memory_usage_command, static) = {
 #if 1
 #include <vppinfra/random.h>
 
-static void* ppp[4000000];
+static void *ppp[4000000];
 
-void
-static test_mheap ()
+void static
+test_mheap ()
 {
   int i;
   u32 max_object_size = 80;
@@ -877,7 +877,8 @@ static test_mheap ()
 				     sizeof (u32));
 	}
 
-      ppp[i] = clib_mem_alloc_aligned_at_offset (size, align, align_offset, 1);
+      ppp[i] =
+	clib_mem_alloc_aligned_at_offset (size, align, align_offset, 1);
       if (i % 10)
 	clib_mem_free (ppp[i]);
     }
@@ -887,7 +888,7 @@ static test_mheap ()
 
 static clib_error_t *
 test_memory_usage (vlib_main_t * vm,
-			   unformat_input_t * input, vlib_cli_command_t * cmd)
+		   unformat_input_t * input, vlib_cli_command_t * cmd)
 {
   f64 t1 = vlib_time_now (vm);
 
@@ -895,7 +896,7 @@ test_memory_usage (vlib_main_t * vm,
 
   f64 t2 = vlib_time_now (vm);
 
-  vlib_cli_output (vm, "duration : %0.3f \n", t2-t1);
+  vlib_cli_output (vm, "duration : %0.3f \n", t2 - t1);
 
   return 0;
 }
