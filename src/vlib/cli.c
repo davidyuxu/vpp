@@ -760,8 +760,9 @@ show_memory_usage (vlib_main_t * vm,
       vlib_cli_output (vm, "  %U\n", format_mheap, clib_per_cpu_mheaps[index],
                        verbose);
       index++;
-	  // kingwel, don't show worker's heap
-	  break;
+
+      // kingwel, don't show worker's heap
+      break;
   }));
   /* *INDENT-ON* */
 #else
@@ -791,6 +792,9 @@ show_memory_usage (vlib_main_t * vm,
       vlib_cli_output (vm, "  %U\n", format_mheap, clib_per_cpu_mheaps[index],
                        verbose);
       index++;
+
+      // kingwel, don't show worker's heap
+      break;
     }));
     /* *INDENT-ON* */
 
