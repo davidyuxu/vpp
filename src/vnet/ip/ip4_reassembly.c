@@ -505,6 +505,11 @@ ip4_reass_finalize (vlib_main_t * vm, vlib_node_runtime_t * node,
   ip->length = clib_host_to_net_u16 (first_b->current_length + total_length);
   ip->checksum = ip4_header_checksum (ip);
   vlib_buffer_chain_compress (vm, first_b, vec_drop_compress);
+
+  /* kingwel, counters for ip reassembly */
+  vlib_node_increment_counter (vm, node->node_index, IP4_ERROR_REASS_FINALIZED, 1);
+  vlib_node_increment_counter (vm, node->node_index, IP4_ERROR_REASS_FINALIZED_FRAGS, buf_cnt);
+  
   if (PREDICT_FALSE (first_b->flags & VLIB_BUFFER_IS_TRACED))
     {
       ip4_reass_add_trace (vm, node, rm, reass, reass->first_bi, FINALIZE, 0);

@@ -84,6 +84,8 @@
   _ (RPF_FAILURE, "Multicast RPF check failed")                         \
                                                                         \
   /* Errors signalled by ip4-reassembly */                              \
+  _ (REASS_FINALIZED_FRAGS, "fragments reassembled")	 \
+  _ (REASS_FINALIZED, "fragments finalized")       \
   _ (REASS_DUPLICATE_FRAGMENT, "duplicate/overlapping fragments")       \
   _ (REASS_LIMIT_REACHED, "drops due to concurrent reassemblies limit") \
   _ (REASS_TIMEOUT, "fragments dropped due to reassembly timeout")
