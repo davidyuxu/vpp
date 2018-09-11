@@ -121,7 +121,8 @@ static void vl_api_gtpu_add_del_tunnel_t_handler
     .mcast_sw_if_index = ntohl (mp->mcast_sw_if_index),
     .encap_fib_index = p[0],
     .decap_next_index = ntohl (mp->decap_next_index),
-    .teid = ntohl (mp->teid),
+    .teid = ntohl (mp->teid_in),
+    .teid_out = ntohl (mp->teid_out),
     .dst = to_ip46 (mp->is_ipv6, mp->dst_address),
     .src = to_ip46 (mp->is_ipv6, mp->src_address),
   };
@@ -293,7 +294,8 @@ static void send_gtpu_tunnel_details
       rmp->encap_vrf_id = htonl (im4->fibs[t->encap_fib_index].ft_table_id);
     }
   rmp->mcast_sw_if_index = htonl (t->mcast_sw_if_index);
-  rmp->teid = htonl (t->teid);
+  rmp->teid_in = htonl (t->teid);
+  rmp->teid_out = htonl (t->teid_out);
   rmp->decap_next_index = htonl (t->decap_next_index);
   rmp->sw_if_index = htonl (t->sw_if_index);
   rmp->is_ipv6 = is_ipv6;
@@ -427,7 +429,7 @@ vl_api_want_gtpu_events_t_handler (vl_api_want_gtpu_events_t * mp)
 			mp->client_pid);
 	  goto out;
 	}
-      gtm->enable_poller = clear_gtpu_client (mp->client_index);
+      gtm->registrations.enable_poller = clear_gtpu_client (mp->client_index);
       goto out;
     }
 
@@ -437,14 +439,14 @@ vl_api_want_gtpu_events_t_handler (vl_api_want_gtpu_events_t * mp)
       rp = &_rp;
       rp->client_index = mp->client_index;
       rp->client_pid = mp->client_pid;
-      gtm->enable_poller = set_gtpu_client (rp);
+      gtm->registrations.enable_poller = set_gtpu_client (rp);
     }
 
 out:
   reg = vl_api_client_index_to_registration (mp->client_index);
   if (!reg)
     {
-      gtm->enable_poller = clear_gtpu_client (mp->client_index);
+      gtm->registrations.enable_poller = clear_gtpu_client (mp->client_index);
       return;
     }
 
