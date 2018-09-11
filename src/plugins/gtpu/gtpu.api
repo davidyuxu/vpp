@@ -25,7 +25,8 @@ option version = "1.0.0";
     @param mcast_sw_if_index - version, O-bit and C-bit (see nsh_packet.h)
     @param encap_vrf_id - fib identifier used for outgoing encapsulated packets
     @param decap_next_index - the index of the next node if success
-    @param teid - Local Tunnel Endpoint Identifier
+    @param teid_in - Local In Tunnel Endpoint Identifier
+    @param teid_out - Local Out Tunnel Endpoint Identifier
 */
 define gtpu_add_del_tunnel
 {
@@ -38,7 +39,8 @@ define gtpu_add_del_tunnel
   u32 mcast_sw_if_index;
   u32 encap_vrf_id;
   u32 decap_next_index;
-  u32 teid;
+  u32 teid_in;
+  u32 teid_out;
 };
 
 /** \brief reply for set or delete an GTPU tunnel
@@ -70,7 +72,6 @@ define gtpu_tunnel_dump
     @param context - sender context, to match reply w/ request
     @param enable_disable - 1 = enable stats, 0 = disable
     @param client_pid - pid of process requesting stats updates
-	--- add by anhua
 */
 autoreply define want_gtpu_events
 {
@@ -85,7 +86,6 @@ autoreply define want_gtpu_events
     @param dst_address - GTPU tunnel's destination address.
 	@param teid - Local Tunnel Endpoint Identifier
 	@param code - Error code
-	--- add by anhua
 */
 
 define gtpu_error_indication_dump
@@ -114,7 +114,8 @@ define gtpu_error_indication_details
     @param mcast_sw_if_index - version, O-bit and C-bit (see nsh_packet.h)
     @param encap_vrf_id - fib identifier used for outgoing encapsulated packets
     @param decap_next_index - the index of the next node if success
-    @param teid - Local Tunnel Endpoint Identifier
+    @param teid_in - Local In Tunnel Endpoint Identifier
+    @param teid_out - Local Out Tunnel Endpoint Identifier
 */
 define gtpu_tunnel_details
 {
@@ -126,7 +127,8 @@ define gtpu_tunnel_details
   u32 mcast_sw_if_index;
   u32 encap_vrf_id;
   u32 decap_next_index;
-  u32 teid;
+  u32 teid_in;
+  u32 teid_out;
 };
 
 /** \brief Interface set gtpu-bypass request
