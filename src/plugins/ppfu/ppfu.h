@@ -360,6 +360,38 @@ typedef struct
 
 } snow3g_ctx_t;
 
+typedef struct
+{
+    /* the state registers of LFSR */
+     u32 LFSR_S0;
+     u32 LFSR_S1;
+     u32 LFSR_S2;
+     u32 LFSR_S3;
+     u32 LFSR_S4;
+     u32 LFSR_S5;
+     u32 LFSR_S6;
+     u32 LFSR_S7;
+     u32 LFSR_S8;
+     u32 LFSR_S9;
+     u32 LFSR_S10;
+     u32 LFSR_S11;
+     u32 LFSR_S12;
+     u32 LFSR_S13;
+     u32 LFSR_S14;
+     u32 LFSR_S15;
+
+     /* the registers of F */
+     u32 F_R1;
+     u32 F_R2;
+
+     /* the outputs of BitReorganization */
+     u32 BRC_X0;
+     u32 BRC_X1;
+     u32 BRC_X2;
+     u32 BRC_X3;
+
+}zuc_ctx_t;
+
 
 typedef struct _ppf_pdcp_sa_t_
 {
@@ -409,6 +441,9 @@ typedef struct
 
   //snow 3g ctx
   snow3g_ctx_t snow3g_ctx;
+
+  //zuc ctx
+  zuc_ctx_t  zuc_ctx;
 
   u8 integrity_key[MAX_PDCP_KEY_LEN];
   u8 crypto_key[MAX_PDCP_KEY_LEN];

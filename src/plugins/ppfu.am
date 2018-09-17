@@ -31,6 +31,7 @@ ppfu_plugin_la_SOURCES =		\
 	ppfu/ppfu.c		\
 	ppfu/ppfu_api.c		\
         ppfu/snow3g.c	    \
+        ppfu/zuc.c	    \
 	ppfu/ppfu_handoff.c
 
 
