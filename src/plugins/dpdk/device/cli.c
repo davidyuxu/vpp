@@ -465,6 +465,7 @@ show_dpdk_physmem (vlib_main_t * vm, unformat_input_t * input,
     }
 
   rte_dump_physmem_layout (f);
+  rte_mempool_list_dump (f);
   fflush (f);
 
   n = n_try = 4096;
