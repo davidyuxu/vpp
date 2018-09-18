@@ -831,6 +831,61 @@ VLIB_CLI_COMMAND (ppf_show_callline_command, static) =
 
 
 
+
+vlib_buffer_t*
+vlib_buffer_chain_pullup (vlib_main_t * vm, u32 bi)
+{
+  u32 discard_buffer;
+  vlib_buffer_t *first = vlib_get_buffer(vm, bi);
+  uword tlen = vlib_buffer_length_in_chain (vm, first);
+  vlib_buffer_free_list_index_t index;
+  vlib_buffer_free_list_t *free_list =
+    vlib_buffer_get_buffer_free_list (vm, first, &index);
+
+  if(PREDICT_TRUE(!(first->flags & VLIB_BUFFER_NEXT_PRESENT)))
+  	{
+  	   return first;
+  	}
+  /* probe free list to find allocated buffer size to avoid overfill */
+
+  discard_buffer = first->next_buffer;
+
+  if (tlen > free_list->n_data_bytes - first->current_data) 
+  	{
+  	//vlib_buffer_free_one(vm, bi);
+  	first->flags &= ~VLIB_BUFFER_NEXT_PRESENT;
+	vlib_buffer_free_one(vm, discard_buffer);
+  	return first;
+  	}
+   
+  do
+    {
+      vlib_buffer_t *next = vlib_get_buffer (vm, first->next_buffer);
+      clib_memcpy (((u8 *) vlib_buffer_get_current (first)) +
+		   first->current_length,
+		   vlib_buffer_get_current (next), next->current_length);
+      first->current_length += next->current_length;
+
+	  if (next->flags & VLIB_BUFFER_NEXT_PRESENT)
+	    {
+	      first->next_buffer = next->next_buffer;
+	    }
+	  else
+	  	{
+	  	  first->flags &= ~VLIB_BUFFER_NEXT_PRESENT;
+	  	}
+    }
+  while (first->flags & VLIB_BUFFER_NEXT_PRESENT);
+
+  first->total_length_not_including_first_buffer = 0;
+
+  vlib_buffer_free_one(vm, discard_buffer);
+
+  return first;
+}
+
+
+
 /*
  * fd.io coding-style-patch-verification: ON
  *
@@ -838,3 +893,4 @@ VLIB_CLI_COMMAND (ppf_show_callline_command, static) =
  * eval: (c-set-style "gnu")
  * End:
  */
+

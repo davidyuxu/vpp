@@ -712,6 +712,8 @@ void ppf_init_calline (u32 call_id, ppf_calline_type_t call_type);
 void ppf_init_callline_intf (u32 call_id);
 void ppf_reset_callline_intf (u32 call_id);
 
+vlib_buffer_t*
+vlib_buffer_chain_pullup (vlib_main_t * vm, u32 bi);
 
 
 #endif /* included_vnet_ppfu_h */
@@ -724,3 +726,4 @@ void ppf_reset_callline_intf (u32 call_id);
  * eval: (c-set-style "gnu")
  * End:
  */
+
