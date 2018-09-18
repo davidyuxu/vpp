@@ -143,11 +143,15 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    to_next += 4;
 	    n_left_from -= 4;
 	    n_left_to_next -= 4;
-
+           /*
 	    b0 = vlib_get_buffer (vm, bi0);
 	    b1 = vlib_get_buffer (vm, bi1);
 	    b2 = vlib_get_buffer (vm, bi2);
-	    b3 = vlib_get_buffer (vm, bi3);
+	    b3 = vlib_get_buffer (vm, bi3);*/
+            b0 = vlib_buffer_chain_pullup(vm, bi0);
+            b1 = vlib_buffer_chain_pullup(vm, bi1);
+            b2 = vlib_buffer_chain_pullup(vm, bi2);
+            b3 = vlib_buffer_chain_pullup(vm, bi3);
 
         /* Find context */	    
 	    tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
@@ -444,7 +448,8 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    n_left_from -= 1;
 	    n_left_to_next -= 1;
 
-	    b0 = vlib_get_buffer (vm, bi0);
+            b0 = vlib_buffer_chain_pullup(vm, bi0);
+	    //b0 = vlib_get_buffer (vm, bi0);
 
         /* Find context */
 	    tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL];
