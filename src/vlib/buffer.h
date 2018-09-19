@@ -48,7 +48,7 @@
 #include <vlib/error.h>		/* for vlib_error_t */
 
 #include <vlib/config.h>	/* for __PRE_DATA_SIZE */
-#define VLIB_BUFFER_DATA_SIZE		(2048)
+#define VLIB_BUFFER_DATA_SIZE		(10240)
 #define VLIB_BUFFER_PRE_DATA_SIZE	__PRE_DATA_SIZE
 
 typedef u8 vlib_buffer_free_list_index_t;
