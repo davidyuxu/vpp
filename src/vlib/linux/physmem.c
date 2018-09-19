@@ -278,9 +278,9 @@ show_physmem (vlib_main_t * vm,
   pool_foreach (pr, vpm->regions, (
     {
       vlib_cli_output (vm, "index %u name '%s' page-size %uKB num-pages %d "
-		       "numa-node %u fd %d\n",
+		       "numa-node %u fd %d virt-mem %p size %u \n",
 		       pr->index, pr->name, (1 << (pr->log2_page_size -10)),
-		       pr->n_pages, pr->numa_node, pr->fd);
+		       pr->n_pages, pr->numa_node, pr->fd, pr->mem, pr->size);
       if (pr->heap)
 	vlib_cli_output (vm, "  %U", format_mheap, pr->heap, /* verbose */ 1);
       else
