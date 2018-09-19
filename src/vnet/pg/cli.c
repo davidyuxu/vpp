@@ -277,7 +277,7 @@ validate_stream (pg_stream_t * s)
   if (s->max_packet_bytes < s->min_packet_bytes)
     return clib_error_create ("max-size < min-size");
 
-  if (s->buffer_bytes >= 4096 || s->buffer_bytes == 0)
+  if (s->buffer_bytes >= 40960 || s->buffer_bytes == 0)
     return
       clib_error_create ("buffer-size must be positive and < 4096, given %d",
 			 s->buffer_bytes);
