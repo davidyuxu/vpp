@@ -360,17 +360,12 @@ application_global_config (vlib_main_t * vm, unformat_input_t * input)
   clib_error_t *error = 0;
   u32 max_capacity = 0;
   u32 max_interfaces = 0;
-  uword heap_size = 0;
 
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (input, "capacity %d", &max_capacity))
 	;
       else if (unformat (input, "max-interfaces %d", &max_interfaces))
-	;
-      else
-	if (unformat
-	    (input, "counter-heap-size %U", unformat_memory_size, &heap_size))
 	;
       else
 	{
@@ -396,14 +391,6 @@ application_global_config (vlib_main_t * vm, unformat_input_t * input)
     {
       vm->max_interfaces = 2000;
     }
-
-  if (heap_size != 0)
-    vm->counter_heap_size = heap_size;
-  else
-    vm->counter_heap_size = 0;
-
-  vlib_counter_heap_init (vm->counter_heap_size);
-
   return error;
 }
 

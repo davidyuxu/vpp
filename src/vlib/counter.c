@@ -74,19 +74,6 @@ vlib_clear_combined_counters (vlib_combined_counter_main_t * cm)
     }
 }
 
-void *counter_heap = 0;
-
-
-void
-vlib_counter_heap_init (uword size)
-{
-  if (size > 0)
-#if USE_DLMALLOC == 0
-    	counter_heap = mheap_alloc (0, size);
-#else
-	counter_heap = create_mspace (size, 1 /* locked */ );
-#endif
-}
 void *vlib_stats_push_heap (void) __attribute__ ((weak));
 void *
 vlib_stats_push_heap (void)
@@ -105,10 +92,7 @@ vlib_validate_simple_counter (vlib_simple_counter_main_t * cm, u32 index)
 {
   vlib_thread_main_t *tm = vlib_get_thread_main ();
   int i;
-  void *oldheap = 0;
-
-  if (counter_heap)
-    oldheap = clib_mem_set_heap (counter_heap);
+  void *oldheap = vlib_stats_push_heap ();
 
   vec_validate (cm->counters, tm->n_vlib_mains - 1);
   for (i = 0; i < tm->n_vlib_mains; i++)
@@ -123,10 +107,7 @@ vlib_validate_combined_counter (vlib_combined_counter_main_t * cm, u32 index)
 {
   vlib_thread_main_t *tm = vlib_get_thread_main ();
   int i;
-  void *oldheap = 0;
-
-  if (counter_heap)
-    oldheap = clib_mem_set_heap (counter_heap);
+  void *oldheap = vlib_stats_push_heap ();
 
   vec_validate (cm->counters, tm->n_vlib_mains - 1);
   for (i = 0; i < tm->n_vlib_mains; i++)

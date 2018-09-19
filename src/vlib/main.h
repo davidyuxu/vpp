@@ -221,9 +221,6 @@ typedef struct vlib_main_t
 
   /* Specify the application capacity, e.g.: gtpu tunnels */
   u32 max_capacity;
-
-  /* Specify dedicated counter heap size */
-  uword counter_heap_size;
 } vlib_main_t;
 
 /* Global main structure. */
