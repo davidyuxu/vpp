@@ -505,7 +505,7 @@ ppf_pdcp_eia3_protect (vlib_main_t * vm, vlib_buffer_t * b0,
     memset(buf0+len, 0, EIA_MAC_LEN);
     #ifdef PDCP_USE_SSO_SNOW3G_ZUC
     ppf_pdcp_gen_iv(PDCP_ZUC_INTEGRITY, sec_para->count, sec_para->bearer, sec_para->dir, iv);
-    sso_zuc_eia3_1_buffer(sec_para->pdcp_sess->crypto_key, iv, buf0,len,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
+    sso_zuc_eia3_1_buffer(sec_para->pdcp_sess->crypto_key, iv, buf0,len<<3,vlib_buffer_put_uninit(b0, EIA_MAC_LEN));
     #else
     ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
     zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
@@ -542,7 +542,7 @@ ppf_pdcp_eia3_validate (vlib_main_t * vm, vlib_buffer_t * b0,
 
     #ifdef PDCP_USE_SSO_SNOW3G_ZUC
     ppf_pdcp_gen_iv(PDCP_ZUC_INTEGRITY, sec_para->count, sec_para->bearer, sec_para->dir, iv);
-    sso_zuc_eia3_1_buffer(sec_para->pdcp_sess->crypto_key, iv, buf0,len,(u32*)mact);
+    sso_zuc_eia3_1_buffer(sec_para->pdcp_sess->crypto_key, iv, buf0,len<<3,(u32*)mact);
     #else
     ppf_pdcp_session_t * pdcp_sess = sec_para->pdcp_sess;
     zuc_ctx_t *ctx = &(pdcp_sess->zuc_ctx);
