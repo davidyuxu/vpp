@@ -465,7 +465,7 @@ show_dpdk_physmem (vlib_main_t * vm, unformat_input_t * input,
     }
 
   rte_dump_physmem_layout (f);
-  rte_mempool_list_dump (f);
+  
   fflush (f);
 
   n = n_try = 4096;
@@ -482,6 +482,40 @@ show_dpdk_physmem (vlib_main_t * vm, unformat_input_t * input,
 	}
       _vec_len (s) = len + (n < 0 ? 0 : n);
     }
+
+  FILE *ff = tmpfile ();
+
+  //rte_mempool_list_dump (ff);
+  rte_log_dump(ff);
+
+  fputs ("----\n", ff);
+
+  rte_pci_dump(ff);
+
+  fputs ("----\n", ff);
+
+  rte_bus_dump (ff);
+
+  fputs ("----\n", ff);
+
+  rte_memzone_dump (ff);
+
+  fputs ("----\n", ff);
+
+  rte_ring_list_dump (ff);
+
+  fflush (ff);
+
+  long ll = ftell (ff);
+  rewind (ff);
+
+  uword len = vec_len (s);
+
+  vec_resize (s, len + ll);
+
+  fread (s + len, ll, 1, ff);
+
+  fclose (ff);
 
   vlib_cli_output (vm, "%v", s);
 
