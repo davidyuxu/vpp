@@ -361,6 +361,8 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 		}
 	      else
 		{
+		  next_hdr_type = n_ih0->ip4.protocol;
+
 		  /* udp encap, fill the udp header */
 		  if (sa0->udp_encap)
 		    {
@@ -384,7 +386,6 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 		      ip_udp_hdr_size = sizeof (ip4_header_t);
 		    }
 
-		  next_hdr_type = n_ih0->ip4.protocol;
 		  next0 = ESP_ENCRYPT_NEXT_IP4_LOOKUP;
 		}
 
