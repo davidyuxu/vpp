@@ -23,48 +23,63 @@
 #include <vlibapi/vat_helper_macros.h>
 
 
-uword unformat_ip46_address (unformat_input_t * input, va_list * args)
+uword
+unformat_ip46_address (unformat_input_t * input, va_list * args)
 {
   ip46_address_t *ip46 = va_arg (*args, ip46_address_t *);
   ip46_type_t type = va_arg (*args, ip46_type_t);
   if ((type != IP46_TYPE_IP6) &&
-      unformat(input, "%U", unformat_ip4_address, &ip46->ip4)) {
-    ip46_address_mask_ip4(ip46);
-    return 1;
-  } else if ((type != IP46_TYPE_IP4) &&
-      unformat(input, "%U", unformat_ip6_address, &ip46->ip6)) {
-    return 1;
-  }
+      unformat (input, "%U", unformat_ip4_address, &ip46->ip4))
+    {
+      ip46_address_mask_ip4 (ip46);
+      return 1;
+    }
+  else if ((type != IP46_TYPE_IP4) &&
+	   unformat (input, "%U", unformat_ip6_address, &ip46->ip6))
+    {
+      return 1;
+    }
   return 0;
 }
-uword unformat_ip46_prefix (unformat_input_t * input, va_list * args)
+
+uword
+unformat_ip46_prefix (unformat_input_t * input, va_list * args)
 {
   ip46_address_t *ip46 = va_arg (*args, ip46_address_t *);
   u8 *len = va_arg (*args, u8 *);
   ip46_type_t type = va_arg (*args, ip46_type_t);
 
   u32 l;
-  if ((type != IP46_TYPE_IP6) && unformat(input, "%U/%u", unformat_ip4_address, &ip46->ip4, &l)) {
-    if (l > 32)
+  if ((type != IP46_TYPE_IP6)
+      && unformat (input, "%U/%u", unformat_ip4_address, &ip46->ip4, &l))
+    {
+      if (l > 32)
+	return 0;
+      *len = l + 96;
+      ip46->pad[0] = ip46->pad[1] = ip46->pad[2] = 0;
+    }
+  else if ((type != IP46_TYPE_IP4)
+	   && unformat (input, "%U/%u", unformat_ip6_address, &ip46->ip6, &l))
+    {
+      if (l > 128)
+	return 0;
+      *len = l;
+    }
+  else
+    {
       return 0;
-    *len = l + 96;
-    ip46->pad[0] = ip46->pad[1] = ip46->pad[2] = 0;
-  } else if ((type != IP46_TYPE_IP4) && unformat(input, "%U/%u", unformat_ip6_address, &ip46->ip6, &l)) {
-    if (l > 128)
-      return 0;
-    *len = l;
-  } else {
-    return 0;
-  }
+    }
   return 1;
 }
+
 /////////////////////////
 
 #define vl_msg_id(n,h) n,
-typedef enum {
+typedef enum
+{
 #include <ppfu/ppf_gtpu.api.h>
-    /* We'll want to know how many messages IDs we need... */
-    VL_MSG_FIRST_AVAILABLE,
+  /* We'll want to know how many messages IDs we need... */
+  VL_MSG_FIRST_AVAILABLE,
 } vl_msg_id_t;
 #undef vl_msg_id
 
@@ -75,7 +90,7 @@ typedef enum {
 
 /* declare message handlers for each api */
 
-#define vl_endianfun             /* define message structures */
+#define vl_endianfun		/* define message structures */
 #include <ppfu/ppf_gtpu.api.h>
 #undef vl_endianfun
 
@@ -90,10 +105,11 @@ typedef enum {
 #include <ppfu/ppf_gtpu.api.h>
 #undef vl_api_version
 
-typedef struct {
-    /* API message ID base */
-    u16 msg_id_base;
-    vat_main_t *vat_main;
+typedef struct
+{
+  /* API message ID base */
+  u16 msg_id_base;
+  vat_main_t *vat_main;
 } ppf_gtpu_test_main_t;
 
 ppf_gtpu_test_main_t ppf_gtpu_test_main;
@@ -149,7 +165,7 @@ static void vl_api_ppf_gtpu_add_del_tunnel_v2_reply_t_handler
             vam->result_ready = 1;                      \
         }                                               \
     }
-  foreach_standard_reply_retval_handler;
+foreach_standard_reply_retval_handler;
 #undef _
 
 /*
@@ -196,19 +212,19 @@ api_sw_interface_set_ppf_gtpu_bypass (vat_main_t * vam)
   while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (i, "%U", api_unformat_sw_if_index, vam, &sw_if_index))
-      sw_if_index_set = 1;
+	sw_if_index_set = 1;
       else if (unformat (i, "sw_if_index %d", &sw_if_index))
-      sw_if_index_set = 1;
+	sw_if_index_set = 1;
       else if (unformat (i, "enable"))
-      is_enable = 1;
+	is_enable = 1;
       else if (unformat (i, "disable"))
-      is_enable = 0;
+	is_enable = 0;
       else if (unformat (i, "ip4"))
-      is_ipv6 = 0;
+	is_ipv6 = 0;
       else if (unformat (i, "ip6"))
-      is_ipv6 = 1;
+	is_ipv6 = 1;
       else
-      break;
+	break;
     }
 
   if (sw_if_index_set == 0)
@@ -272,77 +288,78 @@ api_ppf_gtpu_add_del_tunnel_v2 (vat_main_t * vam)
   while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (line_input, "del"))
-      is_add = 0;
+	is_add = 0;
       else
-      if (unformat (line_input, "src %U", unformat_ip4_address, &src.ip4))
-      {
-	ipv4_set = 1;
-	src_set = 1;
-      }
+	if (unformat (line_input, "src %U", unformat_ip4_address, &src.ip4))
+	{
+	  ipv4_set = 1;
+	  src_set = 1;
+	}
       else
-      if (unformat (line_input, "dst %U", unformat_ip4_address, &dst.ip4))
-      {
-	ipv4_set = 1;
-	dst_set = 1;
-      }
+	if (unformat (line_input, "dst %U", unformat_ip4_address, &dst.ip4))
+	{
+	  ipv4_set = 1;
+	  dst_set = 1;
+	}
       else
-      if (unformat (line_input, "src %U", unformat_ip6_address, &src.ip6))
-      {
-	ipv6_set = 1;
-	src_set = 1;
-      }
-    else
-    if (unformat (line_input, "inner_addr %U", unformat_ip4_address, &inner.ip4))
-    {
-  inner_set = 1;
-    }
+	if (unformat (line_input, "src %U", unformat_ip6_address, &src.ip6))
+	{
+	  ipv6_set = 1;
+	  src_set = 1;
+	}
       else
-      if (unformat (line_input, "dst %U", unformat_ip6_address, &dst.ip6))
-      {
-	ipv6_set = 1;
-	dst_set = 1;
-      }
+	if (unformat
+	    (line_input, "inner_addr %U", unformat_ip4_address, &inner.ip4))
+	{
+	  inner_set = 1;
+	}
+      else
+	if (unformat (line_input, "dst %U", unformat_ip6_address, &dst.ip6))
+	{
+	  ipv6_set = 1;
+	  dst_set = 1;
+	}
       else if (unformat (line_input, "group %U %U",
-		       unformat_ip4_address, &dst.ip4,
-		       api_unformat_sw_if_index, vam, &mcast_sw_if_index))
-      {
-	grp_set = dst_set = 1;
-	ipv4_set = 1;
-      }
+			 unformat_ip4_address, &dst.ip4,
+			 api_unformat_sw_if_index, vam, &mcast_sw_if_index))
+	{
+	  grp_set = dst_set = 1;
+	  ipv4_set = 1;
+	}
       else if (unformat (line_input, "group %U",
-		       unformat_ip4_address, &dst.ip4))
-      {
-	grp_set = dst_set = 1;
-	ipv4_set = 1;
-      }
+			 unformat_ip4_address, &dst.ip4))
+	{
+	  grp_set = dst_set = 1;
+	  ipv4_set = 1;
+	}
       else if (unformat (line_input, "group %U %U",
-		       unformat_ip6_address, &dst.ip6,
-		       api_unformat_sw_if_index, vam, &mcast_sw_if_index))
-      {
-	grp_set = dst_set = 1;
-	ipv6_set = 1;
-      }
+			 unformat_ip6_address, &dst.ip6,
+			 api_unformat_sw_if_index, vam, &mcast_sw_if_index))
+	{
+	  grp_set = dst_set = 1;
+	  ipv6_set = 1;
+	}
       else if (unformat (line_input, "group %U",
-		       unformat_ip6_address, &dst.ip6))
-      {
-	grp_set = dst_set = 1;
-	ipv6_set = 1;
-      }
+			 unformat_ip6_address, &dst.ip6))
+	{
+	  grp_set = dst_set = 1;
+	  ipv6_set = 1;
+	}
       else
-      if (unformat (line_input, "mcast_sw_if_index %u", &mcast_sw_if_index))
-      ;
+	if (unformat (line_input, "mcast_sw_if_index %u", &mcast_sw_if_index))
+	;
       else if (unformat (line_input, "encap-vrf-id %d", &encap_vrf_id))
-      ;
+	;
       else if (unformat (line_input, "decap-next %U",
-		       unformat_ppf_gtpu_decap_next, &decap_next_index))
-      ;
+			 unformat_ppf_gtpu_decap_next, &decap_next_index))
+	;
       else if (unformat (line_input, "teid %d", &teid))
-      ;
+	;
       else
-      {
-	errmsg ("parse error '%U'", format_unformat_error, line_input);
-	return -99;
-      }
+	{
+	  errmsg ("parse error '%U'", format_unformat_error, line_input);
+	  return -99;
+	}
     }
 
   if (src_set == 0)
@@ -381,9 +398,10 @@ api_ppf_gtpu_add_del_tunnel_v2 (vat_main_t * vam)
 
   M (PPF_GTPU_ADD_DEL_TUNNEL_V2, mp);
 
-  if(inner_set) {
-    clib_memcpy (mp->dst_address_r, &inner.ip4, sizeof (inner.ip4));
-  }
+  if (inner_set)
+    {
+      clib_memcpy (mp->dst_address_r, &inner.ip4, sizeof (inner.ip4));
+    }
 
   if (ipv6_set)
     {
@@ -431,72 +449,72 @@ api_ppf_gtpu_add_del_tunnel (vat_main_t * vam)
   while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (line_input, "del"))
-      is_add = 0;
+	is_add = 0;
       else
-      if (unformat (line_input, "src %U", unformat_ip4_address, &src.ip4))
-      {
-	ipv4_set = 1;
-	src_set = 1;
-      }
+	if (unformat (line_input, "src %U", unformat_ip4_address, &src.ip4))
+	{
+	  ipv4_set = 1;
+	  src_set = 1;
+	}
       else
-      if (unformat (line_input, "dst %U", unformat_ip4_address, &dst.ip4))
-      {
-	ipv4_set = 1;
-	dst_set = 1;
-      }
+	if (unformat (line_input, "dst %U", unformat_ip4_address, &dst.ip4))
+	{
+	  ipv4_set = 1;
+	  dst_set = 1;
+	}
       else
-      if (unformat (line_input, "src %U", unformat_ip6_address, &src.ip6))
-      {
-	ipv6_set = 1;
-	src_set = 1;
-      }
+	if (unformat (line_input, "src %U", unformat_ip6_address, &src.ip6))
+	{
+	  ipv6_set = 1;
+	  src_set = 1;
+	}
       else
-      if (unformat (line_input, "dst %U", unformat_ip6_address, &dst.ip6))
-      {
-	ipv6_set = 1;
-	dst_set = 1;
-      }
+	if (unformat (line_input, "dst %U", unformat_ip6_address, &dst.ip6))
+	{
+	  ipv6_set = 1;
+	  dst_set = 1;
+	}
       else if (unformat (line_input, "group %U %U",
-		       unformat_ip4_address, &dst.ip4,
-		       api_unformat_sw_if_index, vam, &mcast_sw_if_index))
-      {
-	grp_set = dst_set = 1;
-	ipv4_set = 1;
-      }
+			 unformat_ip4_address, &dst.ip4,
+			 api_unformat_sw_if_index, vam, &mcast_sw_if_index))
+	{
+	  grp_set = dst_set = 1;
+	  ipv4_set = 1;
+	}
       else if (unformat (line_input, "group %U",
-		       unformat_ip4_address, &dst.ip4))
-      {
-	grp_set = dst_set = 1;
-	ipv4_set = 1;
-      }
+			 unformat_ip4_address, &dst.ip4))
+	{
+	  grp_set = dst_set = 1;
+	  ipv4_set = 1;
+	}
       else if (unformat (line_input, "group %U %U",
-		       unformat_ip6_address, &dst.ip6,
-		       api_unformat_sw_if_index, vam, &mcast_sw_if_index))
-      {
-	grp_set = dst_set = 1;
-	ipv6_set = 1;
-      }
+			 unformat_ip6_address, &dst.ip6,
+			 api_unformat_sw_if_index, vam, &mcast_sw_if_index))
+	{
+	  grp_set = dst_set = 1;
+	  ipv6_set = 1;
+	}
       else if (unformat (line_input, "group %U",
-		       unformat_ip6_address, &dst.ip6))
-      {
-	grp_set = dst_set = 1;
-	ipv6_set = 1;
-      }
+			 unformat_ip6_address, &dst.ip6))
+	{
+	  grp_set = dst_set = 1;
+	  ipv6_set = 1;
+	}
       else
-      if (unformat (line_input, "mcast_sw_if_index %u", &mcast_sw_if_index))
-      ;
+	if (unformat (line_input, "mcast_sw_if_index %u", &mcast_sw_if_index))
+	;
       else if (unformat (line_input, "encap-vrf-id %d", &encap_vrf_id))
-      ;
+	;
       else if (unformat (line_input, "decap-next %U",
-		       unformat_ppf_gtpu_decap_next, &decap_next_index))
-      ;
+			 unformat_ppf_gtpu_decap_next, &decap_next_index))
+	;
       else if (unformat (line_input, "teid %d", &teid))
-      ;
+	;
       else
-      {
-	errmsg ("parse error '%U'", format_unformat_error, line_input);
-	return -99;
-      }
+	{
+	  errmsg ("parse error '%U'", format_unformat_error, line_input);
+	  return -99;
+	}
     }
 
   if (src_set == 0)
@@ -565,12 +583,12 @@ static void vl_api_ppf_gtpu_tunnel_details_t_handler
   ip46_address_t dst = to_ip46 (mp->is_ipv6, mp->src_address);
 
   print (vam->ofp, "%11d%24U%24U%14d%18d%13d%19d",
-       ntohl (mp->sw_if_index),
-       format_ip46_address, &src, IP46_TYPE_ANY,
-       format_ip46_address, &dst, IP46_TYPE_ANY,
-       ntohl (mp->encap_vrf_id),
-       ntohl (mp->decap_next_index), ntohl (mp->teid),
-       ntohl (mp->mcast_sw_if_index));
+	 ntohl (mp->sw_if_index),
+	 format_ip46_address, &src, IP46_TYPE_ANY,
+	 format_ip46_address, &dst, IP46_TYPE_ANY,
+	 ntohl (mp->encap_vrf_id),
+	 ntohl (mp->decap_next_index), ntohl (mp->teid),
+	 ntohl (mp->mcast_sw_if_index));
 }
 
 static int
@@ -586,9 +604,9 @@ api_ppf_gtpu_tunnel_dump (vat_main_t * vam)
   while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (i, "sw_if_index %d", &sw_if_index))
-      sw_if_index_set = 1;
+	sw_if_index_set = 1;
       else
-      break;
+	break;
     }
 
   if (sw_if_index_set == 0)
@@ -599,8 +617,8 @@ api_ppf_gtpu_tunnel_dump (vat_main_t * vam)
   if (!vam->json_output)
     {
       print (vam->ofp, "%11s%24s%24s%14s%18s%13s%19s",
-	   "sw_if_index", "src_address", "dst_address",
-	   "encap_vrf_id", "decap_next_index", "teid", "mcast_sw_if_index");
+	     "sw_if_index", "src_address", "dst_address",
+	     "encap_vrf_id", "decap_next_index", "teid", "mcast_sw_if_index");
     }
 
   /* Get list of ppf_gtpu-tunnel interfaces */
@@ -630,9 +648,9 @@ _(ppf_gtpu_add_del_tunnel_v2,                                                 \
 _(ppf_gtpu_tunnel_dump, "[<intfc> | sw_if_index <nn>]")                    \
 
 static void
-ppf_gtpu_vat_api_hookup (vat_main_t *vam)
+ppf_gtpu_vat_api_hookup (vat_main_t * vam)
 {
-  ppf_gtpu_test_main_t * gtm = &ppf_gtpu_test_main;
+  ppf_gtpu_test_main_t *gtm = &ppf_gtpu_test_main;
   /* Hook up handlers for replies from the data plane plug-in */
 #define _(N,n)                                                  \
   vl_msg_api_set_handlers((VL_API_##N + gtm->msg_id_base),       \
@@ -656,11 +674,12 @@ ppf_gtpu_vat_api_hookup (vat_main_t *vam)
 #undef _
 }
 
-clib_error_t * vat_plugin_register (vat_main_t *vam)
+clib_error_t *
+vat_plugin_register (vat_main_t * vam)
 {
-  ppf_gtpu_test_main_t * gtm = &ppf_gtpu_test_main;
+  ppf_gtpu_test_main_t *gtm = &ppf_gtpu_test_main;
 
-  u8 * name;
+  u8 *name;
 
   gtm->vat_main = vam;
 
@@ -668,10 +687,18 @@ clib_error_t * vat_plugin_register (vat_main_t *vam)
   name = format (0, "ppf_gtpu_%08x%c", api_version, 0);
   gtm->msg_id_base = vl_client_get_first_plugin_msg_id ((char *) name);
 
-  if (gtm->msg_id_base != (u16) ~0)
+  if (gtm->msg_id_base != (u16) ~ 0)
     ppf_gtpu_vat_api_hookup (vam);
 
-  vec_free(name);
+  vec_free (name);
 
   return 0;
 }
+
+/*
+ * fd.io coding-style-patch-verification: ON
+ *
+ * Local Variables:
+ * eval: (c-set-style "gnu")
+ * End:
+ */
