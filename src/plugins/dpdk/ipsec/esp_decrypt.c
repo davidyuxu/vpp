@@ -98,7 +98,7 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_resource_t *res = 0;
   ipsec_sa_t *sa0 = 0;
-	crypto_session_t *cs0 = 0;
+   crypto_session_t *cs0 = 0;
 
   u8 numa = rte_socket_id ();
 	
@@ -142,7 +142,9 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
 	  from += 1;
 	  n_left_from -= 1;
 
-	  b0 = vlib_get_buffer (vm, bi0);
+	  //b0 = vlib_get_buffer (vm, bi0);
+	  b0 = vlib_buffer_chain_pullup (vm, bi0);
+	  
 	  mb0 = rte_mbuf_from_vlib_buffer(b0);
 
 #ifdef IPSEC_DEBUG_OUTPUT
@@ -247,7 +249,6 @@ dpdk_esp_decrypt_node_fn (vlib_main_t * vm,
       //clib_warning ("payload %u not multiple of %d\n", payload_len, cs0->cipher_alg->boundary);
       vlib_node_increment_counter (vm, dpdk_esp_decrypt_node.index,
 				   ESP_DECRYPT_ERROR_BAD_LEN, 1);
-      res->n_ops -= 1;
       to_next[0] = bi0;
       to_next += 1;
       n_left_to_next -= 1;
@@ -453,6 +454,7 @@ dpdk_esp_decrypt_post_node_fn (vlib_main_t * vm,
 	  n_left_to_next -= 1;
 
 	  b0 = vlib_get_buffer (vm, bi0);
+	  
 	  esp0 = vlib_buffer_get_current (b0);
 
 #ifdef IPSEC_DEBUG_OUTPUT

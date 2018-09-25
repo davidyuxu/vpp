@@ -191,7 +191,8 @@ esp_decrypt_node_fn (vlib_main_t * vm,
 
 	  next0 = ESP_DECRYPT_NEXT_DROP;
 
-	  i_b0 = vlib_get_buffer (vm, i_bi0);
+	  //i_b0 = vlib_get_buffer (vm, i_bi0);
+	  i_b0 = vlib_buffer_chain_pullup (vm, i_bi0);
 
 	  /* we start with esp headers */
 	  esp0 = vlib_buffer_get_current (i_b0);

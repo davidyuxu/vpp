@@ -197,7 +197,8 @@ esp_encrypt_node_fn (vlib_main_t * vm,
 
 	  next0 = ESP_ENCRYPT_NEXT_DROP;
 
-	  i_b0 = vlib_get_buffer (vm, i_bi0);
+	  //i_b0 = vlib_get_buffer (vm, i_bi0);
+	  i_b0 = vlib_buffer_chain_pullup (vm, i_bi0);
 	  sa_index0 = vnet_buffer (i_b0)->ipsec.sad_index;
 	  sa0 = pool_elt_at_index (im->sad, sa_index0);
 

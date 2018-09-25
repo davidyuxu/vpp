@@ -80,11 +80,15 @@ ipsec_set_interface_spd (vlib_main_t * vm, u32 sw_if_index, u32 spd_id,
   vnet_feature_enable_disable ("ip6-output", "ipsec-output-ip6", sw_if_index,
 			       is_add, 0, 0);
 
+  config.spd_index = spd_index;
+
   /* enable IPsec on RX */
   vnet_feature_enable_disable ("ip4-unicast", "ipsec-input-ip4", sw_if_index,
 			       is_add, &config, sizeof (config));
   vnet_feature_enable_disable ("ip6-unicast", "ipsec-input-ip6", sw_if_index,
 			       is_add, &config, sizeof (config));
+
+  printf ("cli spd=%d\n", config.spd_index);
 
   return 0;
 }
@@ -623,8 +627,10 @@ ipsec_init (vlib_main_t * vm)
 
   if (vm->max_capacity)
     {
-      pool_init_aligned (im->sad, vm->max_capacity * 2, CLIB_CACHE_LINE_BYTES);
-      pool_init_aligned (im->tunnel_interfaces, vm->max_capacity, CLIB_CACHE_LINE_BYTES);
+      pool_init_aligned (im->sad, vm->max_capacity * 2,
+			 CLIB_CACHE_LINE_BYTES);
+      pool_init_aligned (im->tunnel_interfaces, vm->max_capacity,
+			 CLIB_CACHE_LINE_BYTES);
     }
 
 

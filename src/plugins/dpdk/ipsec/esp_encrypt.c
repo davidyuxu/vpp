@@ -169,7 +169,8 @@ dpdk_esp_encrypt_node_fn (vlib_main_t * vm,
 	  from += 1;
 	  n_left_from -= 1;
 
-	  b0 = vlib_get_buffer (vm, bi0);
+	  //b0 = vlib_get_buffer (vm, bi0);
+	  b0 = vlib_buffer_chain_pullup (vm, bi0);
 	  ih0 = vlib_buffer_get_current (b0);
 	  mb0 = rte_mbuf_from_vlib_buffer (b0);
 
