@@ -390,7 +390,7 @@ ip4_icmp_echo_request (vlib_main_t * vm,
 
 	  ip0->checksum = ip_csum_fold (sum0);
 
-	  printf ("s1=%x s2=%x\n", ip0->checksum, ip4_header_checksum (ip0));
+	  //printf ("s1=%x s2=%x\n", ip0->checksum, ip4_header_checksum (ip0));
 
 	  //ASSERT (ip0->checksum == ip4_header_checksum (ip0));
 
