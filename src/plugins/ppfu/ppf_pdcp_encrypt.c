@@ -106,6 +106,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    u32 tunnel_index0, tunnel_index1, tunnel_index2, tunnel_index3;
 	    ppf_gtpu_tunnel_t * t0 = 0, * t1 = 0, * t2 = 0, * t3 = 0;
 	    ppf_callline_t * c0 = 0, * c1 = 0, * c2 = 0, * c3 = 0;
+            ppf_rb_t *rb0 = NULL, *rb1 = NULL, *rb2 = NULL, *rb3 = NULL;
 	    ppf_pdcp_session_t * pdcp0 = 0, * pdcp1 = 0, * pdcp2 = 0, *pdcp3 = 0;
 	    u8 * buf0, * buf1, * buf2, * buf3;
 	    u32 count0 = 0, count1 = 0, count2 = 0, count3 = 0;
@@ -167,8 +168,9 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
         }
 
         t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
+        rb0 = pool_elt_at_index (pm->rbs, t0->rb_index);
 	    c0 = &(pm->ppf_calline_table[t0->call_id]);
-	    pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
+	    pdcp0 = pool_elt_at_index(ppm->sessions, rb0->pdcp.session_id);
 
 	    if (PREDICT_FALSE(0 == pdcp0->header_length)) {
 	      error0 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
@@ -231,8 +233,9 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
         }
 
 	    t1 = pool_elt_at_index (gtm->tunnels, tunnel_index1);
+            rb1 = pool_elt_at_index (pm->rbs, t1->rb_index);
 	    c1 = &(pm->ppf_calline_table[t1->call_id]);
-	    pdcp1 = pool_elt_at_index(ppm->sessions, c1->pdcp.session_id);
+	    pdcp1 = pool_elt_at_index(ppm->sessions, rb1->pdcp.session_id);
 
 	    if (PREDICT_FALSE(0 == pdcp1->header_length)) {
 	      error1 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
@@ -295,8 +298,9 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
         }
 
 	    t2 = pool_elt_at_index (gtm->tunnels, tunnel_index2);
+            rb2 = pool_elt_at_index (pm->rbs, t2->rb_index);
 	    c2 = &(pm->ppf_calline_table[t2->call_id]);
-	    pdcp2 = pool_elt_at_index(ppm->sessions, c2->pdcp.session_id);
+	    pdcp2 = pool_elt_at_index(ppm->sessions, rb2->pdcp.session_id);
 
 	    if (PREDICT_FALSE(0 == pdcp2->header_length)) {
 	      error2 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
@@ -359,8 +363,9 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
         }
 
 	    t3 = pool_elt_at_index (gtm->tunnels, tunnel_index3);
+            rb3 = pool_elt_at_index (pm->rbs, t3->rb_index);
 	    c3 = &(pm->ppf_calline_table[t3->call_id]);
-	    pdcp3 = pool_elt_at_index(ppm->sessions, c3->pdcp.session_id);
+	    pdcp3 = pool_elt_at_index(ppm->sessions, rb3->pdcp.session_id);
 
 	    if (PREDICT_FALSE(0 == pdcp3->header_length)) {
 	      error3 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;
@@ -433,6 +438,7 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
 	    u32 tunnel_index0;
 	    ppf_gtpu_tunnel_t * t0 = 0;
 	    ppf_callline_t * c0 = 0;
+            ppf_rb_t *rb0 = NULL;
 	    ppf_pdcp_session_t * pdcp0 = 0;
 	    u8 * buf0;
 	    u32 count0 = 0;
@@ -459,8 +465,9 @@ ppf_pdcp_encrypt_inline (vlib_main_t * vm,
         }
 
 	    t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
+            rb0 = pool_elt_at_index (pm->rbs, t0->rb_index);
 	    c0 = &(pm->ppf_calline_table[t0->call_id]);
-	    pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
+	    pdcp0 = pool_elt_at_index(ppm->sessions, rb0->pdcp.session_id);
 
 	    if (PREDICT_FALSE(0 == pdcp0->header_length)) {
 	      error0 = PPF_PDCP_ENCRYPT_ERROR_BYPASSED;

@@ -73,7 +73,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
   ppf_main_t *pm = &ppf_main;
   ppf_gtpu_main_t *gtm = &ppf_gtpu_main;
   u32 *buffers_duplicated = pm->buffers_duplicated_per_thread[vlib_get_thread_index ()];
-  u8 s_sb_ids[MAX_SB_PER_CALL] = {0, 1, 2};
+  u8 s_sb_ids[MAX_SB_PER_RB] = {0, 1, 2};
   
   from = vlib_frame_vector_args (frame);
   n_left_from = frame->n_vectors;
@@ -107,7 +107,8 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	    ppf_gtpu_tunnel_t *t0, *t1, *t2, *t3;
 	    u32 call_id0, call_id1, call_id2, call_id3;
 	    ppf_callline_t *callline0, *callline1, *callline2, *callline3;
-		u32 tunnel_id0 = ~0, tunnel_id1 = ~0, tunnel_id2 = ~0, tunnel_id3 = ~0;
+            ppf_rb_t *rb0 = NULL, *rb1 = NULL, *rb2 = NULL, *rb3 = NULL;
+            u32 tunnel_id0 = ~0, tunnel_id1 = ~0, tunnel_id2 = ~0, tunnel_id3 = ~0;
 	    ppf_gtpu_tunnel_id_type_t * sb_tunnels0 = NULL;
 	    ppf_gtpu_tunnel_id_type_t * sb_tunnels1 = NULL;
 	    ppf_gtpu_tunnel_id_type_t * sb_tunnels2 = NULL;
@@ -163,40 +164,40 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	   
 	    callline0 = &(pm->ppf_calline_table[call_id0]);
 
-	    /* default as DRB */   
-	    {
-		   sb_num0 = PPF_SB_COUNT (callline0->sb_multi_path);
+	    /* default as DRB */
+            if (PREDICT_TRUE(callline0->call_type == PPF_DRB_CALL)){
+                   rb0 = pool_elt_at_index (pm->rbs, vnet_buffer2(b0)->ppf_du_metadata.tx_rb_index);
+		   sb_num0 = PPF_SB_COUNT (rb0->sb_multi_path);
 		   if (PREDICT_TRUE (sb_num0 == 1)) {
-			   tunnel_id0 = callline0->rb.drb.sb_tunnel[PPF_SB_VALID_PATH(callline0->sb_multi_path)].tunnel_id;
+			   tunnel_id0 = rb0->sb_tunnel[PPF_SB_VALID_PATH(rb0->sb_multi_path)].tunnel_id;
 			   vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id0;	   
 		   } else
-			   sb_tunnels0 = callline0->rb.drb.sb_tunnel; 
+			   sb_tunnels0 = rb0->sb_tunnel; 
 	    }
 	   
 	    if (PREDICT_FALSE(callline0->call_type == PPF_SRB_CALL)) {
+                   rb0 = pool_elt_at_index (pm->rbs, callline0->rb.srb_call.srb);
 		   sb_num0 = vnet_buffer2(b0)->ppf_du_metadata.path.sb_num;
 		   sb_ids0 = vnet_buffer2(b0)->ppf_du_metadata.path.sb_id; 
 		   if (1 == sb_num0) {
-			   tunnel_id0 = callline0->rb.srb.sb_tunnel[sb_ids0[0]].tunnel_id; 				   
+			   tunnel_id0 = rb0->sb_tunnel[sb_ids0[0]].tunnel_id; 				   
 			   vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id0;	   
-		   } else if ((sb_num0 > 1) && (sb_num0 <= MAX_SB_PER_CALL)) {
-			   sb_tunnels0 = callline0->rb.srb.sb_tunnel;
+		   } else if ((sb_num0 > 1) && (sb_num0 <= MAX_SB_PER_RB)) {
+			   sb_tunnels0 = rb0->sb_tunnel;
 		   } else {
-			   sb_num0 = PPF_SB_COUNT (callline0->sb_multi_path);
+			   sb_num0 = PPF_SB_COUNT (rb0->sb_multi_path);
 			   if (sb_num0 == 1) {
-				   tunnel_id0 = callline0->rb.srb.sb_tunnel[PPF_SB_VALID_PATH(callline0->sb_multi_path)].tunnel_id;
+				   tunnel_id0 = rb0->sb_tunnel[PPF_SB_VALID_PATH(rb0->sb_multi_path)].tunnel_id;
 				   vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id0;	   
 			   } else {
 				   sb_ids0 = s_sb_ids; 
-				   sb_tunnels0 = callline0->rb.srb.sb_tunnel;
+				   sb_tunnels0 = rb0->sb_tunnel;
 			   }
 		   }
 	    } 
 
 	    if (PREDICT_FALSE(sb_num0 == 0)) {
-           vlib_node_increment_counter (vm, node->node_index,
-           							 PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL,
-           							 1);
+                   vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL, 1);
 		   next0 = PPF_SB_PATH_LB_NEXT_DROP;
 		   goto trace0;
 	    }
@@ -205,10 +206,10 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   u8 id;
 		   u32 duplicate = 0;
 		   
-		   for (id = 0; id < MAX_SB_PER_CALL; id++) {
+		   for (id = 0; id < MAX_SB_PER_RB; id++) {
 			   tunnel_id0 = sb_tunnels0[sb_ids0[id]].tunnel_id;
-			   if ((INVALID_TUNNEL_ID == tunnel_id0)
-                || (PPF_SB_PATH_GET_VALID(callline0->sb_multi_path, sb_ids0[id]) == 0))
+			   if ((INVALID_TUNNEL_ID == tunnel_id0) 
+                                || (PPF_SB_PATH_GET_VALID(rb0->sb_multi_path, sb_ids0[id]) == 0))
 				   continue;
 			   
 			   duplicate++;
@@ -222,9 +223,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   
 					   vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
 				   } else
-					   vlib_node_increment_counter (vm, node->node_index,
-													PPF_SB_PATH_LB_ERROR_NO_BUF,
-													1);
+					   vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_BUF, 1);
 		   
 			   }
 		   }
@@ -258,39 +257,39 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	    callline1 = &(pm->ppf_calline_table[call_id1]);
 
 	    /* default as DRB */
-	    {
-		   sb_num1 = PPF_SB_COUNT (callline1->sb_multi_path);
+            if (PREDICT_TRUE(callline1->call_type == PPF_DRB_CALL)) {
+	           rb1 = pool_elt_at_index (pm->rbs, vnet_buffer2(b1)->ppf_du_metadata.tx_rb_index);
+		   sb_num1 = PPF_SB_COUNT (rb1->sb_multi_path);
 		   if (PREDICT_TRUE (sb_num1 == 1)) {
-			   tunnel_id1 = callline1->rb.drb.sb_tunnel[PPF_SB_VALID_PATH(callline1->sb_multi_path)].tunnel_id;
+			   tunnel_id1 = rb1->sb_tunnel[PPF_SB_VALID_PATH(rb1->sb_multi_path)].tunnel_id;
 			   vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id1;	   
 		   } else
-			   sb_tunnels1 = callline0->rb.drb.sb_tunnel; 
+			   sb_tunnels1 = rb1.sb_tunnel; 
 	    }
 	   
 	    if (PREDICT_FALSE(callline1->call_type == PPF_SRB_CALL)) {
+                   rb1 = pool_elt_at_index (pm->rbs, callline1->rb.srb_call.srb);
 		   sb_num1 = vnet_buffer2(b1)->ppf_du_metadata.path.sb_num;
 		   sb_ids1 = vnet_buffer2(b1)->ppf_du_metadata.path.sb_id; 
 		   if (1 == sb_num1) {
-			   tunnel_id1 = callline1->rb.srb.sb_tunnel[sb_ids1[0]].tunnel_id; 				   
+			   tunnel_id1 = rb1->sb_tunnel[sb_ids1[0]].tunnel_id; 				   
 			   vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id1;	   
-		   } else if ((sb_num1 > 1) && (sb_num1 <= MAX_SB_PER_CALL)) {
-			   sb_tunnels1 = callline1->rb.srb.sb_tunnel;
+		   } else if ((sb_num1 > 1) && (sb_num1 <= MAX_SB_PER_RB)) {
+			   sb_tunnels1 = rb1->sb_tunnel;
 		   } else {
-			   sb_num1 = PPF_SB_COUNT (callline1->sb_multi_path);
+			   sb_num1 = PPF_SB_COUNT (rb1->sb_multi_path);
 			   if (sb_num1 == 1) {
-				   tunnel_id1 = callline1->rb.srb.sb_tunnel[PPF_SB_VALID_PATH(callline1->sb_multi_path)].tunnel_id;
+				   tunnel_id1 = rb1->sb_tunnel[PPF_SB_VALID_PATH(rb1->sb_multi_path)].tunnel_id;
 				   vnet_buffer2(b1)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id1;	   
 			   } else {
 				   sb_ids1 = s_sb_ids; 
-				   sb_tunnels1 = callline1->rb.srb.sb_tunnel;
+				   sb_tunnels1 = rb1->sb_tunnel;
 			   }
 		   }
 	    } 
 
 	    if (PREDICT_FALSE(sb_num1 == 0)) {
-           vlib_node_increment_counter (vm, node->node_index,
-           							 PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL,
-           							 1);
+                   vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL, 1);
 		   next1 = PPF_SB_PATH_LB_NEXT_DROP;
 		   goto trace1;
 	    }
@@ -299,10 +298,10 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   u8 id;
 		   u32 duplicate = 0;
 		   
-		   for (id = 0; id < MAX_SB_PER_CALL; id++) {
+		   for (id = 0; id < MAX_SB_PER_RB; id++) {
 			   tunnel_id1 = sb_tunnels1[sb_ids1[id]].tunnel_id;
 			   if ((INVALID_TUNNEL_ID == tunnel_id1)
-                || (PPF_SB_PATH_GET_VALID(callline1->sb_multi_path, sb_ids1[id]) == 0))
+                                || (PPF_SB_PATH_GET_VALID(rb1->sb_multi_path, sb_ids1[id]) == 0))
 				   continue;
 			   
 			   duplicate++;
@@ -316,9 +315,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   
 					   vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c1));
 				   } else
-					   vlib_node_increment_counter (vm, node->node_index,
-													PPF_SB_PATH_LB_ERROR_NO_BUF,
-													1);
+					   vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_BUF, 1);
 		   
 			   }
 		   }
@@ -352,39 +349,39 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	    callline2 = &(pm->ppf_calline_table[call_id2]);
 
 	    /* default as DRB */
-	    {
-		   sb_num2 = PPF_SB_COUNT (callline2->sb_multi_path);
+	    if (PREDICT_TRUE(callline2->call_type == PPF_DRB_CALL)) {
+	           rb2 = pool_elt_at_index (pm->rbs, vnet_buffer2(b2)->ppf_du_metadata.tx_rb_index);
+		   sb_num2 = PPF_SB_COUNT (rb2->sb_multi_path);
 		   if (PREDICT_TRUE (sb_num2 == 1)) {
-			   tunnel_id2 = callline2->rb.drb.sb_tunnel[PPF_SB_VALID_PATH(callline2->sb_multi_path)].tunnel_id;
+			   tunnel_id2 = rb2->sb_tunnel[PPF_SB_VALID_PATH(rb2->sb_multi_path)].tunnel_id;
 			   vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id2;	   
 		   } else
-			   sb_tunnels2 = callline2->rb.drb.sb_tunnel; 
+			   sb_tunnels2 = rb2->sb_tunnel; 
 	    }
 	   
 	    if (PREDICT_FALSE(callline2->call_type == PPF_SRB_CALL)) {
+                   rb2 = pool_elt_at_index (pm->rbs, callline2->rb.srb_call.srb);
 		   sb_num2 = vnet_buffer2(b2)->ppf_du_metadata.path.sb_num;
 		   sb_ids2 = vnet_buffer2(b2)->ppf_du_metadata.path.sb_id; 
 		   if (1 == sb_num2) {
-			   tunnel_id2 = callline2->rb.srb.sb_tunnel[sb_ids2[0]].tunnel_id; 				   
+			   tunnel_id2 = rb2->sb_tunnel[sb_ids2[0]].tunnel_id; 				   
 			   vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id2;	   
-		   } else if ((sb_num2 > 1) && (sb_num2 <= MAX_SB_PER_CALL)) {
-			   sb_tunnels2 = callline2->rb.srb.sb_tunnel;
+		   } else if ((sb_num2 > 1) && (sb_num2 <= MAX_SB_PER_RB)) {
+			   sb_tunnels2 = rb2->sb_tunnel;
 		   } else {
-			   sb_num2 = PPF_SB_COUNT (callline2->sb_multi_path);
+			   sb_num2 = PPF_SB_COUNT (rb2->sb_multi_path);
 			   if (sb_num2 == 1) {
-				   tunnel_id2 = callline2->rb.srb.sb_tunnel[PPF_SB_VALID_PATH(callline2->sb_multi_path)].tunnel_id;
+				   tunnel_id2 = rb2->sb_tunnel[PPF_SB_VALID_PATH(rb2->sb_multi_path)].tunnel_id;
 				   vnet_buffer2(b2)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id2;	   
 			   } else {
 				   sb_ids2 = s_sb_ids; 
-				   sb_tunnels2 = callline2->rb.srb.sb_tunnel;
+				   sb_tunnels2 = rb2->sb_tunnel;
 			   }
 		   }
 	    } 
 	   
         if (PREDICT_FALSE(sb_num2 == 0)) {
-          vlib_node_increment_counter (vm, node->node_index,
-        							PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL,
-        							1);
+          vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL, 1);
           next2 = PPF_SB_PATH_LB_NEXT_DROP;
           goto trace2;
         }
@@ -393,10 +390,10 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   u8 id;
 		   u32 duplicate = 0;
 		   
-		   for (id = 0; id < MAX_SB_PER_CALL; id++) {
+		   for (id = 0; id < MAX_SB_PER_RB; id++) {
 			   tunnel_id0 = sb_tunnels2[sb_ids2[id]].tunnel_id;
-			   if ((INVALID_TUNNEL_ID == tunnel_id2)
-                || (PPF_SB_PATH_GET_VALID(callline2->sb_multi_path, sb_ids2[id]) == 0))
+			   if ((INVALID_TUNNEL_ID == tunnel_id2) 
+                                || (PPF_SB_PATH_GET_VALID(rb2->sb_multi_path, sb_ids2[id]) == 0))
 				   continue;
 			   
 			   duplicate++;
@@ -410,9 +407,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   
 					   vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c2));
 				   } else
-					   vlib_node_increment_counter (vm, node->node_index,
-													PPF_SB_PATH_LB_ERROR_NO_BUF,
-													1);
+					   vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_BUF, 1);
 		   
 			   }
 		   }
@@ -446,39 +441,39 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	    callline3 = &(pm->ppf_calline_table[call_id3]);
 	   
 	    /* default as DRB */
-	    {
-		  sb_num3 = PPF_SB_COUNT (callline3->sb_multi_path);
+	    if (PREDICT_TRUE(callline3->call_type == PPF_DRB_CALL)) {
+	          rb3 = pool_elt_at_index (pm->rbs, vnet_buffer2(b3)->ppf_du_metadata.tx_rb_index);
+		  sb_num3 = PPF_SB_COUNT (rb3->sb_multi_path);
 		  if (PREDICT_TRUE (sb_num3 == 1)) {
-			  tunnel_id3 = callline3->rb.drb.sb_tunnel[PPF_SB_VALID_PATH(callline3->sb_multi_path)].tunnel_id;
+			  tunnel_id3 = rb3->sb_tunnel[PPF_SB_VALID_PATH(rb3->sb_multi_path)].tunnel_id;
 			  vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id3; 	  
 		  } else
-			  sb_tunnels3 = callline3->rb.drb.sb_tunnel; 
+			  sb_tunnels3 = rb3->sb_tunnel; 
 	    }
 	   
 	    if (PREDICT_FALSE(callline3->call_type == PPF_SRB_CALL)) {
+                  rb3 = pool_elt_at_index (pm->rbs, callline3->rb.srb_call.srb);
 		  sb_num3 = vnet_buffer2(b3)->ppf_du_metadata.path.sb_num;
 		  sb_ids3 = vnet_buffer2(b3)->ppf_du_metadata.path.sb_id; 
 		  if (1 == sb_num3) {
-			  tunnel_id3 = callline3->rb.srb.sb_tunnel[sb_ids3[0]].tunnel_id;				  
+			  tunnel_id3 = rb3->sb_tunnel[sb_ids3[0]].tunnel_id;				  
 			  vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id3; 	  
-		  } else if ((sb_num3 > 1) && (sb_num3 <= MAX_SB_PER_CALL)) {
-			  sb_tunnels3 = callline3->rb.srb.sb_tunnel;
+		  } else if ((sb_num3 > 1) && (sb_num3 <= MAX_SB_PER_RB)) {
+			  sb_tunnels3 = rb3->sb_tunnel;
 		  } else {
-			  sb_num3 = PPF_SB_COUNT (callline3->sb_multi_path);
+			  sb_num3 = PPF_SB_COUNT (rb3->sb_multi_path);
 			  if (sb_num3 == 1) {
-				  tunnel_id3 = callline3->rb.srb.sb_tunnel[PPF_SB_VALID_PATH(callline3->sb_multi_path)].tunnel_id;
+				  tunnel_id3 = rb3->sb_tunnel[PPF_SB_VALID_PATH(rb3->sb_multi_path)].tunnel_id;
 				  vnet_buffer2(b3)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id3; 	  
 			  } else {
 				  sb_ids3 = s_sb_ids; 
-				  sb_tunnels3 = callline3->rb.srb.sb_tunnel;
+				  sb_tunnels3 = rb3->sb_tunnel;
 			  }
 		  }
 	    } 
 
 	    if (PREDICT_FALSE(sb_num3 == 0)) {
-           vlib_node_increment_counter (vm, node->node_index,
-           							 PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL,
-           							 1);
+                   vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL, 1);
 		   next3 = PPF_SB_PATH_LB_NEXT_DROP;
 		   goto trace3;
 	    }
@@ -487,10 +482,10 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		  u8 id;
 		  u32 duplicate = 0;
 		  
-		  for (id = 0; id < MAX_SB_PER_CALL; id++) {
+		  for (id = 0; id < MAX_SB_PER_RB; id++) {
 			  tunnel_id3 = sb_tunnels3[sb_ids3[id]].tunnel_id;
 			  if ((INVALID_TUNNEL_ID == tunnel_id3)
-			   || (PPF_SB_PATH_GET_VALID(callline3->sb_multi_path, sb_ids3[id]) == 0))
+                                || (PPF_SB_PATH_GET_VALID(callline3->sb_multi_path, sb_ids3[id]) == 0))
 				  continue;
 			  
 			  duplicate++;
@@ -504,9 +499,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		  
 					  vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c3));
 				  } else
-					  vlib_node_increment_counter (vm, node->node_index,
-												   PPF_SB_PATH_LB_ERROR_NO_BUF,
-												   1);
+					  vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_BUF, 1);
 		  
 			  }
 		  }
@@ -542,7 +535,8 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	    ppf_gtpu_tunnel_t *t0;
 	    u32 call_id0;
 	    ppf_callline_t *callline0;
-		u32 tunnel_id0 = ~0;
+            ppf_rb_t *rb0 = NULL;
+	    u32 tunnel_id0 = ~0;
 	    ppf_gtpu_tunnel_id_type_t * sb_tunnels0 = NULL;
 	    u8 sb_num0 = 0;
 	    u8 * sb_ids0 = s_sb_ids;
@@ -573,39 +567,39 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 	    callline0 = &(pm->ppf_calline_table[call_id0]);
 
 	    /* default as DRB */
-	    {
-		   sb_num0 = PPF_SB_COUNT (callline0->sb_multi_path);
+	    if (PREDICT_TRUE(callline0->call_type == PPF_DRB_CALL)) {
+	           rb0 = pool_elt_at_index (pm->rbs, vnet_buffer2(b0)->ppf_du_metadata.tx_rb_index);
+		   sb_num0 = PPF_SB_COUNT (rb0->sb_multi_path);
 		   if (PREDICT_TRUE (sb_num0 == 1)) {
-			   tunnel_id0 = callline0->rb.drb.sb_tunnel[PPF_SB_VALID_PATH(callline0->sb_multi_path)].tunnel_id;
+			   tunnel_id0 = rb0->sb_tunnel[PPF_SB_VALID_PATH(rb0->sb_multi_path)].tunnel_id;
 			   vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id0;	   
 		   } else
-			   sb_tunnels0 = callline0->rb.drb.sb_tunnel; 
+			   sb_tunnels0 = rb0->sb_tunnel; 
 	    }
 	   
 	    if (PREDICT_FALSE(callline0->call_type == PPF_SRB_CALL)) {
+                   rb0 = pool_elt_at_index (pm->rbs, callline0->rb.srb_call.srb);
 		   sb_num0 = vnet_buffer2(b0)->ppf_du_metadata.path.sb_num;
 		   sb_ids0 = vnet_buffer2(b0)->ppf_du_metadata.path.sb_id; 
 		   if (1 == sb_num0) {
-			   tunnel_id0 = callline0->rb.srb.sb_tunnel[sb_ids0[0]].tunnel_id; 				   
+			   tunnel_id0 = rb0->sb_tunnel[sb_ids0[0]].tunnel_id; 				   
 			   vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id0;	   
-		   } else if ((sb_num0 > 1) && (sb_num0 <= MAX_SB_PER_CALL)) {
-			   sb_tunnels0 = callline0->rb.srb.sb_tunnel;
+		   } else if ((sb_num0 > 1) && (sb_num0 <= MAX_SB_PER_RB)) {
+			   sb_tunnels0 = rb0->sb_tunnel;
 		   } else {
-			   sb_num0 = PPF_SB_COUNT (callline0->sb_multi_path);
+			   sb_num0 = PPF_SB_COUNT (rb0->sb_multi_path);
 			   if (sb_num0 == 1) {
-				   tunnel_id0 = callline0->rb.srb.sb_tunnel[PPF_SB_VALID_PATH(callline0->sb_multi_path)].tunnel_id;
+				   tunnel_id0 = rb0->sb_tunnel[PPF_SB_VALID_PATH(rb0->sb_multi_path)].tunnel_id;
 				   vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_TX_TUNNEL] = tunnel_id0;	   
 			   } else {
 				   sb_ids0 = s_sb_ids; 
-				   sb_tunnels0 = callline0->rb.srb.sb_tunnel;
+				   sb_tunnels0 = rb0->sb_tunnel;
 			   }
 		   }
 	    } 
 
 	    if (PREDICT_FALSE(sb_num0 == 0)) {
-           vlib_node_increment_counter (vm, node->node_index,
-           							 PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL,
-           							 1);
+                   vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_SUCH_TUNNEL, 1);
 		   next0 = PPF_SB_PATH_LB_NEXT_DROP;
 		   goto trace00;
 	    }
@@ -614,10 +608,10 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   u8 id;
 		   u32 duplicate = 0;
 		   
-		   for (id = 0; id < MAX_SB_PER_CALL; id++) {
+		   for (id = 0; id < MAX_SB_PER_RB; id++) {
 			   tunnel_id0 = sb_tunnels0[sb_ids0[id]].tunnel_id;
 			   if ((INVALID_TUNNEL_ID == tunnel_id0)
-                || (PPF_SB_PATH_GET_VALID(callline0->sb_multi_path, sb_ids0[id]) == 0))
+                                || (PPF_SB_PATH_GET_VALID(rb0->sb_multi_path, sb_ids0[id]) == 0))
 				   continue;
 			   
 			   duplicate++;
@@ -631,9 +625,7 @@ ppf_sb_path_lb_inline (vlib_main_t * vm,
 		   
 					   vec_add1 (buffers_duplicated, vlib_get_buffer_index (vm, c0));
 				   } else
-					   vlib_node_increment_counter (vm, node->node_index,
-													PPF_SB_PATH_LB_ERROR_NO_BUF,
-													1);
+					   vlib_node_increment_counter (vm, node->node_index, PPF_SB_PATH_LB_ERROR_NO_BUF, 1);
 		   
 			   }
 		   }

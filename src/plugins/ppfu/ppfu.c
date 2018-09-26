@@ -224,12 +224,12 @@ ppf_init_callline_intf (u32 call_id)
 int
 vnet_ppf_del_callline (u32 call_id)
 {
-
   ppf_main_t *pm = &ppf_main;
   ppf_callline_t *call_line = 0;
+  ppf_rb_t *rb = 0;
   ppf_gtpu_tunnel_id_type_t *tunnel = 0;
 
-  int i, rv;
+  int i, j, rv;
 
   if (call_id >= pm->max_capacity)
     {
@@ -245,7 +245,7 @@ vnet_ppf_del_callline (u32 call_id)
 
   if (call_line->call_type == PPF_DRB_CALL)
     {
-      tunnel = &(call_line->rb.drb.nb_tunnel);
+      tunnel = &(call_line->rb.drb_call.nb_tunnel);
 
       if ((tunnel->tunnel_id) != INVALID_TUNNEL_ID)
 	{
@@ -255,29 +255,41 @@ vnet_ppf_del_callline (u32 call_id)
 	      // should print some error log, but the del will continue
 	    }
 	}
-
     }
-
-  for (i = 0; i <= MAX_SB_PER_CALL; i++)
-    {
-
+  
+  i = 0;
+  do {
       if (call_line->call_type == PPF_DRB_CALL)
-	tunnel = &(call_line->rb.drb.sb_tunnel[i]);
+        {
+          rb = pool_elt_at_index (pm->rbs, call_line->rb.drb_call.drb[i ++]);
+        }
       else
-	tunnel = &(call_line->rb.srb.sb_tunnel[i]);
+        {
+          rb = pool_elt_at_index (pm->rbs, call_line->rb.srb_call.srb);
+        }
 
-      if (tunnel->tunnel_id != INVALID_TUNNEL_ID)
-	{
-	  rv = vnet_ppf_gtpu_del_tunnel (tunnel->tunnel_id);
-	  if (rv != 0)
-	    {
-	      // should print some error log, but the del will continue
-	    }
-	}
-      else
-	continue;
-    }
+      if (rb)
+        {
+          for (j = 0; j <= MAX_SB_PER_RB; j ++) 
+            {
+              if (rb->sb_tunnel[j].tunnel_id != INVALID_TUNNEL_ID)
+	        {
+	          rv = vnet_ppf_gtpu_del_tunnel (rb->sb_tunnel[j].tunnel_id);
+	          if (rv != 0)
+	            {
+	              // should print some error log, but the del will continue
+	            }
+	        }
+            }
+          rb = NULL;
+        }
 
+      if (call_line->call_type == PPF_SRB_CALL)
+        {
+          break;
+        }
+    }while(i < MAX_DRB_PER_SESSION);
+  
   ppf_reset_calline (call_line->call_index);
 
   return 0;
@@ -300,7 +312,7 @@ ppf_reset_calline (u32 call_id)
 
       call_line->rb.drb.nb_tunnel.tunnel_id = ~0;
 
-      for (int j = 0; j < MAX_SB_PER_CALL; j++)
+      for (int j = 0; j < MAX_SB_PER_RB; j++)
 	{
 	  call_line->rb.drb.sb_tunnel[j].tunnel_id = ~0;
 	}
@@ -308,13 +320,13 @@ ppf_reset_calline (u32 call_id)
   else if (call_line->call_type == PPF_SRB_CALL)
     {
 
-      call_line->rb.srb.nb_out_msg_by_sn = 0;
-      for (int j = 0; j < MAX_SB_PER_CALL; j++)
+      for (int j = 0; j < MAX_SB_PER_RB; j++)
 	{
 	  call_line->rb.srb.sb_tunnel[j].tunnel_id = ~0;
 	}
 
       hash_free (call_line->rb.srb.nb_out_msg_by_sn);
+      call_line->rb.srb.nb_out_msg_by_sn = 0;
     }
 
   if (call_line->pdcp.session_id != ~0)
@@ -331,6 +343,11 @@ ppf_reset_calline (u32 call_id)
   call_line->call_type = INVALID_CALL_TYPE;
   call_line->call_index = ~0;
   call_line->sb_multi_path = 0;
+
+  for (int j = 0; j < MAX_QFI_COUNT; j ++)
+    {
+      call_line->qfi_to_drb_map[j] = INVALID_RB_ID;
+    }
 }
 
 void
@@ -351,7 +368,7 @@ ppf_init_calline (u32 call_id, ppf_calline_type_t call_type)
 
       call_line->rb.drb.nb_tunnel.tunnel_id = ~0;
 
-      for (int j = 0; j < MAX_SB_PER_CALL; j++)
+      for (int j = 0; j < MAX_SB_PER_RB; j++)
 	{
 	  call_line->rb.drb.sb_tunnel[j].tunnel_id = ~0;
 	}
@@ -360,7 +377,7 @@ ppf_init_calline (u32 call_id, ppf_calline_type_t call_type)
     {
 
       call_line->rb.srb.nb_out_msg_by_sn = 0;
-      for (int j = 0; j < MAX_SB_PER_CALL; j++)
+      for (int j = 0; j < MAX_SB_PER_RB; j++)
 	{
 	  call_line->rb.srb.sb_tunnel[j].tunnel_id = ~0;
 	}
@@ -370,6 +387,11 @@ ppf_init_calline (u32 call_id, ppf_calline_type_t call_type)
   call_line->sb_policy = ~0;
   call_line->ue_bearer_id = ~0;
   call_line->sb_multi_path = 0;
+
+  for (int j = 0; j < MAX_QFI_COUNT; j ++)
+    {
+      call_line->qfi_to_drb_map[j] = INVALID_RB_ID;
+    }
 }
 
 int
@@ -558,7 +580,7 @@ ppf_init (vlib_main_t * vm)
 			   tm->n_vlib_mains - 1, NULL);
   vec_foreach (buffers, pm->buffers_duplicated_per_thread)
   {
-    vec_validate (*buffers, ((MAX_SB_PER_CALL + 1) * VLIB_FRAME_SIZE) - 1);
+    vec_validate (*buffers, ((MAX_SB_PER_RB + 1) * VLIB_FRAME_SIZE) - 1);
     _vec_len (*buffers) = 0;
   }
 
@@ -720,7 +742,7 @@ format_ppf_callline (u8 * s, va_list * va)
 		    callline->rb.srb.nb_out_msg_by_sn,
 		    ((verbose > 2) ? 1 : 0));
 
-	  for (sb = 0; sb < MAX_SB_PER_CALL; sb++)
+	  for (sb = 0; sb < MAX_SB_PER_RB; sb++)
 	    {
 	      s =
 		format (s, "\nsb tunnel %U\n", format_ppf_gtpu_tunnel_simple,
@@ -729,7 +751,7 @@ format_ppf_callline (u8 * s, va_list * va)
 	}
       else
 	{
-	  for (sb = 0; sb < MAX_SB_PER_CALL; sb++)
+	  for (sb = 0; sb < MAX_SB_PER_RB; sb++)
 	    {
 	      s =
 		format (s, "sb tunnel {%U} ", format_ppf_gtpu_tunnel_simple,
@@ -745,7 +767,7 @@ format_ppf_callline (u8 * s, va_list * va)
 	    format (s, "\nnb tunnel %U\n", format_ppf_gtpu_tunnel_simple,
 		    &(callline->rb.drb.nb_tunnel), verbose);
 
-	  for (sb = 0; sb < MAX_SB_PER_CALL; sb++)
+	  for (sb = 0; sb < MAX_SB_PER_RB; sb++)
 	    {
 	      s =
 		format (s, "\nsb tunnel %U\n", format_ppf_gtpu_tunnel_simple,
@@ -758,7 +780,7 @@ format_ppf_callline (u8 * s, va_list * va)
 	    format (s, "nb tunnel {%U}\n", format_ppf_gtpu_tunnel_simple,
 		    &(callline->rb.drb.nb_tunnel), verbose);
 
-	  for (sb = 0; sb < MAX_SB_PER_CALL; sb++)
+	  for (sb = 0; sb < MAX_SB_PER_RB; sb++)
 	    {
 	      s =
 		format (s, "sb tunnel {%U} ", format_ppf_gtpu_tunnel_simple,

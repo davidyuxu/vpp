@@ -102,6 +102,7 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           ppf_srb_header_t * srb0;
           u32 call_id0;
           ppf_callline_t * c0;
+          ppf_rb_t * rb0 = NULL;
           ppf_pdcp_session_t * pdcp0;
           uword key0;
           CLIB_UNUSED(ppf_srb_msg_id_t msg0);
@@ -163,9 +164,11 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
             goto trace0;
           }
 
+          rb0 = pool_elt_at_index (pm->rbs, c0->rb.srb_call.srb);
+          
           /* Save transaction-id and request-id in callline */
           /* Generate PDCP SN, map <PDCP SN> to <transaction-id + request-id> */
-          pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
+          pdcp0 = pool_elt_at_index(ppm->sessions, rb0->pdcp.session_id);
           key0 = (uword)PPF_PDCP_COUNT (pdcp0->tx_hfn, pdcp0->tx_next_sn, pdcp0->sn_length);
 
           /* Set pdcp-info in buffer */
@@ -178,7 +181,7 @@ ppf_srb_nb_rx_inline (vlib_main_t * vm,
           if (psm->want_feedback) {
             msg0.transaction_id = clib_net_to_host_u32(srb0->transaction_id);
             msg0.request_id = clib_net_to_host_u32(srb0->msg.out.request_id);
-            hash_set (c0->rb.srb.nb_out_msg_by_sn, key0, msg0.as_u64);
+            hash_set (c0->rb.srb_call.nb_out_msg_by_sn, key0, msg0.as_u64);
           }
           
           /* Determine downlink tunnel */

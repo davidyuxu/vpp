@@ -122,9 +122,9 @@ static void
 
   ppf_callline_t *callline = NULL;
   ppf_gtpu_tunnel_type_t tunnel_type;
-  u32 nb_tunnel_added = 0, sb_tunnel_added[MAX_SB_PER_CALL] = { 0 };	//mark which tunnel has been added
-  u32 nb_in_teid = 0, sb_in_teid[MAX_SB_PER_CALL] = { 0 };	//mark return teid
-  u32 nb_tunnel_id, sb_tunnel_id[MAX_SB_PER_CALL] = { 0 };
+  u32 nb_tunnel_added = 0, sb_tunnel_added[MAX_SB_PER_RB] = { 0 };	//mark which tunnel has been added
+  u32 nb_in_teid = 0, sb_in_teid[MAX_SB_PER_RB] = { 0 };	//mark return teid
+  u32 nb_tunnel_id, sb_tunnel_id[MAX_SB_PER_RB] = { 0 };
   u32 sw_if_index = ~0;
   u32 tunnel_id = ~0;
   ppf_calline_type_t call_type;
@@ -274,7 +274,7 @@ static void
 
 create_sb_tunnels:
 
-  for (i = 0; i < MAX_SB_PER_CALL; i++)
+  for (i = 0; i < MAX_SB_PER_RB; i++)
     {
       sb = &(mp->sb[i]);
 
@@ -354,7 +354,7 @@ out:
 
 	nb_in_teid = 0;
 
- 	for (i = 0; i< MAX_SB_PER_CALL; i++) {
+ 	for (i = 0; i< MAX_SB_PER_RB; i++) {
  	    if (sb_tunnel_added[i] == 1) {
  	    	vnet_ppf_gtpu_del_tunnel (sb_tunnel_id[i]);
  	      sb_tunnel_added[i] = 0;
@@ -370,7 +370,7 @@ out:
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_INSTALL_REPLY,
   ({
 
-     for (i = 0; i< MAX_SB_PER_CALL; i++) {
+     for (i = 0; i< MAX_SB_PER_RB; i++) {
      	rmp->sb_in_teid[i] = clib_host_to_net_u32(sb_in_teid[i]);
      }
       rmp->nb_in_teid = clib_host_to_net_u32(nb_in_teid);
@@ -401,9 +401,9 @@ static void
   ppf_gtpu_tunnel_id_type_t *sb_key;
   u32 sw_if_index = ~0;
   u32 tunnel_id = ~0;
-  u32 sb_in_teid[MAX_SB_PER_CALL];
-  u32 sb_tunnel_added[MAX_SB_PER_CALL] = { 0 };
-  u32 sb_tunnel_id[MAX_SB_PER_CALL] = { 0 };
+  u32 sb_in_teid[MAX_SB_PER_RB];
+  u32 sb_tunnel_added[MAX_SB_PER_RB] = { 0 };
+  u32 sb_tunnel_id[MAX_SB_PER_RB] = { 0 };
   ppf_gtpu_tunnel_t *t = NULL;
   u32 call_id = clib_net_to_host_u32 (mp->call_id);
 
@@ -424,7 +424,7 @@ static void
     }
 
   //first, remove sbs
-  for (i = 0; i < MAX_SB_PER_CALL; i++)
+  for (i = 0; i < MAX_SB_PER_RB; i++)
     {
       if (callline->call_type == PPF_DRB_CALL)
 	sb_key = &(callline->rb.drb.sb_tunnel[i]);
@@ -451,7 +451,7 @@ static void
 
   //second, update or add sbs
   //To be done: how to rollback if updated failded in progress??
-  for (i = 0; i < MAX_SB_PER_CALL; i++)
+  for (i = 0; i < MAX_SB_PER_RB; i++)
     {
       sb = &(mp->sb[i]);
 
@@ -552,7 +552,7 @@ static void
 out:
   /* *INDENT-OFF* */
   if (rv != 0) {
-	for (i = 0; i< MAX_SB_PER_CALL; i++) {
+	for (i = 0; i< MAX_SB_PER_RB; i++) {
 	    if (sb_tunnel_added[i] != 0) {
 	    	vnet_ppf_gtpu_del_tunnel (sb_tunnel_id[i]);
 	    	sb_tunnel_added[i] = 0;
@@ -564,7 +564,7 @@ out:
   REPLY_MACRO2(VL_API_PPFU_PLUGIN_BEARER_UPDATE_REPLY,
   ({
 
-     for (i = 0; i<MAX_SB_PER_CALL; i++) {
+     for (i = 0; i<MAX_SB_PER_RB; i++) {
 	rmp->sb_in_teid[i] = clib_host_to_net_u32(sb_in_teid[i]);
      }
 	rmp->call_id = clib_host_to_net_u32(call_id);
@@ -586,7 +586,7 @@ static void
   ppf_main_t *ppfm = &ppf_main;
   ppf_callline_t *callline = NULL;
   int i = 0;
-  ppf_gtpu_tunnel_id_type_t *nb_tunnel, *sb_tunnel[MAX_SB_PER_CALL];
+  ppf_gtpu_tunnel_id_type_t *nb_tunnel, *sb_tunnel[MAX_SB_PER_RB];
   u32 call_id = clib_net_to_host_u32 (mp->call_id);
 
   if (call_id >= ppfm->max_capacity)
@@ -615,7 +615,7 @@ static void
 
     }
 
-  for (i = 0; i < MAX_SB_PER_CALL; i++)
+  for (i = 0; i < MAX_SB_PER_RB; i++)
     {
 
       if (callline->call_type == PPF_DRB_CALL)

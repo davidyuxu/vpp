@@ -76,12 +76,33 @@ typedef struct
 
 #define PPF_GTPU_HEADER_MIN   (8)
 
+#define NEXT_EXT_HEADER_TYPE_PDU_SESSION (133) // 1000 0101
+
+#define PPF_GTPU_PDU_SESSION_TYPE(type) (((type) >> 4) & 0xf)
+#define PPF_GTPU_PDU_SESSION_RQI(rqi_qfi) ((rqi_qfi) & 0x40)
+#define PPF_GTPU_PDU_SESSION_QFI(rqi_qfi) ((rqi_qfi) & 0x3f)
+#define PPF_GTPU_PDU_SESSION_RQI_QFI(rqi, qfi) ((rqi << 6) | qfi)
+
+typedef struct
+{
+  u8 ext_header_len;
+
+  struct
+    {
+      u8 pdu_type; /* bit 0~3 : spare, bit 4~7 : PDU type */
+      u8 rqi_qfi;  /* bit 0~5 : QFI, bit 6 : RQI, bit 7 : spare */
+    }pdu_session_container;
+  u8 next_ext_header_type;
+}ppf_gtpu_ext_pdu_header_t;
+
+
 /* *INDENT-OFF* */
 typedef CLIB_PACKED(struct
 {
   ip4_header_t ip4;            /* 20 bytes */
   udp_header_t udp;            /* 8 bytes */
   ppf_gtpu_header_t ppf_gtpu;	       /* 8 bytes */
+  ppf_gtpu_ext_pdu_header_t ext_pdu_header;  /* 4 bytes */
 }) ip4_ppf_gtpu_header_t;
 /* *INDENT-ON* */
 
@@ -91,6 +112,7 @@ typedef CLIB_PACKED(struct
   ip6_header_t ip6;            /* 40 bytes */
   udp_header_t udp;            /* 8 bytes */
   ppf_gtpu_header_t ppf_gtpu;     /* 8 bytes */
+  ppf_gtpu_ext_pdu_header_t ext_pdu_header;  /* 4 bytes */
 }) ip6_ppf_gtpu_header_t;
 /* *INDENT-ON* */
 
@@ -171,6 +193,8 @@ typedef struct
    */
   u32 sibling_index;
 
+  u32 rb_index;
+  
   u32 call_id;
   u32 is_ip6;
   ppf_gtpu_tunnel_type_t tunnel_type;

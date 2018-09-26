@@ -221,7 +221,7 @@ _(tunnel_type)						\
 _(sb_id)
 
 static void
-ip_udp_ppf_gtpu_rewrite (ppf_gtpu_tunnel_t * t, bool is_ip6)
+ip_udp_ppf_gtpu_rewrite (ppf_gtpu_tunnel_t * t, bool is_ip6, bool enable_qos)
 {
   union
   {
@@ -237,6 +237,8 @@ ip_udp_ppf_gtpu_rewrite (ppf_gtpu_tunnel_t * t, bool is_ip6)
 
   udp_header_t *udp;
   ppf_gtpu_header_t *ppf_gtpu;
+  ppf_gtpu_ext_pdu_header_t *ext_pdu_heaser;
+  
   /* Fixed portion of the (outer) ip header */
   if (!is_ip6)
     {
@@ -280,7 +282,30 @@ ip_udp_ppf_gtpu_rewrite (ppf_gtpu_tunnel_t * t, bool is_ip6)
 
   t->rewrite = r.rw;
   /* Now only support 8-byte ppf_gtpu header. TBD */
-  _vec_len (t->rewrite) = sizeof (ip4_ppf_gtpu_header_t) - 4;
+  if (is_ip6)
+    {
+      _vec_len (t->rewrite) = sizeof (ip6_ppf_gtpu_header_t) - sizeof(ppf_gtpu_ext_pdu_header_t) - 4;
+    }
+  else
+    {
+      _vec_len (t->rewrite) = sizeof (ip4_ppf_gtpu_header_t) - sizeof(ppf_gtpu_ext_pdu_header_t) - 4;
+    }
+
+  /* ext pdu header */
+  if (t->tunnel_type == PPF_GTPU_NB && ppf_main.qos_enabled)
+    {
+      ppf_gtpu->ver_flags |= PPF_GTPU_E_BIT;
+      ppf_gtpu->sequence = 0;
+      ppf_gtpu->pdu_number = 0;
+      ppf_gtpu->next_ext_type = 0;
+
+      ext_pdu_heaser = ppf_gtpu + 1;
+      ext_pdu_heaser->ext_header_len = 1;
+      ext_pdu_heaser->pdu_session_container.pdu_type = 0;
+      ext_pdu_heaser->pdu_session_container.rqi_qfi = 0;
+      ext_pdu_heaser->next_ext_header_type = 0;
+      _vec_len (t->rewrite) += (sizeof(ppf_gtpu_ext_pdu_header_t) + 4);
+    }
 
   return;
 }

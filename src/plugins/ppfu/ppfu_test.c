@@ -608,7 +608,7 @@ api_ppfu_plugin_bearer_update (vat_main_t * vam)
   mp->ue_bearer_id = clib_host_to_net_u32(ue_bearer_id);
   mp->transaction_id = clib_host_to_net_u32(transaction_id);
 
-  for (i = 0; i < MAX_SB_PER_CALL; i ++) {
+  for (i = 0; i < MAX_SB_PER_RB; i ++) {
 
 	memset (&(mp->sb[i]), 0, sizeof (vl_api_sb_path_context_t));
 	if (sb_del[i] == 1) 

@@ -409,6 +409,9 @@ typedef struct
       } path;
 
       u32 tunnel_id[VLIB_N_RX_TX_TUNNEL];
+      u32 tx_rb_index;
+      u32 qfi;
+      u32 rqi;
     } ppf_du_metadata;
   };
 } vnet_buffer_opaque2_t;

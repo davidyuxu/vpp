@@ -507,7 +507,9 @@ typedef struct
 
 #define PPFU_HANDOFF		0
 #define DEF_MAX_PPF_SESSION 100000
-#define MAX_SB_PER_CALL  3
+#define MAX_SB_PER_RB  8
+#define MAX_DRB_PER_SESSION 32
+#define MAX_QFI_COUNT 64 
 
 #define INVALID_TUNNEL_ID ~0
 
@@ -552,16 +554,26 @@ typedef union
   u64 as_u64;
 } ppf_srb_msg_id_t;
 
+typedef struct 
+{
+  ppf_pdcp_callline_t pdcp;
+  ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_RB];
+  u8 sb_multi_path;
+  u8 sb_policy;
+} ppf_rb_t;
+
 typedef struct
 {
   u64 *nb_out_msg_by_sn;	/* hash <PDCP SN> -> <transaction-id + request-id> */
-  ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_CALL];
+  //ppf_rb_t srb;
+  u32 srb;
 } ppf_srb_callline_t;
 
 typedef struct
 {
   ppf_gtpu_tunnel_id_type_t nb_tunnel;
-  ppf_gtpu_tunnel_id_type_t sb_tunnel[MAX_SB_PER_CALL];
+  //ppf_rb_t drb [MAX_DRB_PER_SESSION];
+  u32 drb[MAX_DRB_PER_SESSION];
 } ppf_drb_callline_t;
 
 typedef struct
@@ -569,8 +581,8 @@ typedef struct
   u32 session_id;
 } ppf_pdcp_callline_t;
 
-#define PPF_SB_COUNT_MASK             (0x03)	// pow2_mask(max_log2(MAX_SB_PER_CALL))
-#define PPF_SB_PATH_MASK              (0x07)	// pow2_mask(MAX_SB_PER_CALL)
+#define PPF_SB_COUNT_MASK             (0x03)	// pow2_mask(max_log2(MAX_SB_PER_RB))
+#define PPF_SB_PATH_MASK              (0x07)	// pow2_mask(MAX_SB_PER_RB)
 #define PPF_SB_PATH_GET_VALID(mp, i)  ((mp) & (i))
 #define PPF_SB_PATH_SET_VALID(mp, i)  ((mp) |= (1 << ((i) + 2)))
 #define PPF_SB_COUNT(mp)              ((mp) & PPF_SB_COUNT_MASK)
@@ -579,18 +591,20 @@ typedef struct
 typedef struct
 {
   u32 call_index;
+  u32 ue_bearer_id;
   ppf_calline_type_t call_type;
+    
   union
   {
-    ppf_drb_callline_t drb;
-    ppf_srb_callline_t srb;
+    ppf_drb_callline_t drb_call;
+    ppf_srb_callline_t srb_call;
   } rb;
-  ppf_pdcp_callline_t pdcp;
-  u8 sb_multi_path;
-  u8 sb_policy;
+
+  u32 qfi_to_drb_map[MAX_QFI_COUNT];
+  
+  //for lbo 
   u8 lbo_mode;
   u8 ue_mode;
-  u32 ue_bearer_id;
   u32 sw_if_index;
   u32 inner_vrf_id;
   u32 hw_if_index;
@@ -614,16 +628,21 @@ enum
   PPF_IO_MODE_DEDICATED
 };
 
+#define INVALID_RB_ID ~0
+
 typedef struct
 {
   ppf_callline_t *ppf_calline_table;
 
+  ppf_rb_t *rbs;/* pool of rb instances */
+  
   u32 handoff_enable;
   u32 io_mode;
   u32 max_capacity;
   u32 **buffers_duplicated_per_thread;
 
   u16 msg_id_base;
+  bool qos_enabled;
 } ppf_main_t;
 
 extern ppf_main_t ppf_main;

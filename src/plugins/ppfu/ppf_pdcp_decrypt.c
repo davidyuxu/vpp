@@ -114,6 +114,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
   	    ppf_gtpu_tunnel_t * t0 = 0, * t1 = 0, * t2 = 0, * t3 = 0;
 	    u32 call_id0 = 0, call_id1 = 0, call_id2 = 0, call_id3 = 0;
   	    ppf_callline_t * c0 = 0, * c1 = 0, * c2 = 0, *c3 = 0;
+            ppf_rb_t *rb0 = NULL, *rb1 = NULL, *rb2 = NULL, *rb3 = NULL;
 	    ppf_pdcp_session_t * pdcp0 = 0, * pdcp1 = 0, * pdcp2 = 0, * pdcp3 = 0;
 	    u8 * buf0, * buf1, * buf2, * buf3;
 	    u8 dc0 = 0, dc1 = 0, dc2 = 0, dc3 = 0;
@@ -123,7 +124,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
 	    u32 count0 = 0, count1 = 0, count2 = 0, count3 = 0;
 	    u32 count_last_fwd0 = 0, count_last_fwd1 = 0, count_last_fwd2 = 0, count_last_fwd3 = 0;
 	    u32 len0, len1, len2, len3;
-        ppf_pdcp_security_param_t sp0, sp1, sp2, sp3;
+            ppf_pdcp_security_param_t sp0, sp1, sp2, sp3;
 	    
 	    /* Prefetch next iteration. */
 	    {
@@ -189,7 +190,8 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           goto trace0;
         }
         t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
-
+        rb0 = pool_elt_at_index (pm->rbs, t0->rb_index);
+        
         /* Handle buffer 0 */
 
          /* Find callline */
@@ -203,7 +205,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         c0 = &(pm->ppf_calline_table[call_id0]);
         
         /* Find pdcp session */
-        pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
+        pdcp0 = pool_elt_at_index(ppm->sessions, rb0->pdcp.session_id);
         if (PREDICT_FALSE(0 == pdcp0->header_length)) {
           error0 = PPF_PDCP_DECRYPT_ERROR_BYPASSED;
           vnet_buffer2(b0)->ppf_du_metadata.pdcp.bypass_reorder = 1;
@@ -311,6 +313,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           goto trace1;
         }
         t1 = pool_elt_at_index (gtm->tunnels, tunnel_index1);
+        rb1 = pool_elt_at_index (pm->rbs, t1->rb_index);
 
         /* Handle buffer 1 */
 
@@ -325,7 +328,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         c1 = &(pm->ppf_calline_table[call_id1]);
         
         /* Find pdcp session */
-        pdcp1 = pool_elt_at_index(ppm->sessions, c1->pdcp.session_id);
+        pdcp1 = pool_elt_at_index(ppm->sessions, rb1->pdcp.session_id);
         if (PREDICT_FALSE(0 == pdcp1->header_length)) {
           error1 = PPF_PDCP_DECRYPT_ERROR_BYPASSED;
           vnet_buffer2(b1)->ppf_du_metadata.pdcp.bypass_reorder = 1;
@@ -433,6 +436,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           goto trace2;
         }
         t2 = pool_elt_at_index (gtm->tunnels, tunnel_index2);
+        rb2 = pool_elt_at_index (pm->rbs, t2->rb_index);
 
         /* Handle buffer 2 */
 
@@ -447,7 +451,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         c2 = &(pm->ppf_calline_table[call_id2]);
         
         /* Find pdcp session */
-        pdcp2 = pool_elt_at_index(ppm->sessions, c2->pdcp.session_id);
+        pdcp2 = pool_elt_at_index(ppm->sessions, rb2->pdcp.session_id);
         if (PREDICT_FALSE(0 == pdcp2->header_length)) {
           error2 = PPF_PDCP_DECRYPT_ERROR_BYPASSED;
           vnet_buffer2(b2)->ppf_du_metadata.pdcp.bypass_reorder = 1;
@@ -555,7 +559,8 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           goto trace3;
         }
         t3 = pool_elt_at_index (gtm->tunnels, tunnel_index3);
-
+        rb3 = pool_elt_at_index (pm->rbs, t3->rb_index);
+        
         /* Handle buffer 3 */
 
          /* Find callline */
@@ -569,7 +574,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         c3 = &(pm->ppf_calline_table[call_id3]);
         
         /* Find pdcp session */
-        pdcp3 = pool_elt_at_index(ppm->sessions, c3->pdcp.session_id);
+        pdcp3 = pool_elt_at_index(ppm->sessions, rb3->pdcp.session_id);
         if (PREDICT_FALSE(0 == pdcp3->header_length)) {
           error3 = PPF_PDCP_DECRYPT_ERROR_BYPASSED;
           vnet_buffer2(b3)->ppf_du_metadata.pdcp.bypass_reorder = 1;
@@ -684,6 +689,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         ppf_gtpu_tunnel_t * t0 = NULL;
         u32 call_id0 = 0;
         ppf_callline_t * c0 = NULL;
+        ppf_rb_t *rb0 = NULL;
         ppf_pdcp_session_t * pdcp0 = NULL;
         u8 * buf0;
         u8 dc0 = 0;
@@ -718,6 +724,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
           goto trace00;
         }
         t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
+        rb0 = pool_elt_at_index (pm->rbs, t0->rb_index);
 
         /* Handle buffer 0 */
 
@@ -732,7 +739,7 @@ ppf_pdcp_decrypt_inline (vlib_main_t * vm,
         c0 = &(pm->ppf_calline_table[call_id0]);
         
         /* Find pdcp session */
-        pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
+        pdcp0 = pool_elt_at_index(ppm->sessions, rb0->pdcp.session_id);
         if (PREDICT_FALSE(0 == pdcp0->header_length)) {
           error0 = PPF_PDCP_DECRYPT_ERROR_BYPASSED;
           vnet_buffer2(b0)->ppf_du_metadata.pdcp.bypass_reorder = 1;
@@ -951,6 +958,7 @@ ppf_pdcp_reorder_inline (vlib_main_t * vm,
         ppf_gtpu_tunnel_t * t0 = NULL;
         u32 call_id0 = 0;
         ppf_callline_t * c0 = NULL;
+        ppf_rb_t *rb0 = NULL;
         ppf_pdcp_session_t * pdcp0 = NULL;
         u32 sn0 = 0;
         u32 count0 = 0;
@@ -967,7 +975,7 @@ ppf_pdcp_reorder_inline (vlib_main_t * vm,
         b0 = vlib_get_buffer (vm, bi0);
         sn0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.sn;
         count0 = vnet_buffer2(b0)->ppf_du_metadata.pdcp.count;
-
+        
         /* Get tunnel index from buffer */
         tunnel_index0 = vnet_buffer2(b0)->ppf_du_metadata.tunnel_id[VLIB_RX_TUNNEL];
         
@@ -978,6 +986,8 @@ ppf_pdcp_reorder_inline (vlib_main_t * vm,
           goto trace00;
         }
         t0 = pool_elt_at_index (gtm->tunnels, tunnel_index0);
+        
+        rb0 = pool_elt_at_index (pm->rbs, t0->rb_index);
 
         /* Handle buffer 0 */
 
@@ -988,11 +998,11 @@ ppf_pdcp_reorder_inline (vlib_main_t * vm,
           next0 = PPF_PDCP_REORDER_NEXT_DROP;
           goto trace00;
         }
-    
+        
         c0 = &(pm->ppf_calline_table[call_id0]);
 
         /* Find pdcp session */
-        pdcp0 = pool_elt_at_index(ppm->sessions, c0->pdcp.session_id);
+        pdcp0 = pool_elt_at_index(ppm->sessions, rb0->pdcp.session_id);
         if (PREDICT_TRUE(1 == vnet_buffer2(b0)->ppf_du_metadata.pdcp.bypass_reorder)) {
           goto next00;
         }

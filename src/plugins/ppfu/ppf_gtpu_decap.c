@@ -225,7 +225,7 @@ ppf_gtpu_input (vlib_main_t * vm,
 			callline0 = &(pm->ppf_calline_table[t0->call_id]);
 
 			if (t0->tunnel_type == PPF_GTPU_SB) {
-				next_tunne_id0 = callline0->rb.drb.nb_tunnel.tunnel_id;
+				next_tunne_id0 = callline0->rb.drb_call.nb_tunnel.tunnel_id;
 			}
 
 			goto next0; /* valid packet */
@@ -272,7 +272,7 @@ ppf_gtpu_input (vlib_main_t * vm,
 			  callline0 = &(pm->ppf_calline_table[t0->call_id]);
 
 			  if (t0->tunnel_type == PPF_GTPU_SB) {	  
-				  next_tunne_id0 = callline0->rb.drb.nb_tunnel.tunnel_id;
+				  next_tunne_id0 = callline0->rb.drb_call.nb_tunnel.tunnel_id;
 			  }
 			  
 			  goto next0; /* valid packet */
@@ -287,21 +287,37 @@ ppf_gtpu_input (vlib_main_t * vm,
 	  /* Manipulate ppf_gtpu header */
 	  if (PREDICT_FALSE((ppf_gtpu0->ver_flags & PPF_GTPU_E_S_PN_BIT) != 0))
 	    {
+              u8 next_ext_type = 0;
+              u32 ext_head_len = 0;
+              ppf_gtpu_ext_pdu_header_t *pdu_header;
+              
 	      ppf_gtpu_hdr_len0 = sizeof(ppf_gtpu_header_t);
 
 	      /* Manipulate Sequence Number and N-PDU Number */
 	      /* TBD */
 
-	      /* Manipulate Next Extension Header */
-	      /* TBD */
-	      if (ppf_gtpu0->next_ext_type != 0)
-	        ppf_gtpu_hdr_len0 += 4;
+              next_ext_type = ppf_gtpu0->next_ext_type;
+              while (next_ext_type)
+                {
+                  if (next_ext_type == NEXT_EXT_HEADER_TYPE_PDU_SESSION)
+                        {
+                          pdu_header = (ppf_gtpu_ext_pdu_header_t *)(((u8 *)ppf_gtpu0) + ppf_gtpu_hdr_len0);
+                          vnet_buffer2(b0)->ppf_du_metadata.qfi = 
+                                PPF_GTPU_PDU_SESSION_QFI (pdu_header->pdu_session_container.rqi_qfi);
+                          vnet_buffer2(b0)->ppf_du_metadata.rqi = 
+                                PPF_GTPU_PDU_SESSION_RQI (pdu_header->pdu_session_container.rqi_qfi);
+                        }
+                  
+                  ext_head_len = *((u8 *)(((u8 *)ppf_gtpu0) + ppf_gtpu_hdr_len0));
+                  ppf_gtpu_hdr_len0 += (ext_head_len * 4);
+                  next_ext_type = *((u8 *)(((u8 *)ppf_gtpu0) + ppf_gtpu_hdr_len0 - 1));
+                }
 	    }
 	  else
 	    {
 	      ppf_gtpu_hdr_len0 = sizeof(ppf_gtpu_header_t) - 4;
 	    }
-
+        
 	  /* Pop ppf_gtpu header */
 	  vlib_buffer_advance (b0, ppf_gtpu_hdr_len0);
 
@@ -402,7 +418,7 @@ ppf_gtpu_input (vlib_main_t * vm,
 			callline1 = &(pm->ppf_calline_table[t1->call_id]);
 
 			if (t1->tunnel_type == PPF_GTPU_SB) {
-				next_tunne_id1 = callline1->rb.drb.nb_tunnel.tunnel_id;
+				next_tunne_id1 = callline1->rb.drb_call.nb_tunnel.tunnel_id;
 			}
 
 			goto next1; /* valid packet */
@@ -450,7 +466,7 @@ ppf_gtpu_input (vlib_main_t * vm,
 			callline1 = &(pm->ppf_calline_table[t1->call_id]);	
 
 			if (t1->tunnel_type == PPF_GTPU_SB) {
-				next_tunne_id1 = callline1->rb.drb.nb_tunnel.tunnel_id;
+				next_tunne_id1 = callline1->rb.drb_call.nb_tunnel.tunnel_id;
 			}
 
 			goto next1; /* valid packet */
@@ -465,15 +481,31 @@ ppf_gtpu_input (vlib_main_t * vm,
 	  /* Manipulate ppf_gtpu header */
 	  if (PREDICT_FALSE((ppf_gtpu1->ver_flags & PPF_GTPU_E_S_PN_BIT) != 0))
 	    {
+              u8 next_ext_type = 0;
+              u32 ext_head_len = 0;
+              ppf_gtpu_ext_pdu_header_t *pdu_header;
+              
 	      ppf_gtpu_hdr_len1 = sizeof(ppf_gtpu_header_t);
 
 	      /* Manipulate Sequence Number and N-PDU Number */
 	      /* TBD */
 
-	      /* Manipulate Next Extension Header */
-	      /* TBD */
-	      if (ppf_gtpu1->next_ext_type != 0)
-	        ppf_gtpu_hdr_len1 += 4;
+              next_ext_type = ppf_gtpu1->next_ext_type;
+              while (next_ext_type)
+                {
+                  if (next_ext_type == NEXT_EXT_HEADER_TYPE_PDU_SESSION)
+                        {
+                          pdu_header = (ppf_gtpu_ext_pdu_header_t *)(((u8 *)ppf_gtpu1) + ppf_gtpu_hdr_len1);
+                          vnet_buffer2(b1)->ppf_du_metadata.qfi = 
+                                PPF_GTPU_PDU_SESSION_QFI (pdu_header->pdu_session_container.rqi_qfi);
+                          vnet_buffer2(b1)->ppf_du_metadata.rqi = 
+                                PPF_GTPU_PDU_SESSION_RQI (pdu_header->pdu_session_container.rqi_qfi);
+                        }
+                  
+                  ext_head_len = *((u8 *)(((u8 *)ppf_gtpu1) + ppf_gtpu_hdr_len1));
+                  ppf_gtpu_hdr_len1 += (ext_head_len * 4);
+                  next_ext_type = *((u8 *)(((u8 *)ppf_gtpu1) + ppf_gtpu_hdr_len1 - 1));
+                }
 	    }
 	  else
 	    {
@@ -635,7 +667,7 @@ ppf_gtpu_input (vlib_main_t * vm,
 			  callline0 = &(pm->ppf_calline_table[t0->call_id]);
 			  
 			  if (t0->tunnel_type == PPF_GTPU_SB) {			  
-				  next_tunne_id0 = callline0->rb.drb.nb_tunnel.tunnel_id;
+				  next_tunne_id0 = callline0->rb.drb_call.nb_tunnel.tunnel_id;
 			  }
 			  
 			  goto next00; /* valid packet */
@@ -681,7 +713,7 @@ ppf_gtpu_input (vlib_main_t * vm,
 			  callline0 = &(pm->ppf_calline_table[t0->call_id]);
 			  
 			  if (t0->tunnel_type == PPF_GTPU_SB) {		  
-				  next_tunne_id0 = callline0->rb.drb.nb_tunnel.tunnel_id;
+				  next_tunne_id0 = callline0->rb.drb_call.nb_tunnel.tunnel_id;
 			  }
 			  
 			  goto next00; /* valid packet */
@@ -696,15 +728,31 @@ ppf_gtpu_input (vlib_main_t * vm,
 	  /* Manipulate ppf_gtpu header */
 	  if (PREDICT_FALSE((ppf_gtpu0->ver_flags & PPF_GTPU_E_S_PN_BIT) != 0))
 	    {
+	      u8 next_ext_type = 0;
+              u32 ext_head_len = 0;
+              ppf_gtpu_ext_pdu_header_t *pdu_header;
+              
 	      ppf_gtpu_hdr_len0 = sizeof(ppf_gtpu_header_t);
 
 	      /* Manipulate Sequence Number and N-PDU Number */
 	      /* TBD */
 
-	      /* Manipulate Next Extension Header */
-	      /* TBD */
-	      if (ppf_gtpu0->next_ext_type != 0)
-	        ppf_gtpu_hdr_len0 += 4;
+              next_ext_type = ppf_gtpu0->next_ext_type;
+              while (next_ext_type)
+                {
+                  if (next_ext_type == NEXT_EXT_HEADER_TYPE_PDU_SESSION)
+                        {
+                          pdu_header = (ppf_gtpu_ext_pdu_header_t *)(((u8 *)ppf_gtpu0) + ppf_gtpu_hdr_len0);
+                          vnet_buffer2(b0)->ppf_du_metadata.qfi = 
+                                PPF_GTPU_PDU_SESSION_QFI (pdu_header->pdu_session_container.rqi_qfi);
+                          vnet_buffer2(b0)->ppf_du_metadata.rqi = 
+                                PPF_GTPU_PDU_SESSION_RQI (pdu_header->pdu_session_container.rqi_qfi);
+                        }
+                  
+                  ext_head_len = *((u8 *)(((u8 *)ppf_gtpu0) + ppf_gtpu_hdr_len0));
+                  ppf_gtpu_hdr_len0 += (ext_head_len * 4);
+                  next_ext_type = *((u8 *)(((u8 *)ppf_gtpu0) + ppf_gtpu_hdr_len0 - 1));
+                }
 	    }
 	  else
 	    {

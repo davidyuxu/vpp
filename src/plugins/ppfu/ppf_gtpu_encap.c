@@ -103,27 +103,28 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 
       while (n_left_from >= 8 && n_left_to_next >= 4)
 	{
-		u32 bi0, bi1, bi2, bi3;
-		vlib_buffer_t * b0, * b1, * b2, * b3;
-		//u32 flow_hash0, flow_hash1, flow_hash2, flow_hash3;
-		u32 len0, len1, len2, len3;
-		ip4_header_t * ip4_0, * ip4_1, * ip4_2, * ip4_3;
-		ip6_header_t * ip6_0, * ip6_1, * ip6_2, * ip6_3;
-		udp_header_t * udp0, * udp1, * udp2, * udp3;
-		ppf_gtpu_header_t * ppf_gtpu0, * ppf_gtpu1, * ppf_gtpu2, * ppf_gtpu3;
-		u64 * copy_src0, * copy_dst0;
-		u64 * copy_src1, * copy_dst1;
-		u64 * copy_src2, * copy_dst2;
-		u64 * copy_src3, * copy_dst3;
-		u32 * copy_src_last0, * copy_dst_last0;
-		u32 * copy_src_last1, * copy_dst_last1;
-		u32 * copy_src_last2, * copy_dst_last2;
-		u32 * copy_src_last3, * copy_dst_last3;
-		u16 new_l0, new_l1, new_l2, new_l3;
-		CLIB_UNUSED(ip_csum_t sum0);
-		CLIB_UNUSED(ip_csum_t sum1);
-		CLIB_UNUSED(ip_csum_t sum2);
-		CLIB_UNUSED(ip_csum_t sum3);
+	  u32 bi0, bi1, bi2, bi3;
+	  vlib_buffer_t * b0, * b1, * b2, * b3;
+	  //u32 flow_hash0, flow_hash1, flow_hash2, flow_hash3;
+	  u32 len0, len1, len2, len3;
+	  ip4_header_t * ip4_0, * ip4_1, * ip4_2, * ip4_3;
+	  ip6_header_t * ip6_0, * ip6_1, * ip6_2, * ip6_3;
+	  udp_header_t * udp0, * udp1, * udp2, * udp3;
+	  ppf_gtpu_header_t * ppf_gtpu0, * ppf_gtpu1, * ppf_gtpu2, * ppf_gtpu3;
+          ppf_gtpu_ext_pdu_header_t * ext_pdu0, * ext_pdu1, * ext_pdu2, * ext_pdu3;
+	  u64 * copy_src0, * copy_dst0;
+	  u64 * copy_src1, * copy_dst1;
+	  u64 * copy_src2, * copy_dst2;
+	  u64 * copy_src3, * copy_dst3;
+	  u32 * copy_src_last0, * copy_dst_last0;
+	  u32 * copy_src_last1, * copy_dst_last1;
+	  u32 * copy_src_last2, * copy_dst_last2;
+	  u32 * copy_src_last3, * copy_dst_last3;
+	  u16 new_l0, new_l1, new_l2, new_l3;
+	  CLIB_UNUSED(ip_csum_t sum0);
+	  CLIB_UNUSED(ip_csum_t sum1);
+	  CLIB_UNUSED(ip_csum_t sum2);
+	  CLIB_UNUSED(ip_csum_t sum3);
 
 	  /* Prefetch next iteration. */
 	  {
@@ -175,36 +176,40 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  
 	  t0 = &gtm->tunnels[tid0];
    	  t1 = &gtm->tunnels[tid1];
-      t2 = &gtm->tunnels[tid2];
-      t3 = &gtm->tunnels[tid3];
+          t2 = &gtm->tunnels[tid2];
+          t3 = &gtm->tunnels[tid3];
 
 	  vnet_buffer (b0)->sw_if_index[VLIB_TX] = t0->encap_fib_index;
 	  vnet_buffer (b1)->sw_if_index[VLIB_TX] = t1->encap_fib_index;
 	  vnet_buffer (b2)->sw_if_index[VLIB_TX] = t2->encap_fib_index;
 	  vnet_buffer (b3)->sw_if_index[VLIB_TX] = t3->encap_fib_index;
 
-      /* Apply the rewrite string. $$$$ vnet_rewrite? */
-      vlib_buffer_advance (b0, -(word)_vec_len(t0->rewrite));
-      vlib_buffer_advance (b1, -(word)_vec_len(t1->rewrite));
-      vlib_buffer_advance (b2, -(word)_vec_len(t2->rewrite));
-      vlib_buffer_advance (b3, -(word)_vec_len(t3->rewrite));
+          /* Apply the rewrite string. $$$$ vnet_rewrite? */
+          vlib_buffer_advance (b0, -(word)_vec_len(t0->rewrite));
+          vlib_buffer_advance (b1, -(word)_vec_len(t1->rewrite));
+          vlib_buffer_advance (b2, -(word)_vec_len(t2->rewrite));
+          vlib_buffer_advance (b3, -(word)_vec_len(t3->rewrite));
 
-	  if (is_ip4)
+          if (is_ip4)
 	    {
-		  next0 = (t0->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
-					  PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
-		  next1 = (t1->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
-					  PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
-		  next2 = (t2->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
-					  PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
-		  next3 = (t3->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP:
-					  PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+	      next0 = (t0->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP : PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+              next1 = (t1->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP : PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+              next2 = (t2->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP : PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
+              next3 = (t3->is_ip6 == 1)? PPF_GTPU_ENCAP_NEXT_IP6_LOOKUP : PPF_GTPU_ENCAP_NEXT_IP4_LOOKUP;
 	    
 	      ip4_0 = vlib_buffer_get_current(b0);
 	      ip4_1 = vlib_buffer_get_current(b1);
 	      ip4_2 = vlib_buffer_get_current(b2);
 	      ip4_3 = vlib_buffer_get_current(b3);
-
+              udp0 = (udp_header_t *)(ip4_0+1);
+              udp1 = (udp_header_t *)(ip4_1+1);
+              udp2 = (udp_header_t *)(ip4_2+1);
+              udp3 = (udp_header_t *)(ip4_3+1);
+              ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
+              ppf_gtpu1 = (ppf_gtpu_header_t *)(udp1+1);
+              ppf_gtpu2 = (ppf_gtpu_header_t *)(udp2+1);
+              ppf_gtpu3 = (ppf_gtpu_header_t *)(udp3+1);
+              
 	      /* Copy the fixed header */
 	      copy_dst0 = (u64 *) ip4_0;
 	      copy_src0 = (u64 *) t0->rewrite;
@@ -229,96 +234,97 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      foreach_fixed_header4_offset;
 #undef _
 	      /* Last 4 octets. Hopefully gcc will be our friend */
-          copy_dst_last0 = (u32 *)(&copy_dst0[4]);
-          copy_src_last0 = (u32 *)(&copy_src0[4]);
-          copy_dst_last0[0] = copy_src_last0[0];
-          copy_dst_last1 = (u32 *)(&copy_dst1[4]);
-          copy_src_last1 = (u32 *)(&copy_src1[4]);
-          copy_dst_last1[0] = copy_src_last1[0];
-          copy_dst_last2 = (u32 *)(&copy_dst2[4]);
-          copy_src_last2 = (u32 *)(&copy_src2[4]);
-          copy_dst_last2[0] = copy_src_last2[0];
-          copy_dst_last3 = (u32 *)(&copy_dst3[4]);
-          copy_src_last3 = (u32 *)(&copy_src3[4]);
-          copy_dst_last3[0] = copy_src_last3[0];
+              copy_dst_last0 = (u32 *)(&copy_dst0[4]);
+              copy_src_last0 = (u32 *)(&copy_src0[4]);
+              copy_dst_last0[0] = copy_src_last0[0];
+              copy_dst_last1 = (u32 *)(&copy_dst1[4]);
+              copy_src_last1 = (u32 *)(&copy_src1[4]);
+              copy_dst_last1[0] = copy_src_last1[0];
+              copy_dst_last2 = (u32 *)(&copy_dst2[4]);
+              copy_src_last2 = (u32 *)(&copy_src2[4]);
+              copy_dst_last2[0] = copy_src_last2[0];
+              copy_dst_last3 = (u32 *)(&copy_dst3[4]);
+              copy_src_last3 = (u32 *)(&copy_src3[4]);
+              copy_dst_last3[0] = copy_src_last3[0];
 
-		  b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
-		  b1->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
-		  b2->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
-		  b3->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+              if ((ppf_gtpu0->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst_last0[1] = copy_src_last0[1];
+                  copy_dst_last0[2] = copy_src_last0[2];
+                }
+              if ((ppf_gtpu1->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst_last1[1] = copy_src_last1[1];
+                  copy_dst_last1[2] = copy_src_last1[2];
+                }  
+              if ((ppf_gtpu2->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst_last2[1] = copy_src_last2[1];
+                  copy_dst_last2[2] = copy_src_last2[2];
+                }  
+              if ((ppf_gtpu3->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst_last3[1] = copy_src_last3[1];
+                  copy_dst_last3[2] = copy_src_last3[2];
+                }
+
+              b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+              b1->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+              b2->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+              b3->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
 		
 	      /* Fix the IP4 checksum and length */
 	      sum0 = ip4_0->checksum;
 	      new_l0 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0));
-              sum0 = ip_csum_update (sum0, old_l0, new_l0, ip4_header_t,
-				     length /* changed member */);
+              sum0 = ip_csum_update (sum0, old_l0, new_l0, ip4_header_t, length /* changed member */);
 	      ip4_0->checksum = ip_csum_fold (sum0);
 	      ip4_0->length = new_l0;
 		  
 	      sum1 = ip4_1->checksum;
 	      new_l1 = /* old_l1 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b1));
-              sum1 = ip_csum_update (sum1, old_l1, new_l1, ip4_header_t,
-				     length /* changed member */);
+              sum1 = ip_csum_update (sum1, old_l1, new_l1, ip4_header_t, length /* changed member */);
 	      ip4_1->checksum = ip_csum_fold (sum1);
 	      ip4_1->length = new_l1;
 
 	      sum2 = ip4_2->checksum;
 	      new_l2 = /* old_l0 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b2));
-              sum2 = ip_csum_update (sum2, old_l2, new_l2, ip4_header_t,
-				     length /* changed member */);
+              sum2 = ip_csum_update (sum2, old_l2, new_l2, ip4_header_t, length /* changed member */);
 	      ip4_2->checksum = ip_csum_fold (sum2);
 	      ip4_2->length = new_l2;
 		  
 	      sum3 = ip4_3->checksum;
 	      new_l3 = /* old_l1 always 0, see the rewrite setup */
                 clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b3));
-              sum3 = ip_csum_update (sum3, old_l3, new_l3, ip4_header_t,
-				     length /* changed member */);
+              sum3 = ip_csum_update (sum3, old_l3, new_l3, ip4_header_t, length /* changed member */);
 	      ip4_3->checksum = ip_csum_fold (sum3);
 	      ip4_3->length = new_l3;
 
 	      /* Fix UDP length and set source port */
-	      udp0 = (udp_header_t *)(ip4_0+1);
-	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0));
-	      udp0->length = new_l0;
+	      udp0->length = 
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0) - sizeof (*ip4_0));
 	      //udp0->src_port = flow_hash0;
-	      udp1 = (udp_header_t *)(ip4_1+1);
-	      new_l1 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1)
-					     - sizeof (*ip4_1));
-	      udp1->length = new_l1;
+	      udp1->length = 
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1) - sizeof (*ip4_1));
 	      //udp1->src_port = flow_hash1;
-	      udp2 = (udp_header_t *)(ip4_2+1);
-	      new_l2 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
-					     - sizeof (*ip4_2));
-	      udp2->length = new_l2;
+	      udp2->length = 
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2) - sizeof (*ip4_2));
 	      //udp2->src_port = flow_hash2;
-	      udp3 = (udp_header_t *)(ip4_3+1);
-	      new_l3 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
-					     - sizeof (*ip4_3));
-	      udp3->length = new_l3;
+	      udp3->length = 
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3) - sizeof (*ip4_3));
 	      //udp3->src_port = flow_hash3;
 
 	      /* Fix GTPU length */
-	      ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
-	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0) - sizeof(*udp0) - 8);
-	      ppf_gtpu0->length = new_l0;
-	      ppf_gtpu1 = (ppf_gtpu_header_t *)(udp1+1);
-	      new_l1 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1)
-					     - sizeof (*ip4_1) - sizeof(*udp1) - 8);
-	      ppf_gtpu1->length = new_l1;
-	      ppf_gtpu2 = (ppf_gtpu_header_t *)(udp2+1);
-	      new_l2 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
-					     - sizeof (*ip4_2) - sizeof(*udp2) - 8);
-	      ppf_gtpu2->length = new_l2;
-	      ppf_gtpu3 = (ppf_gtpu_header_t *)(udp3+1);
-	      new_l3 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
-					     - sizeof (*ip4_3) - sizeof(*udp3) - 8);
-	      ppf_gtpu3->length = new_l3;
+	      ppf_gtpu0->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
+					              - sizeof (*ip4_0) - sizeof(*udp0) - 8);
+	      ppf_gtpu1->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1)
+					              - sizeof (*ip4_1) - sizeof(*udp1) - 8);
+	      ppf_gtpu2->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
+					              - sizeof (*ip4_2) - sizeof(*udp2) - 8);
+	      ppf_gtpu3->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
+					              - sizeof (*ip4_3) - sizeof(*udp3) - 8);
 	    }
 	  else /* ipv6 */
 	    {
@@ -328,6 +334,14 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      ip6_1 = vlib_buffer_get_current(b1);
 	      ip6_2 = vlib_buffer_get_current(b2);
 	      ip6_3 = vlib_buffer_get_current(b3);
+              udp0 = (udp_header_t *)(ip6_0+1);
+              udp1 = (udp_header_t *)(ip6_1+1);
+              udp2 = (udp_header_t *)(ip6_2+1);
+              udp3 = (udp_header_t *)(ip6_3+1);
+	      ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
+	      ppf_gtpu1 = (ppf_gtpu_header_t *)(udp1+1);
+	      ppf_gtpu2 = (ppf_gtpu_header_t *)(udp2+1);
+	      ppf_gtpu3 = (ppf_gtpu_header_t *)(udp3+1);
 
 	      /* Copy the fixed header */
 	      copy_dst0 = (u64 *) ip6_0;
@@ -351,76 +365,111 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 #define _(offs) copy_dst3[offs] = copy_src3[offs];
 	      foreach_fixed_header6_offset;
 #undef _
+              if ((ppf_gtpu0->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst0[7] = copy_src0[7];
+                }
+              if ((ppf_gtpu1->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst1[7] = copy_src1[7];
+                }  
+              if ((ppf_gtpu2->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst2[7] = copy_src2[7];
+                }  
+              if ((ppf_gtpu3->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst3[7] = copy_src3[7];
+                }
+              
 	      /* Fix IP6 payload length */
 	      new_l0 =
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0)
-				      - sizeof(*ip6_0));
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0) - sizeof(*ip6_0));
 	      ip6_0->payload_length = new_l0;
 	      new_l1 =
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b1)
-				      - sizeof(*ip6_1));
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b1) - sizeof(*ip6_1));
 	      ip6_1->payload_length = new_l1;
 	      new_l2 =
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b2)
-				      - sizeof(*ip6_2));
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b2) - sizeof(*ip6_2));
 	      ip6_2->payload_length = new_l2;
 	      new_l3 =
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b3)
-				      - sizeof(*ip6_3));
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b3) - sizeof(*ip6_3));
 	      ip6_3->payload_length = new_l3;
 
 	      /* Fix UDP length  and set source port */
-	      udp0 = (udp_header_t *)(ip6_0+1);
 	      udp0->length = new_l0;
 	      //udp0->src_port = flow_hash0;
-	      udp1 = (udp_header_t *)(ip6_1+1);
 	      udp1->length = new_l1;
 	      //udp1->src_port = flow_hash1;
-	      udp2 = (udp_header_t *)(ip6_2+1);
 	      udp2->length = new_l2;
 	      //udp2->src_port = flow_hash2;
-	      udp3 = (udp_header_t *)(ip6_3+1);
 	      udp3->length = new_l3;
 	      //udp3->src_port = flow_hash3;
 
 	      /* IPv6 UDP checksum is mandatory */
-	      udp0->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b0,
-								 ip6_0, &bogus);
+	      udp0->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b0, ip6_0, &bogus);
 	      if (udp0->checksum == 0)
 		udp0->checksum = 0xffff;
-	      udp1->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b1,
-                                                        ip6_1, &bogus);
+	      udp1->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b1, ip6_1, &bogus);
 	      if (udp1->checksum == 0)
 		udp1->checksum = 0xffff;
-	      udp2->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b2,
-								 ip6_2, &bogus);
+	      udp2->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b2, ip6_2, &bogus);
 	      if (udp2->checksum == 0)
 		udp2->checksum = 0xffff;
-	      udp3->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b3,
-                                                        ip6_3, &bogus);
+	      udp3->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b3, ip6_3, &bogus);
 	      if (udp3->checksum == 0)
 		udp3->checksum = 0xffff;
 
 	      /* Fix GTPU length */
-	      ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
-	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0) - sizeof(*udp0) - 8);
-	      ppf_gtpu0->length = new_l0;
-	      ppf_gtpu1 = (ppf_gtpu_header_t *)(udp1+1);
-	      new_l1 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1)
-					     - sizeof (*ip4_1) - sizeof(*udp1) - 8);
-	      ppf_gtpu1->length = new_l1;
-	      ppf_gtpu2 = (ppf_gtpu_header_t *)(udp2+1);
-	      new_l2 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
-					     - sizeof (*ip4_2) - sizeof(*udp2) - 8);
-	      ppf_gtpu2->length = new_l2;
-	      ppf_gtpu3 = (ppf_gtpu_header_t *)(udp3+1);
-	      new_l3 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
-					     - sizeof (*ip4_3) - sizeof(*udp3) - 8);
-	      ppf_gtpu3->length = new_l3;
+	      ppf_gtpu0->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
+					     - sizeof (*ip6_0) - sizeof(*udp0) - 8);
+	      ppf_gtpu1->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b1)
+					     - sizeof (*ip6_1) - sizeof(*udp1) - 8);
+	      ppf_gtpu2->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b2)
+					     - sizeof (*ip6_2) - sizeof(*udp2) - 8);
+	      ppf_gtpu3->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b3)
+					     - sizeof (*ip6_3) - sizeof(*udp3) - 8);
 	    }
+          
+          /* Fix ext PDU header */
+          if ((ppf_gtpu0->ver_flags & PPF_GTPU_E_BIT) != 0)
+            {
+              ext_pdu0 = ppf_gtpu_ext_pdu_header_t(ppf_gtpu0 + 1);
+              ext_pdu0->pdu_session_container.rqi_qfi = 
+                    PPF_GTPU_PDU_SESSION_RQI_QFI (vnet_buffer2(b0)->ppf_du_metadata.rqi, vnet_buffer2(b0)->ppf_du_metadata.qfi);
+              ext_pdu0->pdu_session_container.pdu_type = 
+                    vnet_buffer2(b0)->ppf_du_metadata.rqi ? (1 << 4) : 0;
+              ppf_gtpu0->length -= 8;
+            }
+          if ((ppf_gtpu1->ver_flags & PPF_GTPU_E_BIT) != 0)
+            {
+              ext_pdu1 = ppf_gtpu_ext_pdu_header_t(ppf_gtpu1 + 1);
+              ext_pdu1->pdu_session_container.rqi_qfi = 
+                    PPF_GTPU_PDU_SESSION_RQI_QFI (vnet_buffer2(b1)->ppf_du_metadata.rqi, vnet_buffer2(b1)->ppf_du_metadata.qfi);
+              ext_pdu1->pdu_session_container.pdu_type = 
+                    vnet_buffer2(b1)->ppf_du_metadata.rqi ? (1 << 4) : 0;
+              ppf_gtpu1->length -= 8;
+            }  
+          if ((ppf_gtpu2->ver_flags & PPF_GTPU_E_BIT) != 0)
+            {
+              ext_pdu2 = ppf_gtpu_ext_pdu_header_t(ppf_gtpu2 + 1);
+              ext_pdu2->pdu_session_container.rqi_qfi = 
+                    PPF_GTPU_PDU_SESSION_RQI_QFI (vnet_buffer2(b2)->ppf_du_metadata.rqi, vnet_buffer2(b2)->ppf_du_metadata.qfi);
+              ext_pdu2->pdu_session_container.pdu_type = 
+                    vnet_buffer2(b2)->ppf_du_metadata.rqi ? (1 << 4) : 0;
+              ppf_gtpu2->length -= 8;
+            }  
+          if ((ppf_gtpu3->ver_flags & PPF_GTPU_E_BIT) != 0)
+            {
+              ext_pdu3 = ppf_gtpu_ext_pdu_header_t(ppf_gtpu3 + 1);
+              ext_pdu3->pdu_session_container.rqi_qfi = 
+                    PPF_GTPU_PDU_SESSION_RQI_QFI (vnet_buffer2(b3)->ppf_du_metadata.rqi, vnet_buffer2(b3)->ppf_du_metadata.qfi);
+              ext_pdu3->pdu_session_container.pdu_type = 
+                    vnet_buffer2(b3)->ppf_du_metadata.rqi ? (1 << 4) : 0;
+              ppf_gtpu3->length -= 8;
+            }
 
-      pkts_encapsulated += 4;
+          pkts_encapsulated += 4;
  	  len0 = vlib_buffer_length_in_chain (vm, b0);
  	  len1 = vlib_buffer_length_in_chain (vm, b1);
  	  len2 = vlib_buffer_length_in_chain (vm, b2);
@@ -519,6 +568,7 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  ip6_header_t * ip6_0;
 	  udp_header_t * udp0;
 	  ppf_gtpu_header_t * ppf_gtpu0;
+          ppf_gtpu_ext_pdu_header_t * ext_pdu0;
 	  u64 * copy_src0, * copy_dst0;
 	  u32 * copy_src_last0, * copy_dst_last0;
 	  u16 new_l0;
@@ -550,8 +600,10 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	  if (is_ip4)
 	    {
 	      ip4_0 = vlib_buffer_get_current(b0);
+              udp0 = (udp_header_t *)(ip4_0+1);
+              ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
 
-	      /* Copy the fixed header */
+              /* Copy the fixed header */
 	      copy_dst0 = (u64 *) ip4_0;
 	      copy_src0 = (u64 *) t0->rewrite;
 	      /* Copy first 32 octets 8-bytes at a time */
@@ -559,11 +611,17 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      foreach_fixed_header4_offset;
 #undef _
 	      /* Last 4 octets. Hopefully gcc will be our friend */
-          copy_dst_last0 = (u32 *)(&copy_dst0[4]);
-          copy_src_last0 = (u32 *)(&copy_src0[4]);
-          copy_dst_last0[0] = copy_src_last0[0];
+              copy_dst_last0 = (u32 *)(&copy_dst0[4]);
+              copy_src_last0 = (u32 *)(&copy_src0[4]);
+              copy_dst_last0[0] = copy_src_last0[0];
 
-          b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
+              if ((ppf_gtpu0->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst_last0[1] = copy_src_last0[1];
+                  copy_dst_last0[2] = copy_src_last0[2];
+                }
+
+              b0->flags |= VNET_BUFFER_F_LOCALLY_ORIGINATED;
 
 	      /* Fix the IP4 checksum and length */
 	      sum0 = ip4_0->checksum;
@@ -575,54 +633,64 @@ ppf_gtpu_encap_inline (vlib_main_t * vm,
 	      ip4_0->length = new_l0;
 
 	      /* Fix UDP length and set source port */
-	      udp0 = (udp_header_t *)(ip4_0+1);
-	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0));
-	      udp0->length = new_l0;
+	      udp0->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
+					           - sizeof (*ip4_0));
 	      //udp0->src_port = flow_hash0;
 
 	      /* Fix GTPU length */
-	      ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
-	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0) - sizeof(*udp0) - 8);
-	      ppf_gtpu0->length = new_l0;
+	      ppf_gtpu0->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
+					                - sizeof (*ip4_0) - sizeof(*udp0) - 8);
 	    }
-
 	  else /* ip6 path */
 	    {
               int bogus = 0;
 
 	      ip6_0 = vlib_buffer_get_current(b0);
+              udp0 = (udp_header_t *)(ip6_0+1);
+              ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
+
 	      /* Copy the fixed header */
 	      copy_dst0 = (u64 *) ip6_0;
 	      copy_src0 = (u64 *) t0->rewrite;
+              
 	      /* Copy first 56 (ip6) octets 8-bytes at a time */
 #define _(offs) copy_dst0[offs] = copy_src0[offs];
 	      foreach_fixed_header6_offset;
 #undef _
+              if ((ppf_gtpu0->ver_flags & PPF_GTPU_E_BIT) != 0)
+                {
+                  copy_dst0[7] = copy_src0[7];
+                }
+              
 	      /* Fix IP6 payload length */
 	      new_l0 =
-                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0)
-				      - sizeof(*ip6_0));
+                clib_host_to_net_u16 (vlib_buffer_length_in_chain (vm, b0) - sizeof(*ip6_0));
 	      ip6_0->payload_length = new_l0;
 
 	      /* Fix UDP length  and set source port */
-	      udp0 = (udp_header_t *)(ip6_0+1);
 	      udp0->length = new_l0;
 	      udp0->src_port = flow_hash0;
 
 	      /* IPv6 UDP checksum is mandatory */
-	      udp0->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b0,
-								 ip6_0, &bogus);
+	      udp0->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b0, ip6_0, &bogus);
 	      if (udp0->checksum == 0)
 		udp0->checksum = 0xffff;
 
 	      /* Fix GTPU length */
-	      ppf_gtpu0 = (ppf_gtpu_header_t *)(udp0+1);
-	      new_l0 = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
-					     - sizeof (*ip4_0) - sizeof(*udp0) - 8);
-	      ppf_gtpu0->length = new_l0;
+	      ppf_gtpu0->length = clib_host_to_net_u16 (vlib_buffer_length_in_chain(vm, b0)
+					                - sizeof (*ip6_0) - sizeof(*udp0) - 8);
 	    }
+          
+          /* Fix ext PDU header */
+          if ((ppf_gtpu0->ver_flags & PPF_GTPU_E_BIT) != 0)
+            {
+              ext_pdu0 = ppf_gtpu_ext_pdu_header_t(ppf_gtpu0 + 1);
+              ext_pdu0->pdu_session_container.rqi_qfi = 
+                    PPF_GTPU_PDU_SESSION_RQI_QFI (vnet_buffer2(b0)->ppf_du_metadata.rqi, vnet_buffer2(b0)->ppf_du_metadata.qfi);
+              ext_pdu0->pdu_session_container.pdu_type = 
+                    vnet_buffer2(b0)->ppf_du_metadata.rqi ? (1 << 4) : 0;
+              ppf_gtpu0->length -= 8;
+            }
 
 	  pkts_encapsulated ++;
 	  len0 = vlib_buffer_length_in_chain (vm, b0);
