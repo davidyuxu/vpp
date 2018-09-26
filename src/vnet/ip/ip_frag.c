@@ -245,6 +245,7 @@ ip4_frag (vlib_main_t * vm, vlib_node_runtime_t * node, vlib_frame_t * frame)
 	  vlib_buffer_t *p0;
 	  ip_frag_error_t error0;
 	  ip4_frag_next_t next0;
+	  u32 trace_flags = 0;
 
 	  //Note: The packet is not enqueued now.
 	  //It is instead put in a vector where other fragments
@@ -266,6 +267,8 @@ ip4_frag (vlib_main_t * vm, vlib_node_runtime_t * node, vlib_frame_t * frame)
 	      tr->ipv6 = 0;
 	      tr->n_fragments = vec_len (buffer);
 	      tr->next = vnet_buffer (p0)->ip_frag.next_index;
+
+	      trace_flags = VLIB_BUFFER_IS_TRACED;
 	    }
 
 	  if (error0 == IP_FRAG_ERROR_DONT_FRAGMENT_SET)
@@ -310,7 +313,10 @@ ip4_frag (vlib_main_t * vm, vlib_node_runtime_t * node, vlib_frame_t * frame)
 		  to_next += 1;
 		  n_left_to_next -= 1;
 
-		  vlib_get_buffer (vm, i)->error = error_node->errors[error0];
+		  vlib_buffer_t * b = vlib_get_buffer (vm, i);
+
+		  b->error = error_node->errors[error0];
+		  b->flags |= trace_flags;
 		  vlib_validate_buffer_enqueue_x1 (vm, node, next_index,
 						   to_next, n_left_to_next, i,
 						   next0);
